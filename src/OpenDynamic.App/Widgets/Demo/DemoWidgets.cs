@@ -17,16 +17,15 @@ public sealed class DemoWidgetA : IslandWidgetBase
 
     private bool _shouldThrowOnView;
 
-    public DemoWidgetA(int priority = 70) : base(priority)
+    public DemoWidgetA(int priority = 70, bool startActive = true) : base(priority)
     {
         CurrentActivity = new IslandActivity(
-            Id: Id,
+            SourceId: Id,
             Title: "Bohemian Rhapsody",
             Subtitle: "Queen - A Night at the Opera",
             Priority: priority);
 
-        // Active by default for immediate manual testing
-        IsActive = true;
+        IsActive = startActive;
     }
 
     public void ToggleActive()
@@ -195,16 +194,15 @@ public sealed class DemoWidgetB : IslandWidgetBase
 
     private bool _shouldThrowOnView;
 
-    public DemoWidgetB(int priority = 50) : base(priority)
+    public DemoWidgetB(int priority = 50, bool startActive = true) : base(priority)
     {
         CurrentActivity = new IslandActivity(
-            Id: Id,
+            SourceId: Id,
             Title: "Temporizador",
             Subtitle: "12:45 restantes",
             Priority: priority);
 
-        // Active by default for immediate manual testing in Split
-        IsActive = true;
+        IsActive = startActive;
     }
 
     public void ToggleActive()
