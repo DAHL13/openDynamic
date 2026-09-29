@@ -3,6 +3,51 @@
 Todas las modificaciones notables en este proyecto serán documentadas en este archivo.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y cumple con [SemVer](https://semver.org/).
 
+## [0.6.0] - 2026-09-28 (Fase 5: Volumen, Batería y Pantalla Completa)
+
+### Añadido
+- Modelos de dominio y contratos puros de audio en `OpenDynamic.Core.Audio` (Regla de oro 5):
+  - `IVolumeController`: Contrato puro para lectura, modificación relativa/absoluta, mute y eventos de volumen.
+  - `VolumeChangedEventArgs`: Argumentos inmutables de cambio de volumen y estado de mute.
+  - `VolumeIconType`: Categorización de icono de altavoz (`Muted`, `Low`, `Medium`, `High`).
+  - `VolumeCalculator`: Lógica pura de cálculo y normalización `[0.0, 1.0]`, cálculo de pasos por rueda del ratón (`CalculateLevelStep`), porcentaje entero `[0, 100]` y selección de icono.
+- Modelos de dominio y tracker de alertas de energía en `OpenDynamic.Core.Power` (Regla de oro 5):
+  - `IBatteryMonitor`: Contrato para monitoreo reactivo de energía y eventos de alerta sin polling.
+  - `BatterySnapshot`: Snapshot inmutable de estado de batería (`Percent`, `IsCharging`, `HasBattery`).
+  - `BatteryAlertKind`: Categorías de alerta (`None`, `ChargerConnected`, `ChargerDisconnected`, `LowBattery`, `CriticalBattery`).
+  - `BatteryThresholdTracker`: Tracker puro de cruce de umbrales con histéresis (2%) que garantiza una sola notificación por cruce al descender del 20% y del 10% sin re-notificar en fluctuaciones de voltaje, con reinicio al conectar el cargador o subir por encima del umbral.
+- Detección geométrica y de estado en `OpenDynamic.Core.Windowing`:
+  - `FullscreenDetector`: Lógica pura para evaluar estados `QUNS_*` de Windows y cobertura completa de ventana sobre monitor (juegos y reproductores sin bordes).
+- Configuración extendida en `AppSettings`:
+  - `DefaultVolumePriority = 80`, `VolumeTransientDurationSeconds = 2.0`.
+  - `DefaultBatteryPriority = 90`, `BatteryChargerTransientDurationSeconds = 3.0`, `BatteryWarningTransientDurationSeconds = 3.0`.
+  - `BatteryLowThresholdPercent = 20`, `BatteryCriticalThresholdPercent = 10`.
+  - `HideOnFullscreen = true`.
+- Servicio nativo de audio `VolumeService` en `OpenDynamic.App.Services`:
+  - Implementación con NAudio (`MMDeviceEnumerator`, `AudioEndpointVolume`).
+  - Soporte de cambio de dispositivo en caliente mediante registro COM nativo de `IMMNotificationClient`.
+  - Todas las operaciones COM encapsuladas en `try/catch` con registro estructurado en Serilog (Regla de oro 4).
+- Widget de volumen transitorio `VolumeWidget` y vistas en `OpenDynamic.App.Widgets.Volume`:
+  - Actividad transitoria (Prioridad 80, duración 2.0 s).
+  - Vistas `Compact`, `Expanded` y `Split` con iconos reactivos y barra de volumen elegante.
+  - Interacción directa con la rueda del ratón sobre la cápsula para ajustar volumen y reiniciar inmediatamente el temporizador de gracia de 2 segundos.
+- Servicio reactivo de energía `PowerService` en `OpenDynamic.App.Services`:
+  - Escucha de mensajes `WM_POWERBROADCAST` en el `WndProc` de `IslandWindow`.
+  - Registro de notificaciones Win32 `RegisterPowerSettingNotification` (`GUID_ACDC_POWER_SOURCE` y `GUID_BATTERY_PERCENTAGE_REMAINING`).
+  - Cero polling (Regla de oro 1: CPU ~0% en reposo, ningún timer periódico).
+- Widget de batería transitorio `BatteryWidget` y vistas en `OpenDynamic.App.Widgets.Battery`:
+  - Actividad transitoria (Prioridad 90, duración 3.0 s).
+  - Alertas visuales inmediatas al conectar o desconectar el cargador y al cruzar los umbrales de 20% y 10%.
+- Detector de pantalla completa `FullscreenWatcher` en `OpenDynamic.App.Windowing`:
+  - Detección combinada de `SHQueryUserNotificationState` y `EVENT_SYSTEM_FOREGROUND` con `SetWinEventHook`.
+  - Detección de juegos exclusivos DirectX/Vulkan y aplicaciones maximizadas sin bordes (YouTube en navegador, VLC).
+  - Ocultamiento inmediato de la isla (`SuspendForFullscreen`), cancelación de timers activos y congelación del animador (`SnapTo(Hidden)`). Restauración suave al salir de pantalla completa (`ResumeFromFullscreen`).
+- Suite de 43 nuevas pruebas unitarias en `OpenDynamic.Tests` (131 pruebas en verde en total):
+  - `VolumeCalculatorTests`: Normalización, pasos con rueda del ratón, porcentaje y categorías de icono.
+  - `BatteryThresholdTrackerTests`: Alertas de cargador, cruce único de umbrales 20% y 10%, histéresis ante fluctuaciones, reseteo al conectar cargador e ignorar PCs sin batería.
+  - `PriorityResolverPhase5Tests`: Precedencia de Volumen (80) sobre Media (30), Batería (90) sobre Volumen (80), y auto-expiración / reinicio de tiempo de vida.
+  - `FullscreenDetectorTests`: Detección de estados `QUNS_*` y evaluación de geometría de ventana vs monitor.
+
 ## [0.5.0] - 2026-09-28 (Fase 4: Widget Multimedia - GSMTC)
 
 ### Añadido
