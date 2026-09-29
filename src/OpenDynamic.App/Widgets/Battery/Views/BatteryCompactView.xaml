@@ -73,19 +73,22 @@
             </StackPanel>
         </Grid>
 
-        <!-- Textual Alert Details -->
+        <!-- Textual Alert Details (Polite live announcement) -->
         <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,6,0">
             <TextBlock Text="{Binding Title}"
-                       Foreground="#FFFFFFFF"
+                       Foreground="{DynamicResource AppTextPrimaryBrush}"
                        FontSize="10.5"
                        FontWeight="SemiBold"
                        TextTrimming="CharacterEllipsis"
-                       TextWrapping="NoWrap" />
+                       TextWrapping="NoWrap"
+                       AutomationProperties.LiveSetting="Polite"
+                       AutomationProperties.Name="{Binding Title}" />
             <TextBlock Text="{Binding Subtitle}"
-                       Foreground="#FFAAAAAA"
+                       Foreground="{DynamicResource AppTextSecondaryBrush}"
                        FontSize="9"
                        TextTrimming="CharacterEllipsis"
-                       TextWrapping="NoWrap" />
+                       TextWrapping="NoWrap"
+                       AutomationProperties.Name="{Binding Subtitle}" />
         </StackPanel>
 
         <!-- Right Accent (Lightning bolt if charging, or percent) -->

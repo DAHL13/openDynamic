@@ -33,6 +33,8 @@ La estrategia de aseguramiento de calidad de **openDynamic** se sustenta en tres
 | **UT-10** | `OpenDynamic.Core.Positioning` | Geometría en 1080p, 1440p, 4K y DPI escalas 100-200% | Posicionamiento centrado horizontalmente y coordenadas físicas exactas calculadas con `IslandPositionCalculator`. | **PASA** |
 | **UT-11** | `OpenDynamic.Core.Positioning` | Multi-monitor con DPI mixto y monitores a la izquierda | Soporta coordenadas virtuales negativas y factores de escala heterogéneos sin recortes ni desalineación. | **PASA** |
 | **UT-12** | `OpenDynamic.Core.Positioning` | Fallback seguro ante monitor desconectado | Cuando el monitor destino ya no existe, calcula coordenadas seguras centradas en el monitor principal. | **PASA** |
+| **UT-13** | `OpenDynamic.Core.Animation` | Resolución y física de `MotionProfile` (`MotionProfileTests`) | Modo reducido produce amortiguamiento crítico ($\zeta = 1.0$) con 0.0% overshoot en subida y bajada; modo completo produce rebote elástico. | **PASA** |
+| **UT-14** | `OpenDynamic.Core.Settings` | Migración de esquemas v1/v2 a v3 (`SettingsServiceTests`) | Carga de configuraciones anteriores preserva ajustes de usuario y asigna `MotionMode.Auto` con SchemaVersion 3. | **PASA** |
 
 ---
 
@@ -56,7 +58,7 @@ La estrategia de aseguramiento de calidad de **openDynamic** se sustenta en tres
 
 | ID | Categoría | Caso de Prueba / Escenario | Procedimiento de Validación | Pasa / Falla | Notas del Tester |
 |---|---|---|---|:---:|---|
-| **MAN-01** | Pantallas | **Resolución 1080p (Full HD)** | Configurar pantalla en 1920x1080 @ 100%. Verificar centrado horizontal y margen superior de 8 DIP. | [ ] | |
+| **MAN-01** | Pantallas | **Resolución 1080p (Full HD)** | Configurar pantalla en 1920x1080 @ 100%. Verificar centrado horizontal y anclaje superior exacto. | [ ] | |
 | **MAN-02** | Pantallas | **Resolución 1440p (QHD)** | Configurar pantalla en 2560x1440 @ 100% y 125%. Verificar alineación de la cápsula. | [ ] | |
 | **MAN-03** | Pantallas | **Resolución 4K (UHD)** | Configurar pantalla en 3840x2160 @ 150% y 200%. Verificar escalado de fuentes y nitidez de iconos. | [ ] | |
 | **MAN-04** | Pantallas | **Escalado DPI Heterogéneo (100% / 125% / 150% / 200%)** | Alternar escala en Ajustes de Windows. Confirmar que la cápsula se redimensiona proporcionalmente vía `WM_DPICHANGED`. | [ ] | |
@@ -68,10 +70,14 @@ La estrategia de aseguramiento de calidad de **openDynamic** se sustenta en tres
 | **MAN-10** | Shell | **Reinicio del Explorador (`TaskbarCreated`)** | Finalizar `explorer.exe` desde el Administrador de Tareas y reiniciarlo (`Archivo > Ejecutar > explorer`). Verificar que el icono de bandeja reaparece intacto. | [ ] | |
 | **MAN-11** | Sesión | **Bloqueo de Sesión (Win + L)** | Bloquear Windows con `Win+L` y desbloquear. Verificar que la cápsula mantiene su estado visual y no se desplaza. | [ ] | |
 | **MAN-12** | Pantalla Completa | **Juegos o Video en Pantalla Completa** | Abrir video en YouTube a pantalla completa o un videojuego. Verificar que la cápsula se oculta automáticamente (0% CPU). | [ ] | |
-| **MAN-13** | UI / Ajustes | **Contraste de ComboBox de Monitores** | Abrir ventana de Ajustes y desplegar el ComboBox de monitores. Verificar fondo oscuro (#1C1C1E / #2C2C2E), texto blanco (#FFFFFF) y resaltado azul sin fondos blancos nativos. | [ ] | |
-| **MAN-14** | UI / Ajustes | **Actualizaciones en Vivo (Sliders)** | Mover sliders de Offset X, Offset Y, Ancho y Alto. Verificar movimiento elástico en tiempo real de la cápsula flotante. | [ ] | |
+| **MAN-13** | UI / Ajustes | **Contraste de ComboBox de Monitores y Modo** | Abrir ventana de Ajustes y desplegar los ComboBoxes. Verificar fondo oscuro, texto blanco (#FFFFFF) y resaltado azul sin fondos blancos nativos. | [ ] | |
+| **MAN-14** | UI / Ajustes | **Actualizaciones en Vivo (Sliders y Modos)** | Mover sliders y cambiar modo de movimiento. Verificar actualización elástica/directa en tiempo real de la cápsula. | [ ] | |
 | **MAN-15** | Atajos | **Atajo Global Win32 (`Win+Ctrl+I`)** | Presionar `Win+Ctrl+I` para ocultar la cápsula; presionar nuevamente para restaurarla. Probar cambio de combinación en Ajustes. | [ ] | |
 | **MAN-16** | Resiliencia | **Inyección de Excepciones (DemoWidget)** | Desde el menú contextual de la cápsula abrir *Panel de Depuración (DEBUG)* y pulsar *💥 Forzar Fallo*. Confirmar aislamiento en cuarentena sin cierre de la app. | [ ] | |
+| **MAN-17** | Accesibilidad | **Desactivación de Animaciones en Windows (`WM_SETTINGCHANGE`)** | Desactivar *Efectos de animación* en *Configuración > Accesibilidad > Efectos visuales*. Con `MotionMode.Auto`, verificar en vivo que la muesca no rebota (0% overshoot), transiciona en <= 150 ms y oculta las barras de ecualizador. | [ ] | |
+| **MAN-18** | Accesibilidad | **Conmutación Forzada de Modo de Movimiento** | En Ajustes > *Atajos y Sistema*, cambiar a *Reducidas* y luego a *Completas*. Validar la física y la actualización reactiva del texto de diagnóstico. | [ ] | |
+| **MAN-19** | Accesibilidad | **Modo de Alto Contraste de Windows** | Activar el tema de Alto Contraste (*Alt Izq + Shift Izq + Impr Pant* o desde Accesibilidad). Confirmar que la muesca adquiere borde visible de 1 DIP, fondo negro sólido y textos del sistema. | [ ] | |
+| **MAN-20** | Accesibilidad | **Lectura con Narrador de Windows (`UI Automation`)** | Iniciar Narrador (`Win + Ctrl + Enter`). Interactuar con la cápsula, controles multimedia y sliders. Verificar dicción de `Name`, `HelpText` y avisos en vivo. | [ ] | |
 
 ---
 

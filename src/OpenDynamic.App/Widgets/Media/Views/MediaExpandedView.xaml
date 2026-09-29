@@ -64,11 +64,12 @@
                     ClipToBounds="True"
                     Background="#2AFFFFFF"
                     Margin="0,0,10,0"
-                    VerticalAlignment="Center">
+                    VerticalAlignment="Center"
+                    AutomationProperties.Name="Carátula del álbum">
                 <Grid>
                     <!-- Fallback Icon -->
                     <Path Data="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"
-                          Fill="#88FFFFFF"
+                          Fill="{DynamicResource AppTextMutedBrush}"
                           Stretch="Uniform"
                           Width="20"
                           Height="20"
@@ -84,19 +85,21 @@
             <!-- Titles and Artists -->
             <StackPanel Grid.Column="1" VerticalAlignment="Center">
                 <TextBlock Text="{Binding TrackTitle}"
-                           Foreground="#FFFFFFFF"
+                           Foreground="{DynamicResource AppTextPrimaryBrush}"
                            FontSize="13.5"
                            FontWeight="SemiBold"
                            TextTrimming="CharacterEllipsis"
-                           TextWrapping="NoWrap" />
+                           TextWrapping="NoWrap"
+                           AutomationProperties.Name="{Binding TrackTitle}" />
                 <TextBlock Text="{Binding TrackArtist}"
-                           Foreground="#FFCCCCCC"
+                           Foreground="{DynamicResource AppTextSecondaryBrush}"
                            FontSize="11"
                            Margin="0,1.5,0,0"
                            TextTrimming="CharacterEllipsis"
-                           TextWrapping="NoWrap" />
+                           TextWrapping="NoWrap"
+                           AutomationProperties.Name="{Binding TrackArtist}" />
                 <TextBlock Text="{Binding TrackAlbum}"
-                           Foreground="#FF888888"
+                           Foreground="{DynamicResource AppTextMutedBrush}"
                            FontSize="9.5"
                            Margin="0,1,0,0"
                            TextTrimming="CharacterEllipsis"
@@ -111,9 +114,11 @@
                     Width="28"
                     Height="28"
                     Padding="5"
-                    VerticalAlignment="Top">
+                    VerticalAlignment="Top"
+                    AutomationProperties.Name="Abrir reproductor"
+                    AutomationProperties.HelpText="Abre o trae al frente la aplicación emisora de música">
                 <Path Data="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"
-                      Fill="#B3FFFFFF"
+                      Fill="{DynamicResource AppTextPrimaryBrush}"
                       Stretch="Uniform"
                       Width="13"
                       Height="13" />
@@ -134,13 +139,15 @@
                     Background="Transparent"
                     Cursor="Hand"
                     MouseLeftButtonDown="OnProgressTrackClicked"
-                    MouseMove="OnProgressTrackMouseMove">
+                    MouseMove="OnProgressTrackMouseMove"
+                    AutomationProperties.Name="Progreso de reproducción"
+                    AutomationProperties.HelpText="Haz clic o arrastra para cambiar la posición de reproducción">
                 <Grid Height="4" VerticalAlignment="Center">
                     <!-- Background Track -->
                     <Border Background="#33FFFFFF" CornerRadius="2" />
                     <!-- Active Fill Track -->
                     <Border x:Name="ActiveProgressFill"
-                            Background="#FFFFFFFF"
+                            Background="{DynamicResource AppAccentBrush}"
                             CornerRadius="2"
                             HorizontalAlignment="Left"
                             Width="0" />
@@ -150,11 +157,11 @@
             <!-- Time Labels -->
             <Grid Grid.Row="1" Margin="0,1,0,0">
                 <TextBlock Text="{Binding CurrentPositionFormatted}"
-                           Foreground="#FF888888"
+                           Foreground="{DynamicResource AppTextMutedBrush}"
                            FontSize="9.5"
                            HorizontalAlignment="Left" />
                 <TextBlock Text="{Binding DurationFormatted}"
-                           Foreground="#FF888888"
+                           Foreground="{DynamicResource AppTextMutedBrush}"
                            FontSize="9.5"
                            HorizontalAlignment="Right" />
             </Grid>
@@ -168,9 +175,11 @@
                         Style="{StaticResource TransportButtonStyle}"
                         Width="34"
                         Height="34"
-                        Margin="0,0,16,0">
+                        Margin="0,0,16,0"
+                        AutomationProperties.Name="Pista anterior"
+                        AutomationProperties.HelpText="Salta a la pista anterior">
                     <Path Data="M6 6h2v12H6zm3.5 6l8.5 6V6z"
-                          Fill="#FFFFFFFF"
+                          Fill="{DynamicResource AppTextPrimaryBrush}"
                           Stretch="Uniform"
                           Width="15"
                           Height="15" />
@@ -181,19 +190,21 @@
                         Cursor="Hand"
                         Focusable="False"
                         Width="40"
-                        Height="40">
+                        Height="40"
+                        AutomationProperties.Name="Reproducir o pausar"
+                        AutomationProperties.HelpText="Alterna la reproducción de música">
                     <Button.Template>
                         <ControlTemplate TargetType="Button">
                             <Border x:Name="circleBorder"
                                     Width="40"
                                     Height="40"
                                     CornerRadius="20"
-                                    Background="#FFFFFFFF">
+                                    Background="{DynamicResource AppAccentBrush}">
                                 <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <!-- Play Icon (shown when paused) -->
                                     <Path x:Name="playPath"
                                           Data="M8 5v14l11-7z"
-                                          Fill="#FF000000"
+                                          Fill="{DynamicResource AppAccentTextBrush}"
                                           Stretch="Uniform"
                                           Width="17"
                                           Height="17"
@@ -201,7 +212,7 @@
                                     <!-- Pause Icon (shown when playing) -->
                                     <Path x:Name="pausePath"
                                           Data="M6 19h4V5H6v14zm8-14v14h4V5h-4z"
-                                          Fill="#FF000000"
+                                          Fill="{DynamicResource AppAccentTextBrush}"
                                           Stretch="Uniform"
                                           Width="17"
                                           Height="17"
@@ -214,10 +225,10 @@
                                     <Setter TargetName="pausePath" Property="Visibility" Value="Visible" />
                                 </DataTrigger>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="circleBorder" Property="Background" Value="#FFE0E0E0" />
+                                    <Setter TargetName="circleBorder" Property="Opacity" Value="0.85" />
                                 </Trigger>
                                 <Trigger Property="IsPressed" Value="True">
-                                    <Setter TargetName="circleBorder" Property="Background" Value="#FFCCCCCC" />
+                                    <Setter TargetName="circleBorder" Property="Opacity" Value="0.70" />
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
@@ -229,9 +240,11 @@
                         Style="{StaticResource TransportButtonStyle}"
                         Width="34"
                         Height="34"
-                        Margin="16,0,0,0">
+                        Margin="16,0,0,0"
+                        AutomationProperties.Name="Pista siguiente"
+                        AutomationProperties.HelpText="Salta a la pista siguiente">
                     <Path Data="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"
-                          Fill="#FFFFFFFF"
+                          Fill="{DynamicResource AppTextPrimaryBrush}"
                           Stretch="Uniform"
                           Width="15"
                           Height="15" />

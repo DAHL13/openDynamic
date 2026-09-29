@@ -16,9 +16,16 @@ public static class NativeMethods
     public const int WS_EX_NOACTIVATE = 0x08000000;
 
     // Window Messages
+    public const int WM_SETTINGCHANGE = 0x001A;
     public const int WM_MOUSEACTIVATE = 0x0021;
     public const int WM_DISPLAYCHANGE = 0x007E;
     public const int WM_DPICHANGED = 0x02E0;
+
+    // SystemParametersInfo SPI Actions
+    public const int SPI_GETCLIENTAREAANIMATION = 0x1042;
+    public const int SPI_SETCLIENTAREAANIMATION = 0x1043;
+    public const int SPI_GETHIGHCONTRAST = 0x0042;
+    public const int SPI_SETHIGHCONTRAST = 0x0043;
 
     // Mouse Activate Return Values
     public const int MA_NOACTIVATE = 3;

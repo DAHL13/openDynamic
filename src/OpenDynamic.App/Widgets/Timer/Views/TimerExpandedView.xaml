@@ -28,28 +28,31 @@
                         Padding="8,3"
                         FontSize="9.5"
                         FontWeight="SemiBold"
-                        Foreground="#FFFFFF"
-                        Background="#2C2C2E"
+                        Foreground="{DynamicResource AppTextPrimaryBrush}"
+                        Background="{DynamicResource AppControlBackgroundBrush}"
                         BorderThickness="0"
-                        Cursor="Hand" />
+                        Cursor="Hand"
+                        AutomationProperties.Name="Modo temporizador normal" />
                 <Button Content="Pomodoro (25m)"
                         Command="{Binding SwitchToPomodoroWorkCommand}"
                         Padding="8,3"
                         FontSize="9.5"
                         FontWeight="SemiBold"
-                        Foreground="#FFFFFF"
+                        Foreground="{DynamicResource AppTextPrimaryBrush}"
                         Background="Transparent"
                         BorderThickness="0"
-                        Cursor="Hand" />
+                        Cursor="Hand"
+                        AutomationProperties.Name="Modo Pomodoro trabajo 25 minutos" />
                 <Button Content="Descanso (5m)"
                         Command="{Binding SwitchToPomodoroBreakCommand}"
                         Padding="8,3"
                         FontSize="9.5"
                         FontWeight="SemiBold"
-                        Foreground="#FFFFFF"
+                        Foreground="{DynamicResource AppTextPrimaryBrush}"
                         Background="Transparent"
                         BorderThickness="0"
-                        Cursor="Hand" />
+                        Cursor="Hand"
+                        AutomationProperties.Name="Modo Pomodoro descanso 5 minutos" />
             </StackPanel>
         </Border>
 
@@ -58,24 +61,27 @@
             <TextBlock Text="{Binding FormattedTime}"
                        FontSize="34"
                        FontWeight="Bold"
-                       Foreground="#FFFFFF"
-                       HorizontalAlignment="Center" />
+                       Foreground="{DynamicResource AppTextPrimaryBrush}"
+                       HorizontalAlignment="Center"
+                       AutomationProperties.LiveSetting="Polite"
+                       AutomationProperties.Name="Tiempo restante" />
             <TextBlock Text="{Binding ModeDescription}"
                        FontSize="10.5"
-                       Foreground="#8E8E93"
+                       Foreground="{DynamicResource AppTextMutedBrush}"
                        HorizontalAlignment="Center"
                        Margin="0,1,0,0" />
         </StackPanel>
 
         <!-- Progress Bar -->
-        <Border Grid.Row="2" Height="4" Background="#2C2C2E" CornerRadius="2" Margin="10,0,10,8">
+        <Border Grid.Row="2" Height="4" Background="{DynamicResource AppControlBackgroundBrush}" CornerRadius="2" Margin="10,0,10,8">
             <ProgressBar Value="{Binding ProgressPercent}"
                          Minimum="0"
                          Maximum="100"
                          Height="4"
                          Foreground="{Binding StatusColorBrush}"
                          Background="Transparent"
-                         BorderThickness="0" />
+                         BorderThickness="0"
+                         AutomationProperties.Name="Progreso del temporizador" />
         </Border>
 
         <!-- Controls Row -->
@@ -93,20 +99,22 @@
                         Padding="7,3"
                         FontSize="9.5"
                         FontWeight="SemiBold"
-                        Foreground="#FFFFFF"
-                        Background="#2C2C2E"
+                        Foreground="{DynamicResource AppTextPrimaryBrush}"
+                        Background="{DynamicResource AppControlBackgroundBrush}"
                         BorderThickness="0"
                         Cursor="Hand"
-                        Margin="0,0,4,0" />
+                        Margin="0,0,4,0"
+                        AutomationProperties.Name="Añadir 1 minuto" />
                 <Button Content="+5m"
                         Command="{Binding AddFiveMinutesCommand}"
                         Padding="7,3"
                         FontSize="9.5"
                         FontWeight="SemiBold"
-                        Foreground="#FFFFFF"
-                        Background="#2C2C2E"
+                        Foreground="{DynamicResource AppTextPrimaryBrush}"
+                        Background="{DynamicResource AppControlBackgroundBrush}"
                         BorderThickness="0"
-                        Cursor="Hand" />
+                        Cursor="Hand"
+                        AutomationProperties.Name="Añadir 5 minutos" />
             </StackPanel>
 
             <!-- Play / Pause Action Button (100% visible, fully circular with safe clearance) -->
@@ -117,7 +125,8 @@
                     Background="{Binding StatusColorBrush}"
                     BorderThickness="0"
                     Cursor="Hand"
-                    HorizontalAlignment="Center">
+                    HorizontalAlignment="Center"
+                    AutomationProperties.Name="Iniciar o pausar temporizador">
                 <Button.Template>
                     <ControlTemplate TargetType="Button">
                         <Border Background="{TemplateBinding Background}" CornerRadius="18">
@@ -126,7 +135,7 @@
                     </ControlTemplate>
                 </Button.Template>
                 <Path Data="{Binding PlayPauseIconData}"
-                      Fill="#000000"
+                      Fill="{DynamicResource AppAccentTextBrush}"
                       Width="14"
                       Height="14"
                       Stretch="Uniform"
@@ -139,10 +148,11 @@
                     Command="{Binding ResetCommand}"
                     Width="32"
                     Height="32"
-                    Background="#2C2C2E"
+                    Background="{DynamicResource AppControlBackgroundBrush}"
                     BorderThickness="0"
                     Cursor="Hand"
-                    HorizontalAlignment="Right">
+                    HorizontalAlignment="Right"
+                    AutomationProperties.Name="Reiniciar temporizador">
                 <Button.Template>
                     <ControlTemplate TargetType="Button">
                         <Border Background="{TemplateBinding Background}" CornerRadius="16">
@@ -151,7 +161,7 @@
                     </ControlTemplate>
                 </Button.Template>
                 <Path Data="M 12,4 A 8,8 0 1 0 16,10 M 16,4 V 10 H 10"
-                      Stroke="#FFFFFF"
+                      Stroke="{DynamicResource AppTextPrimaryBrush}"
                       StrokeThickness="1.5"
                       Fill="Transparent"
                       Width="12"

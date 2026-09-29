@@ -10,12 +10,14 @@
         <Border x:Name="MainCapsuleBorder"
                 Width="200"
                 Height="36"
-                Background="#FF000000"
-                BorderBrush="#26FFFFFF"
-                BorderThickness="1,0,1,1"
+                Background="{DynamicResource AppCapsuleBackgroundBrush}"
+                BorderBrush="{DynamicResource AppBorderBrush}"
+                BorderThickness="{DynamicResource AppNotchBorderThickness}"
                 CornerRadius="0,0,14,14"
                 ClipToBounds="False"
-                Cursor="Hand">
+                Cursor="Hand"
+                AutomationProperties.Name="Muesca openDynamic"
+                AutomationProperties.HelpText="Haz clic para alternar entre modo compacto y expandido, o usa la rueda del ratón para volumen">
             <Grid x:Name="PrimaryContentContainer" ClipToBounds="True">
                 <ContentControl x:Name="PrimaryContent"
                                 HorizontalAlignment="Stretch"
@@ -29,14 +31,16 @@
         <Border x:Name="SatelliteBorder"
                 Width="36"
                 Height="36"
-                Background="#FF000000"
-                BorderBrush="#26FFFFFF"
-                BorderThickness="1,0,1,1"
+                Background="{DynamicResource AppCapsuleBackgroundBrush}"
+                BorderBrush="{DynamicResource AppBorderBrush}"
+                BorderThickness="{DynamicResource AppNotchBorderThickness}"
                 CornerRadius="0,0,14,14"
                 ClipToBounds="False"
                 Margin="10,0,0,0"
                 Visibility="Collapsed"
-                Cursor="Hand">
+                Cursor="Hand"
+                AutomationProperties.Name="Satélite multitarea openDynamic"
+                AutomationProperties.HelpText="Haz clic para intercambiar la actividad primaria y secundaria">
             <Grid x:Name="SecondaryContentContainer" ClipToBounds="True">
                 <ContentControl x:Name="SecondaryContent"
                                 HorizontalAlignment="Stretch"

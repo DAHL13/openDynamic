@@ -12,7 +12,7 @@
             <Setter Property="Height" Value="4" />
             <Setter Property="Minimum" Value="0" />
             <Setter Property="Maximum" Value="100" />
-            <Setter Property="Background" Value="#2C2C2E" />
+            <Setter Property="Background" Value="{DynamicResource AppControlBackgroundBrush}" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Template">
                 <Setter.Value>
@@ -37,7 +37,9 @@
 
     <Grid Margin="18,12,18,14">
         <Grid.RowDefinitions>
+            <!-- Header -->
             <RowDefinition Height="Auto" />
+            <!-- Metric Cards -->
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -46,7 +48,7 @@
             <TextBlock Text="Rendimiento del Sistema"
                        FontSize="12"
                        FontWeight="SemiBold"
-                       Foreground="#8E8E93"
+                       Foreground="{DynamicResource AppTextMutedBrush}"
                        VerticalAlignment="Center" />
             <TextBlock Text="0% CPU en reposo"
                        FontSize="10"
@@ -58,42 +60,48 @@
         <!-- Metric Cards -->
         <UniformGrid Grid.Row="1" Columns="2">
             <!-- CPU Card -->
-            <Border Background="#1C1C1E" CornerRadius="10" Padding="12" Margin="0,0,6,0">
+            <Border Background="{DynamicResource AppControlBackgroundBrush}" CornerRadius="10" Padding="12" Margin="0,0,6,0"
+                    AutomationProperties.Name="Tarjeta de procesador CPU">
                 <StackPanel>
                     <DockPanel Margin="0,0,0,6">
-                        <TextBlock Text="CPU" FontSize="11" FontWeight="SemiBold" Foreground="#8E8E93" />
+                        <TextBlock Text="CPU" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource AppTextMutedBrush}" />
                         <TextBlock Text="{Binding CpuSummaryText}"
                                    FontSize="15"
                                    FontWeight="Bold"
                                    Foreground="#4CD964"
-                                   HorizontalAlignment="Right" />
+                                   HorizontalAlignment="Right"
+                                   AutomationProperties.LiveSetting="Polite"
+                                   AutomationProperties.Name="Porcentaje de uso de CPU" />
                     </DockPanel>
                     <!-- Progress bar -->
                     <ProgressBar Style="{StaticResource HardwareProgressBarStyle}"
                                  Value="{Binding CpuUsagePercent, Mode=OneWay}"
                                  Foreground="#4CD964"
                                  Margin="0,0,0,4" />
-                    <TextBlock Text="Carga de Procesador" FontSize="9" Foreground="#8E8E93" Margin="0,2,0,0" />
+                    <TextBlock Text="Carga de Procesador" FontSize="9" Foreground="{DynamicResource AppTextMutedBrush}" Margin="0,2,0,0" />
                 </StackPanel>
             </Border>
 
             <!-- RAM Card -->
-            <Border Background="#1C1C1E" CornerRadius="10" Padding="12" Margin="6,0,0,0">
+            <Border Background="{DynamicResource AppControlBackgroundBrush}" CornerRadius="10" Padding="12" Margin="6,0,0,0"
+                    AutomationProperties.Name="Tarjeta de memoria RAM">
                 <StackPanel>
                     <DockPanel Margin="0,0,0,6">
-                        <TextBlock Text="MEMORIA" FontSize="11" FontWeight="SemiBold" Foreground="#8E8E93" />
+                        <TextBlock Text="MEMORIA" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource AppTextMutedBrush}" />
                         <TextBlock Text="{Binding RamSummaryText}"
                                    FontSize="15"
                                    FontWeight="Bold"
                                    Foreground="#5E5CE6"
-                                   HorizontalAlignment="Right" />
+                                   HorizontalAlignment="Right"
+                                   AutomationProperties.LiveSetting="Polite"
+                                   AutomationProperties.Name="Porcentaje de uso de memoria RAM" />
                     </DockPanel>
                     <!-- Progress bar -->
                     <ProgressBar Style="{StaticResource HardwareProgressBarStyle}"
                                  Value="{Binding RamUsagePercent, Mode=OneWay}"
                                  Foreground="#5E5CE6"
                                  Margin="0,0,0,4" />
-                    <TextBlock Text="{Binding MemoryUsageText}" FontSize="9" Foreground="#8E8E93" Margin="0,2,0,0" />
+                    <TextBlock Text="{Binding MemoryUsageText}" FontSize="9" Foreground="{DynamicResource AppTextMutedBrush}" Margin="0,2,0,0" />
                 </StackPanel>
             </Border>
         </UniformGrid>

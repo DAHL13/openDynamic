@@ -4,6 +4,8 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Messaging;
+using OpenDynamic.App.Widgets.Messages;
 using OpenDynamic.App.Widgets.Timer.Views;
 using OpenDynamic.Core.Settings;
 using OpenDynamic.Core.Timer;
@@ -103,6 +105,23 @@ public sealed class TimerWidget : IslandWidgetBase
             Interval = TimeSpan.FromSeconds(1)
         };
         _tickTimer.Tick += OnTickTimerTick;
+
+        WeakReferenceMessenger.Default.Register<MotionProfileChangedMessage>(this, (_, msg) =>
+        {
+            IsDecorativeAllowed = msg.Profile.AllowDecorative;
+        });
+    }
+
+    private bool _isDecorativeAllowed = true;
+
+    /// <summary>
+    /// Indicates whether decorative animations are permitted.
+    /// In reduced motion mode, alert animations are kept strictly static (Task 4).
+    /// </summary>
+    public bool IsDecorativeAllowed
+    {
+        get => _isDecorativeAllowed;
+        set => SetProperty(ref _isDecorativeAllowed, value);
     }
 
     public override void Initialize()

@@ -60,6 +60,13 @@ public sealed class IslandAnimator : IDisposable
     public event EventHandler? FrameUpdated;
     public event EventHandler? Settled;
     public event EventHandler? Started;
+    public event EventHandler<MotionProfile>? ProfileChanged;
+
+    /// <summary>
+    /// Gets the currently active motion profile.
+    /// Defaults to <see cref="MotionProfile.Full"/>.
+    /// </summary>
+    public MotionProfile CurrentProfile { get; private set; } = MotionProfile.Full;
 
     public IslandAnimator(IslandStateMachine? stateMachine = null, IslandLayout? layout = null)
     {
@@ -158,6 +165,20 @@ public sealed class IslandAnimator : IDisposable
         OpacitySpring.Stiffness = stiffness;
         OpacitySpring.Damping = damping;
         OpacitySpring.Mass = mass;
+    }
+
+    /// <summary>
+    /// Applies a new motion profile to the springs in real time,
+    /// strictly preserving the in-flight velocity and current progress of active springs.
+    /// </summary>
+    public void ApplyProfile(MotionProfile profile)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+        CurrentProfile = profile;
+        SetSpringParameters(profile.Stiffness, profile.Damping, profile.Mass);
+        Log.Information("IslandAnimator: Applied MotionProfile (Stiffness={Stiffness}, Damping={Damping}, AllowDecorative={AllowDecorative}). In-flight velocities preserved.",
+            profile.Stiffness, profile.Damping, profile.AllowDecorative);
+        ProfileChanged?.Invoke(this, profile);
     }
 
     /// <summary>

@@ -62,6 +62,21 @@ openDynamic adopta una estética de **muesca rectangular superior (Notch)** pega
 | **Fase 8** | **Optimización, robustez, eventos del sistema y pruebas de rendimiento (Previo a M6)** | **Completada** |
 | **Notch UI** | **Rediseño geométrico a muesca rectangular superior con esquinas asimétricas (ADR-017)** | **Completada** |
 | **Fase 9** | **Empaquetado Inno Setup, decisión de runtime (ADR-016), CI/CD y documentación técnica (M6)** | **Completada** |
+| **Fase 10** | **Accesibilidad integral, perfiles de movimiento, alto contraste y UI Automation (v1.1)** | **Completada** |
+
+---
+
+## Accesibilidad y Preferencias de Movimiento
+
+openDynamic está diseñado desde sus cimientos cumpliendo con las directrices de accesibilidad **WCAG 2.1** (Criterios 2.2.2 y 2.3.3) y las guías de diseño de Windows 11:
+
+- **Perfiles de Movimiento Adaptativos (`MotionMode`):**
+  - **Automático (`Auto` - Por defecto):** Sigue la preferencia de accesibilidad de Windows (*Configuración > Accesibilidad > Efectos visuales > Efectos de animación*). Detectado 100% de forma reactiva mediante `WM_SETTINGCHANGE` (sin polling, 0% CPU).
+  - **Reducidas (`Reduced`):** Diseñado para usuarios con sensibilidad al movimiento o trastornos vestibulares. Amortiguamiento crítico ($\zeta = 1.0$) sin sobreimpulso (overshoot 0.0%), sin rebotes elásticos, cross-fades directos de 120 ms ($\le 150\text{ ms}$) y supresión automática de animaciones decorativas (como las barras oscilantes del ecualizador).
+  - **Completas (`Full`):** Física elástica de resortes subamortiguados con rebote suave natural de ~4%.
+- **Soporte de Alto Contraste del Sistema:** Detección instantánea de `SystemParameters.HighContrast`. Aplica dinámicamente pinceles de alto contraste (`SystemColors.*Key`), fuerza un borde sólido visible de 1 DIP alrededor de la muesca y fondo negro opaco para garantizar legibilidad infinita sobre cualquier ventana o fondo de pantalla.
+- **Lectores de Pantalla y UI Automation:** Soporte nativo para el Narrador de Windows mediante propiedades estructuradas (`AutomationProperties.Name`, `AutomationProperties.HelpText`) y notificaciones dinámicas (`AutomationProperties.LiveSetting="Polite"`) en la cápsula y todos los widgets interactivos.
+- **Interacción sin Robo de Foco:** La ventana utiliza `WS_EX_NOACTIVATE` y `WM_MOUSEACTIVATE`, permitiendo interactuar con los widgets sin quitar el foco del teclado de la aplicación activa.
 
 ---
 
@@ -122,22 +137,22 @@ En estricto cumplimiento de la **Regla de Oro 1** (0% CPU en reposo y consumo m�
 ## Documentación Técnica
 
 - **[Arquitectura y Guía para Desarrolladores (`docs/arquitectura.md`)](./docs/arquitectura.md):** Diagramas conceptuales de capas (Core vs. App), flujo del `IslandOrchestrator`, ciclo de vida de la FSM y la **Guía de 10 pasos** para crear e integrar nuevos widgets desde cero.
-- **[Registro de Decisiones de Arquitectura (`DECISIONS.md`)](./DECISIONS.md):** Registro histórico y justificación de las 17 decisiones técnicas (ADR-001 a ADR-017).
-- **[Matriz de Validación y Pruebas (`docs/pruebas.md`)](./docs/pruebas.md):** 198 pruebas unitarias automatizadas y 16 casos de prueba manual de sistema (DPI, multimonitor, suspensión, pantalla completa).
+- **[Registro de Decisiones de Arquitectura (`DECISIONS.md`)](./DECISIONS.md):** Registro histórico y justificación de las 18 decisiones técnicas (ADR-001 a ADR-018).
+- **[Matriz de Validación y Pruebas (`docs/pruebas.md`)](./docs/pruebas.md):** 213 pruebas unitarias automatizadas y casos de prueba manual de sistema (DPI, multimonitor, suspensión, pantalla completa, accesibilidad).
 
 ---
 
 ## Stack Tecnológico
 
 - **Lenguaje / Runtime:** C# 13+, .NET 10
-- **Interfaz de Usuario:** WPF (`net10.0-windows10.0.19041.0`) con soporte `PerMonitorV2` DPI
+- **Interfaz de Usuario:** WPF (`net10.0-windows10.0.19041.0`) con soporte `PerMonitorV2` DPI y UI Automation
 - **Patrón Arquitectónico:** MVVM mediante `CommunityToolkit.Mvvm`
 - **Inyección de Dependencias:** `Microsoft.Extensions.DependencyInjection`
 - **Audio:** `NAudio` (`MMDeviceEnumerator`, `AudioEndpointVolume`) con detección en caliente (`IMMNotificationClient`)
 - **Multimedia:** WinRT `Windows.Media.Control` (GSMTC) con extrapolación continua y miniaturas congeladas
 - **Bandeja del Sistema (Tray):** `H.NotifyIcon.Wpf` (cero WinForms)
 - **Atajos Globales:** Win32 `RegisterHotKey` / `UnregisterHotKey` mediante WndProc
-- **Configuración y Persistencia:** `System.Text.Json` en `%AppData%\openDynamic\settings.json` (esquema v2 y debounce de 500ms)
+- **Configuración y Persistencia:** `System.Text.Json` en `%AppData%\openDynamic\settings.json` (esquema v3 y debounce de 500ms)
 - **Registro de Eventos (Logging):** `Serilog` y `Serilog.Sinks.File` en `%LocalAppData%\openDynamic\logs`
 - **Pruebas Unitarias:** `xUnit`
 - **Instalador:** Inno Setup 6 (distribución ReadyToRun)

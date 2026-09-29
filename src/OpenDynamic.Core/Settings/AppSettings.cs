@@ -1,16 +1,19 @@
+using System.Text.Json.Serialization;
+using OpenDynamic.Core.Animation;
+
 namespace OpenDynamic.Core.Settings;
 
 /// <summary>
 /// Application settings for openDynamic.
-/// Holds configuration values for window placement, widgets, audio, power, hardware monitoring, timer, and hotkeys.
+/// Holds configuration values for window placement, widgets, audio, power, hardware monitoring, timer, hotkeys, and motion.
 /// </summary>
 public sealed class AppSettings
 {
     /// <summary>
     /// Current configuration schema version for migration tracking.
-    /// Version 2 introduces the top rectangular notch format (OffsetY = 0.0, CapsuleCornerRadius = 14.0).
+    /// Version 3 introduces the MotionMode setting (Auto, Reduced, Full).
     /// </summary>
-    public const int CurrentSchemaVersion = 2;
+    public const int CurrentSchemaVersion = 3;
 
     /// <summary>
     /// Configuration schema version. Defaults to <see cref="CurrentSchemaVersion"/>.
@@ -59,6 +62,19 @@ public sealed class AppSettings
     /// Default is 1.0 (100%).
     /// </summary>
     public double ScaleFactor { get; set; } = 1.0;
+
+    #endregion
+
+    #region Motion and Animation Settings
+
+    /// <summary>
+    /// Motion mode preference for island animations.
+    /// <see cref="MotionMode.Auto"/> follows Windows system animation preference (Default).
+    /// <see cref="MotionMode.Reduced"/> suppresses bouncing and decorative animations.
+    /// <see cref="MotionMode.Full"/> enables complete spring physics.
+    /// </summary>
+    [JsonConverter(typeof(JsonStringEnumConverter<MotionMode>))]
+    public MotionMode MotionMode { get; set; } = MotionMode.Auto;
 
     #endregion
 
@@ -286,7 +302,8 @@ public sealed class AppSettings
             PomodoroBreakDurationMinutes = this.PomodoroBreakDurationMinutes,
             ToggleIslandHotkey = this.ToggleIslandHotkey,
             EnableGlobalHotkeys = this.EnableGlobalHotkeys,
-            StartWithWindows = this.StartWithWindows
+            StartWithWindows = this.StartWithWindows,
+            MotionMode = this.MotionMode
         };
     }
 
@@ -305,6 +322,7 @@ public sealed class AppSettings
         CapsuleHeight = other.CapsuleHeight;
         CapsuleCornerRadius = other.CapsuleCornerRadius;
         ScaleFactor = other.ScaleFactor;
+        MotionMode = other.MotionMode;
         EnableMediaWidget = other.EnableMediaWidget;
         MediaPauseGracePeriodSeconds = other.MediaPauseGracePeriodSeconds;
         DefaultMediaPriority = other.DefaultMediaPriority;

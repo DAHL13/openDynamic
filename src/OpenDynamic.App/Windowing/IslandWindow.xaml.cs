@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Threading;
+using CommunityToolkit.Mvvm.Messaging;
 using Microsoft.Win32;
 using OpenDynamic.App.Animation;
 using OpenDynamic.App.Native;
@@ -103,6 +104,8 @@ public partial class IslandWindow : Window
 
         _powerService?.RegisterWindowNotifications(_hwnd);
         SystemEvents.PowerModeChanged += OnPowerModeChanged;
+        SystemParameters.StaticPropertyChanged += OnSystemParametersStaticPropertyChanged;
+        UpdateMotionProfileLive();
 
         if (_fullscreenWatcher != null)
         {
@@ -123,6 +126,8 @@ public partial class IslandWindow : Window
     /// </summary>
     public void ApplySettingsAndReposition()
     {
+        UpdateMotionProfileLive();
+
         _windowPositioner.TargetMonitorIndex = _settings.TargetMonitorIndex;
         _windowPositioner.OffsetXDip = _settings.OffsetX;
         _windowPositioner.TopMarginDip = _settings.OffsetY;
@@ -187,9 +192,69 @@ public partial class IslandWindow : Window
             case NativeMethods.WM_POWERBROADCAST:
                 HandlePowerBroadcast(wParam, lParam);
                 break;
+
+            // React to system setting changes (Animation effects, High Contrast, etc.) - 100% reactive (Golden Rules 1 & 11)
+            case NativeMethods.WM_SETTINGCHANGE:
+                HandleSettingChange(wParam, lParam);
+                break;
         }
 
         return IntPtr.Zero;
+    }
+
+    private void HandleSettingChange(IntPtr wParam, IntPtr lParam)
+    {
+        int action = wParam.ToInt32();
+        Log.Information("WM_SETTINGCHANGE received (wParam SPI: 0x{Action:X4})", action);
+
+        // React reactively on UI thread
+        Dispatcher.InvokeAsync(() =>
+        {
+            UpdateMotionProfileLive();
+            UpdateHighContrastThemeLive();
+        });
+    }
+
+    /// <summary>
+    /// Evaluates the system animation preference and resolves the active motion profile in real time.
+    /// Preserves in-flight spring velocities (Task 3).
+    /// </summary>
+    public void UpdateMotionProfileLive()
+    {
+        bool systemAnimations = SystemParameters.ClientAreaAnimation;
+        var resolvedProfile = Core.Animation.MotionProfileResolver.Resolve(_settings.MotionMode, systemAnimations);
+        _animator.ApplyProfile(resolvedProfile);
+        IslandHostView.UpdateMotionProfile(resolvedProfile);
+
+        CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger.Default.Send(
+            new Widgets.Messages.MotionProfileChangedMessage(resolvedProfile));
+
+        Log.Information("MotionProfile updated live. Mode: {MotionMode}, Windows Animations: {SystemAnimations}, Stiffness: {Stiffness}, AllowDecorative: {AllowDecorative}",
+            _settings.MotionMode, systemAnimations, resolvedProfile.Stiffness, resolvedProfile.AllowDecorative);
+    }
+
+    /// <summary>
+    /// Reacts to system high contrast mode transitions.
+    /// </summary>
+    public void UpdateHighContrastThemeLive()
+    {
+        bool isHighContrast = SystemParameters.HighContrast;
+        Infrastructure.AccessibilityThemeManager.ApplyTheme(isHighContrast);
+        Log.Information("System HighContrast status evaluated and theme applied: {IsHighContrast}", isHighContrast);
+    }
+
+    private void OnSystemParametersStaticPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(SystemParameters.ClientAreaAnimation))
+        {
+            Log.Information("SystemParameters.ClientAreaAnimation static property changed reactively: {Value}", SystemParameters.ClientAreaAnimation);
+            UpdateMotionProfileLive();
+        }
+        else if (e.PropertyName == nameof(SystemParameters.HighContrast))
+        {
+            Log.Information("SystemParameters.HighContrast static property changed reactively: {Value}", SystemParameters.HighContrast);
+            UpdateHighContrastThemeLive();
+        }
     }
 
     private void HandlePowerBroadcast(IntPtr wParam, IntPtr lParam)
@@ -528,6 +593,7 @@ public partial class IslandWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         SystemEvents.PowerModeChanged -= OnPowerModeChanged;
+        SystemParameters.StaticPropertyChanged -= OnSystemParametersStaticPropertyChanged;
 
         _hoverEnterTimer.Stop();
         _hoverEnterTimer.Tick -= OnHoverEnterTimerTick;
