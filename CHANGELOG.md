@@ -3,6 +3,36 @@
 Todas las modificaciones notables en este proyecto serán documentadas en este archivo.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y cumple con [SemVer](https://semver.org/).
 
+## [1.1.0-dev] - 2026-09-29 (Fase 10: Accesibilidad y Preferencias de Animación)
+
+### Añadido
+- **Perfiles de Movimiento en Core (`OpenDynamic.Core.Animation`):**
+  - Enum `MotionMode` con opciones `Auto` (sigue la configuración de Windows), `Reduced` (sin rebote ni efectos decorativos) y `Full` (física elástica de resortes completa).
+  - Clase inmutable `MotionProfile` con rigidez ($k$), amortiguamiento ($c$), masa ($m$), duración de transiciones de contenido y bandera booleana `AllowDecorative`.
+  - Resolvedor determinista `MotionProfileResolver` que mapea el modo y la configuración del sistema operativo:
+    * En `Reduced` o `Auto` sin animaciones de Windows: amortiguamiento crítico exacto ($k=400, c=40, m=1 \rightarrow \zeta = 1.0$) garantizando 0% de sobreimpulso (overshoot), transiciones de contenido de 120 ms ($\le 150\text{ ms}$) y desactivación de efectos decorativos.
+    * En `Full` o `Auto` con animaciones de Windows activas: física de resorte natural ($k=280, c=24, m=1 \rightarrow \zeta \approx 0.717$) con rebote elástico suave de ~4% y transiciones de 250 ms.
+  - **Regla de Oro 5 cumplida:** Cero dependencias de namespaces de Windows, Win32 o WPF en `OpenDynamic.Core`.
+- **Detección Reactiva de Preferencias de Windows (`OpenDynamic.App`):**
+  - Detección 100% reactiva en `IslandWindow.WndProc` interceptando el mensaje nativo `WM_SETTINGCHANGE (0x001A)` con `SPI_GETCLIENTAREAANIMATION` y mediante `SystemParameters.StaticPropertyChanged`.
+  - **Reglas de Oro 1 y 11 cumplidas:** Prohibición absoluta de polling o timers periódicos para consultar la configuración del sistema operativo.
+  - Preservación de inercia y velocidad: `ApplyProfile()` en `IslandAnimator` actualiza rigidez y amortiguamiento de los resortes en vuelo sin reiniciar ni alterar `Velocity` o `Value`, evitando congelamientos visuales o discontinuidades.
+- **Supresión de Animaciones Decorativas en Widgets:**
+  - Desacoplamiento mediante el mensaje `MotionProfileChangedMessage` transmitido a través de `WeakReferenceMessenger`.
+  - `MediaWidget`: propiedad reactiva `IsDecorativeAllowed` y `EqualizerVisibility` que colapsa y oculta las barras simuladas del ecualizador cuando el movimiento está reducido.
+  - `TimerWidget`: desactiva animaciones decorativas parpadeantes al expirar la cuenta regresiva, manteniendo resaltado estático carmesí y sonido.
+- **Modo de Alto Contraste y UI Automation para Lectores de Pantalla:**
+  - `AccessibilityThemeManager` en infraestructura para aplicar de forma reactiva temas de Alto Contraste ante cambios en `SystemParameters.HighContrast`.
+  - Recursos dinámicos en `App.xaml` vinculados a `SystemColors.*Key`, garantizando bordes de 1 DIP visibles y fondo negro sólido en modo de alto contraste para máxima legibilidad.
+  - Enlaces de accesibilidad UI en todas las vistas XAML (`AutomationProperties.Name`, `AutomationProperties.HelpText`, y `AutomationProperties.LiveSetting="Polite"`) en la muesca y en widgets de música, volumen, batería, hardware y temporizador.
+- **Persistencia, Configuración y Migración de Esquema (Schema v3):**
+  - Propiedad `MotionMode` persistida en `AppSettings.cs` con valor predeterminado `Auto`.
+  - Incremento a `CurrentSchemaVersion = 3` con migración transparente e inmediata en `SettingsService.Load()` para esquemas v1 y v2 sin pérdida de datos.
+  - Selector accesible en `SettingsWindow.xaml` con información y diagnóstico en tiempo real del estado de efectos de animación de Windows.
+- **Pruebas Automatizadas:**
+  - 15 nuevas pruebas unitarias en `MotionProfileTests` y `SettingsServiceTests` verificando la resolución de perfiles, física sin sobreimpulso en trayectorias crecientes y decrecientes, y migración segura de esquemas v1/v2 a v3.
+  - Suite completa de 213 pruebas unitarias en verde.
+
 ## [1.0.0] - 2026-09-29 (Fase 9: Empaquetado, Documentación y Release Beta - Hito M6)
 
 ### Añadido

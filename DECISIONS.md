@@ -351,6 +351,49 @@
     - **Migración Automática de Configuración (Schema v2):** Se incrementa `CurrentSchemaVersion = 2` en `AppSettings.cs`. En `SettingsService.Load()`, las configuraciones existentes con `SchemaVersion < 2` (procedentes de versiones previas con `OffsetY = 8.0` y `CapsuleCornerRadius = 18.0`) se normalizan automáticamente a `OffsetY = 0.0` y `CapsuleCornerRadius = 14.0`, guardándose inmediatamente en disco.
     - **Comandos de Restablecimiento en ViewModel:** Se alinean `ResetPosition()` y `ResetToDefaults()` en `SettingsViewModel.cs` con `OffsetY = 0.0`, `CapsuleCornerRadius = 14.0` y llamada explícita a `ApplyPositionLive()`.
 
+---
+
+## ADR-018: Perfiles de Movimiento, Detección Reactiva de Accesibilidad, Alto Contraste y UI Automation (Fase 10)
+
+- **Estado:** Aceptado
+- **Fecha:** 2026-09-29
+- **Contexto:**
+  Para el ciclo v1.1 (Fase 10), openDynamic implementa soporte integral de accesibilidad cumpliendo las directrices WCAG 2.1 (Criterios 2.2.2 y 2.3.3 de reducción de movimiento y animaciones por interacción) y las guías de diseño accesible de Windows 11. Los usuarios con trastornos vestibulares, sensibilidad al movimiento o usuarios de tecnologías de asistencia (como el Narrador de Windows) requieren interfaces predecibles, sin sobreimpulsos ni rebotes visuales continuos, junto a soporte de Alto Contraste del sistema y nombres accesibles estructurados en todos los componentes interactivos.
+
+- **Decisiones Técnicas:**
+
+  1. **Perfiles de Movimiento Puros en OpenDynamic.Core (Regla de Oro 5):**
+     - Se define el enum `MotionMode` con tres estados: `Auto` (sigue la preferencia del sistema operativo), `Reduced` (sin rebote ni efectos decorativos) y `Full` (física elástica completa con resorte subamortiguado).
+     - Se implementa `MotionProfile` inmutable con parámetros físicos ($k$: rigidez, $c$: amortiguamiento, $m$: masa), duración de cross-fade de contenido (`CrossFadeDurationMs`) y la política decorativa `AllowDecorative`.
+     - `MotionProfileResolver` resuelve de manera determinista el perfil activo:
+       * **Modo Full (o Auto con animaciones de Windows activas):** $k=280.0, c=24.0, m=1.0$ ($\zeta \approx 0.717$, resorte subamortiguado con overshoot natural de ~4%), `CrossFadeDurationMs = 250 ms`, `AllowDecorative = true`.
+       * **Modo Reduced (o Auto con animaciones de Windows desactivadas):** $k=400.0, c=40.0, m=1.0$ ($\zeta = 1.0$, amortiguamiento crítico exacto sin sobreimpulso ni oscilación residual, $0.0\%$ de overshoot), `CrossFadeDurationMs = 120 ms` ($\le 150\text{ ms}$), `AllowDecorative = false`.
+     - Se valida formalmente mediante pruebas unitarias en `OpenDynamic.Tests` la pureza de ensamblado (cero referencias a Windows, Win32 o WPF en Core) y la ausencia matemática absoluta de overshoot en modo reducido tanto en trayectorias crecientes como decrecientes.
+
+  2. **Detección Reactiva de Windows sin Polling (Reglas de Oro 1 y 11):**
+     - La preferencia de Windows ("Efectos de animación" / `SPI_GETCLIENTAREAANIMATION`) se detecta de forma 100% reactiva en `IslandWindow.WndProc` interceptando el mensaje nativo `WM_SETTINGCHANGE (0x001A)` y suscribiéndose a `SystemParameters.StaticPropertyChanged`.
+     - Queda estrictamente prohibido el uso de timers de sondeo o consultas periódicas al registro.
+     - Preservación de inercia en vuelo: Cuando el perfil cambia mientras una animación se encuentra en progreso, `IslandAnimator.ApplyProfile()` actualiza dinámicamente la rigidez ($k$) y el amortiguamiento ($c$) de los resortes activos sin alterar la posición (`Value`) ni la velocidad instantánea (`Velocity`), evitando saltos abruptos o congelamientos visuales.
+
+  3. **Supresión de Animaciones Decorativas en Widgets:**
+     - `IslandWindow` difunde el mensaje desacoplado `MotionProfileChangedMessage` mediante `WeakReferenceMessenger.Default`.
+     - `MediaWidget` evalúa `IsDecorativeAllowed`: en modo reducido o con animaciones desactivadas, la propiedad `EqualizerVisibility` colapsa automáticamente las barras simuladas del ecualizador, mostrando la información estática del reproductor sin oscilaciones innecesarias.
+     - `TimerWidget` desactiva parpadeos decorativos de finalización, manteniendo un indicador estático en color carmesí de alerta y la emisión de audio.
+
+  4. **Modo de Alto Contraste y UI Automation para Lectores de Pantalla:**
+     - Se introduce `AccessibilityThemeManager` en la capa de infraestructura, reaccionando a `SystemParameters.HighContrast` y a eventos del sistema para actualizar dinámicamente los recursos compartidos en `App.xaml` (`AppCapsuleBackgroundBrush`, `AppBorderBrush`, `AppNotchBorderThickness`, `AppTextPrimaryBrush`, etc.).
+     - En modo de Alto Contraste, se aplican pinceles enlazados a `SystemColors.WindowTextBrushKey` y `SystemColors.HighlightBrushKey`, forzando un borde sólido visible de 1 DIP alrededor de la muesca y fondo negro opaco para garantizar contraste infinito sobre fondos claros o transparentes.
+     - Se añaden atributos de accesibilidad en todas las vistas XAML (`IslandView`, `MediaCompactView`, `MediaExpandedView`, `TimerCompactView`, `TimerExpandedView`, `VolumeCompactView`, `VolumeExpandedView`, `BatteryCompactView`, `HardwareCompactView`, `HardwareExpandedView`):
+       * `AutomationProperties.Name` descriptivo en todos los botones de control, sliders y tarjetas.
+       * `AutomationProperties.HelpText` con instrucciones concisas para usuarios del Narrador de Windows.
+       * `AutomationProperties.LiveSetting="Polite"` en indicadores dinámicos y estados de alerta, permitiendo al Narrador anunciar cambios importantes sin interrumpir la dicción actual del usuario.
+
+  5. **Persistencia y Migración de Configuración Segura (Regla de Oro 9):**
+     - Se incorpora `MotionMode` en `AppSettings.cs` con valor por defecto documentado `MotionMode.Auto`.
+     - Se incrementa la versión de esquema a `CurrentSchemaVersion = 3`. `SettingsService.Load()` detecta archivos de configuración previos con `SchemaVersion < 3`, preserva todos los ajustes de usuario existentes y asigna automáticamente `MotionMode = MotionMode.Auto`, persistiendo el archivo actualizado en disco.
+     - Se integra un selector de modo de animación con ComboBox accesible y diagnóstico en tiempo real del estado de Windows en la pestaña "Atajos y Sistema" de `SettingsWindow.xaml`.
+
+
 
 
 
