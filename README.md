@@ -4,6 +4,7 @@
 [![Release](https://github.com/DAHL13/openDynamic/actions/workflows/release.yml/badge.svg)](https://github.com/DAHL13/openDynamic/actions/workflows/release.yml)
 [![.NET 10](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/download)
 [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?logo=windows)](https://www.microsoft.com/windows)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-win--x64-lightgrey)]()
 [![RAM](https://img.shields.io/badge/RAM-%3C%2030%20MB-brightgreen)]()
 [![CPU](https://img.shields.io/badge/CPU%20Idle-0.0%25-brightgreen)]()
@@ -169,3 +170,17 @@ dotnet run --project src/OpenDynamic.App/OpenDynamic.App.csproj -- --smoke-test
 ```powershell
 dotnet publish src/OpenDynamic.App/OpenDynamic.App.csproj -c Release -r win-x64 -p:PublishReadyToRun=true --self-contained false -o publish
 ```
+
+---
+
+## Autoría y Créditos
+
+- **Desarrollador Principal y Autor del Proyecto:** [Diego Ángel Hernández Lezama (@DAHL13)](https://github.com/DAHL13)
+- **Asistencia de Inteligencia Artificial:** El desarrollo de openDynamic contó con la asistencia de Inteligencia Artificial como copiloto técnico para el diseño arquitectónico, implementación de código y control de calidad (QA).
+
+---
+
+## Licencia
+
+Este proyecto se distribuye bajo los términos de la **[Licencia MIT](./LICENSE)**. Para más detalles sobre permisos, condiciones y limitaciones de responsabilidad, consulta el archivo oficial [`LICENSE`](./LICENSE).
+
