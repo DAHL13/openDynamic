@@ -6,6 +6,8 @@ using System.Windows.Media;
 using OpenDynamic.App.Animation;
 using OpenDynamic.App.Orchestration;
 using OpenDynamic.App.Widgets.Demo;
+using OpenDynamic.App.Widgets.Hardware;
+using OpenDynamic.App.Widgets.Timer;
 using OpenDynamic.Core.State;
 
 namespace OpenDynamic.App.Windowing;
@@ -164,6 +166,20 @@ public sealed class IslandDebugWindow : Window
         {
             var demoB = _orchestrator.RegisteredWidgets.OfType<DemoWidgetB>().FirstOrDefault();
             demoB?.ArmFaultSimulation();
+            UpdateTelemetry();
+        }));
+
+        demoGrid.Children.Add(CreateButton("💻 Conmutar Monitor de Hardware", () =>
+        {
+            var hw = _orchestrator.RegisteredWidgets.OfType<HardwareWidget>().FirstOrDefault();
+            hw?.ToggleMonitoring();
+            UpdateTelemetry();
+        }));
+
+        demoGrid.Children.Add(CreateButton("⏱ Iniciar Temporizador (1 min)", () =>
+        {
+            var timer = _orchestrator.RegisteredWidgets.OfType<TimerWidget>().FirstOrDefault();
+            timer?.Start(TimeSpan.FromMinutes(1));
             UpdateTelemetry();
         }));
 

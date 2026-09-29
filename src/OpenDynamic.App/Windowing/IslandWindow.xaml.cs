@@ -6,6 +6,7 @@ using System.Windows.Threading;
 using OpenDynamic.App.Animation;
 using OpenDynamic.App.Native;
 using OpenDynamic.App.Orchestration;
+using OpenDynamic.App.Widgets.Hardware;
 using OpenDynamic.Core.State;
 using Serilog;
 
@@ -204,9 +205,26 @@ public partial class IslandWindow : Window
 
     private void SetupContextMenu()
     {
-        IslandHostView.CapsuleBorder.MouseRightButtonUp += (s, e) =>
+        MouseButtonEventHandler openMenu = (s, e) =>
         {
             var menu = new ContextMenu();
+
+            var hwWidget = _orchestrator.RegisteredWidgets.OfType<HardwareWidget>().FirstOrDefault();
+            if (hwWidget != null)
+            {
+                var hwItem = new MenuItem
+                {
+                    Header = "Monitor de Rendimiento (CPU/RAM)",
+                    IsCheckable = true,
+                    IsChecked = hwWidget.IsActive
+                };
+                hwItem.Click += (_, _) =>
+                {
+                    hwWidget.ToggleMonitoring();
+                };
+                menu.Items.Add(hwItem);
+                menu.Items.Add(new Separator());
+            }
 
 #if DEBUG
             var debugItem = new MenuItem { Header = "🛠 Panel de Depuración y Widgets (DEBUG)" };
@@ -223,10 +241,13 @@ public partial class IslandWindow : Window
             };
             menu.Items.Add(closeItem);
 
-            menu.PlacementTarget = IslandHostView.CapsuleBorder;
+            menu.PlacementTarget = s as UIElement ?? IslandHostView.CapsuleBorder;
             menu.IsOpen = true;
             e.Handled = true;
         };
+
+        IslandHostView.CapsuleBorder.MouseRightButtonUp += openMenu;
+        IslandHostView.SatelliteBubble.MouseRightButtonUp += openMenu;
     }
 
     private void SetupMouseInteractions()

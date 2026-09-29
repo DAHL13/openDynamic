@@ -107,18 +107,62 @@ public sealed class HardwareWidget : IslandWidgetBase
 
         if (_settings.EnableHardwareMonitoring)
         {
-            Priority = _settings.DefaultHardwarePriority;
-            IsActive = true;
-            CurrentActivity = new IslandActivity(
-                Id: Id,
-                Title: "Monitor de Rendimiento",
-                Subtitle: "CPU & RAM",
-                Priority: Priority,
-                IsTransient: false,
-                Duration: null);
+            EnableMonitoring();
+        }
+        else
+        {
+            IsActive = false;
+            CurrentActivity = null;
+        }
+    }
 
+    /// <summary>
+    /// Explicitly enables hardware telemetry monitoring.
+    /// Sets IsActive to true, registers the continuous activity, and starts sampling if visible.
+    /// </summary>
+    public void EnableMonitoring()
+    {
+        _settings.EnableHardwareMonitoring = true;
+        Priority = _settings.DefaultHardwarePriority;
+        CurrentActivity = new IslandActivity(
+            Id: Id,
+            Title: "Monitor de Rendimiento",
+            Subtitle: "CPU & RAM",
+            Priority: Priority,
+            IsTransient: false,
+            Duration: null);
+        IsActive = true;
 
-            Log.Information("HardwareWidget initialized with priority {Priority}.", Priority);
+        UpdateSamplingTimerState();
+        Log.Information("HardwareWidget: Telemetry monitoring enabled (Priority: {Priority}).", Priority);
+    }
+
+    /// <summary>
+    /// Explicitly disables hardware telemetry monitoring.
+    /// Sets IsActive to false, clears CurrentActivity, and halts the sampling timer.
+    /// </summary>
+    public void DisableMonitoring()
+    {
+        _settings.EnableHardwareMonitoring = false;
+        IsActive = false;
+        CurrentActivity = null;
+
+        UpdateSamplingTimerState();
+        Log.Information("HardwareWidget: Telemetry monitoring disabled.");
+    }
+
+    /// <summary>
+    /// Toggles hardware monitoring state between active and inactive.
+    /// </summary>
+    public void ToggleMonitoring()
+    {
+        if (IsActive)
+        {
+            DisableMonitoring();
+        }
+        else
+        {
+            EnableMonitoring();
         }
     }
 
@@ -130,12 +174,13 @@ public sealed class HardwareWidget : IslandWidgetBase
 
     /// <summary>
     /// Strict Visibility Condition (Golden Rule 1):
-    /// Activates sampling timer ONLY when actively visible on screen.
-    /// Halts completely when hidden to ensure 0% CPU consumption.
+    /// Activates sampling timer ONLY when actively visible on screen and monitoring is active.
+    /// Halts completely when hidden or inactive to ensure 0% CPU consumption.
     /// </summary>
     private void UpdateSamplingTimerState()
     {
-        bool shouldSample = IsVisibleOnIsland &&
+        bool shouldSample = IsActive &&
+                            IsVisibleOnIsland &&
                             (DisplayMode == WidgetDisplayMode.Compact ||
                              DisplayMode == WidgetDisplayMode.Expanded ||
                              DisplayMode == WidgetDisplayMode.Split);

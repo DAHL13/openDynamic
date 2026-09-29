@@ -86,9 +86,9 @@ public sealed class AppSettings
 
     /// <summary>
     /// Flag to enable hardware monitoring widget.
-    /// Default is true.
+    /// Default is false.
     /// </summary>
-    public bool EnableHardwareMonitoring { get; set; } = true;
+    public bool EnableHardwareMonitoring { get; set; } = false;
 
     /// <summary>
     /// Default priority value for active running countdown timer.
