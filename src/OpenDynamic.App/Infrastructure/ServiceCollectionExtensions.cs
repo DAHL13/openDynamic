@@ -30,6 +30,11 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<OpenDynamic.Core.Media.IMediaService>(sp => sp.GetRequiredService<Services.MediaService>());
         services.AddSingleton<Widgets.Media.MediaWidget>();
 
+        // Audio & Volume Services
+        services.AddSingleton<Services.VolumeService>();
+        services.AddSingleton<OpenDynamic.Core.Audio.IVolumeController>(sp => sp.GetRequiredService<Services.VolumeService>());
+        services.AddSingleton<Widgets.Volume.VolumeWidget>();
+
         return services;
     }
 }

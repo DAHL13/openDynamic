@@ -53,6 +53,10 @@ public partial class App : Application
         var mediaWidget = Services.GetRequiredService<Widgets.Media.MediaWidget>();
         orchestrator.RegisterWidget(mediaWidget);
 
+        // Register VolumeWidget (Priority 80, Transient)
+        var volumeWidget = Services.GetRequiredService<Widgets.Volume.VolumeWidget>();
+        orchestrator.RegisterWidget(volumeWidget);
+
 #if DEBUG
         // Register demo widgets for manual testing/fault injection from debug window
         var demoA = new Widgets.Demo.DemoWidgetA(priority: 70, startActive: false);
