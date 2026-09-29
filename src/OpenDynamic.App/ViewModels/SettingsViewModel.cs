@@ -25,6 +25,8 @@ public partial class SettingsViewModel : ObservableObject
     private readonly IHotkeyService _hotkeyService;
     private readonly IAutostartService _autostartService;
     private readonly Func<IslandWindow>? _getIslandWindow;
+    private readonly NetworkService? _networkService;
+    private readonly DeviceService? _deviceService;
 
     private readonly AppSettings _settings;
 
@@ -127,6 +129,35 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string? _hotkeyConflictMessage;
 
+    // Network Alerts (Phase 11)
+    [ObservableProperty]
+    private bool _enableNetworkAlerts;
+
+    [ObservableProperty]
+    private int _defaultNetworkPriority;
+
+    [ObservableProperty]
+    private double _networkTransientDurationSeconds;
+
+    // Device Alerts (Phase 11)
+    [ObservableProperty]
+    private bool _enableDeviceAlerts;
+
+    [ObservableProperty]
+    private int _defaultDevicePriority;
+
+    [ObservableProperty]
+    private double _deviceTransientDurationSeconds;
+
+    [ObservableProperty]
+    private ObservableCollection<string> _ignoredDeviceNames = new();
+
+    [ObservableProperty]
+    private string _newIgnoredDeviceName = string.Empty;
+
+    [ObservableProperty]
+    private string? _selectedIgnoredDevice;
+
     // Motion and Animations (Phase 10)
     [ObservableProperty]
     private MotionMode _motionMode;
@@ -162,7 +193,9 @@ public partial class SettingsViewModel : ObservableObject
         WindowPositioner windowPositioner,
         IHotkeyService hotkeyService,
         IAutostartService autostartService,
-        Func<IslandWindow>? getIslandWindow = null)
+        Func<IslandWindow>? getIslandWindow = null,
+        NetworkService? networkService = null,
+        DeviceService? deviceService = null)
     {
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _orchestrator = orchestrator ?? throw new ArgumentNullException(nameof(orchestrator));
@@ -170,6 +203,8 @@ public partial class SettingsViewModel : ObservableObject
         _hotkeyService = hotkeyService ?? throw new ArgumentNullException(nameof(hotkeyService));
         _autostartService = autostartService ?? throw new ArgumentNullException(nameof(autostartService));
         _getIslandWindow = getIslandWindow;
+        _networkService = networkService;
+        _deviceService = deviceService;
 
         _settings = _settingsService.CurrentSettings;
 
@@ -208,6 +243,16 @@ public partial class SettingsViewModel : ObservableObject
         _defaultTimerPriority = _settings.DefaultTimerPriority;
         _pomodoroWorkDurationMinutes = _settings.PomodoroWorkDurationMinutes;
         _pomodoroBreakDurationMinutes = _settings.PomodoroBreakDurationMinutes;
+
+        _enableNetworkAlerts = _settings.EnableNetworkAlerts;
+        _defaultNetworkPriority = _settings.DefaultNetworkPriority;
+        _networkTransientDurationSeconds = _settings.NetworkTransientDurationSeconds;
+
+        _enableDeviceAlerts = _settings.EnableDeviceAlerts;
+        _defaultDevicePriority = _settings.DefaultDevicePriority;
+        _deviceTransientDurationSeconds = _settings.DeviceTransientDurationSeconds;
+
+        _ignoredDeviceNames = new ObservableCollection<string>(_settings.IgnoredDeviceNames ?? Enumerable.Empty<string>());
 
         _hideOnFullscreen = _settings.HideOnFullscreen;
         _startWithWindows = _autostartService.IsEnabled();
@@ -399,6 +444,94 @@ public partial class SettingsViewModel : ObservableObject
         _settingsService.SaveDebounced();
     }
 
+    partial void OnEnableNetworkAlertsChanged(bool value)
+    {
+        _settings.EnableNetworkAlerts = value;
+        _settingsService.SaveDebounced();
+
+        if (value)
+        {
+            _networkService?.Start();
+        }
+        else
+        {
+            _networkService?.Stop();
+        }
+    }
+
+    partial void OnDefaultNetworkPriorityChanged(int value)
+    {
+        _settings.DefaultNetworkPriority = value;
+        _settingsService.SaveDebounced();
+    }
+
+    partial void OnNetworkTransientDurationSecondsChanged(double value)
+    {
+        _settings.NetworkTransientDurationSeconds = value;
+        _settingsService.SaveDebounced();
+    }
+
+    partial void OnEnableDeviceAlertsChanged(bool value)
+    {
+        _settings.EnableDeviceAlerts = value;
+        _settingsService.SaveDebounced();
+
+        if (value)
+        {
+            var hwnd = _getIslandWindow?.Invoke()?.Hwnd ?? IntPtr.Zero;
+            _deviceService?.Start(hwnd);
+        }
+        else
+        {
+            _deviceService?.Stop();
+        }
+    }
+
+    partial void OnDefaultDevicePriorityChanged(int value)
+    {
+        _settings.DefaultDevicePriority = value;
+        _settingsService.SaveDebounced();
+    }
+
+    partial void OnDeviceTransientDurationSecondsChanged(double value)
+    {
+        _settings.DeviceTransientDurationSeconds = value;
+        _settingsService.SaveDebounced();
+    }
+
+    [RelayCommand]
+    public void AddIgnoredDevice()
+    {
+        if (string.IsNullOrWhiteSpace(NewIgnoredDeviceName)) return;
+
+        string trimmed = NewIgnoredDeviceName.Trim();
+        if (!IgnoredDeviceNames.Any(d => string.Equals(d, trimmed, StringComparison.OrdinalIgnoreCase)))
+        {
+            IgnoredDeviceNames.Add(trimmed);
+            _settings.IgnoredDeviceNames = IgnoredDeviceNames.ToList();
+            _deviceService?.UpdateIgnoredDevices();
+            _settingsService.SaveDebounced();
+        }
+
+        NewIgnoredDeviceName = string.Empty;
+    }
+
+    [RelayCommand]
+    public void RemoveIgnoredDevice(string? deviceName)
+    {
+        string? target = deviceName ?? SelectedIgnoredDevice;
+        if (string.IsNullOrWhiteSpace(target)) return;
+
+        var existing = IgnoredDeviceNames.FirstOrDefault(d => string.Equals(d, target, StringComparison.OrdinalIgnoreCase));
+        if (existing != null)
+        {
+            IgnoredDeviceNames.Remove(existing);
+            _settings.IgnoredDeviceNames = IgnoredDeviceNames.ToList();
+            _deviceService?.UpdateIgnoredDevices();
+            _settingsService.SaveDebounced();
+        }
+    }
+
     partial void OnHideOnFullscreenChanged(bool value)
     {
         _settings.HideOnFullscreen = value;
@@ -536,6 +669,21 @@ public partial class SettingsViewModel : ObservableObject
         DefaultTimerPriority = _settings.DefaultTimerPriority;
         PomodoroWorkDurationMinutes = _settings.PomodoroWorkDurationMinutes;
         PomodoroBreakDurationMinutes = _settings.PomodoroBreakDurationMinutes;
+
+        EnableNetworkAlerts = _settings.EnableNetworkAlerts;
+        DefaultNetworkPriority = _settings.DefaultNetworkPriority;
+        NetworkTransientDurationSeconds = _settings.NetworkTransientDurationSeconds;
+
+        EnableDeviceAlerts = _settings.EnableDeviceAlerts;
+        DefaultDevicePriority = _settings.DefaultDevicePriority;
+        DeviceTransientDurationSeconds = _settings.DeviceTransientDurationSeconds;
+
+        IgnoredDeviceNames.Clear();
+        foreach (var d in _settings.IgnoredDeviceNames)
+        {
+            IgnoredDeviceNames.Add(d);
+        }
+        _deviceService?.UpdateIgnoredDevices();
 
         HideOnFullscreen = _settings.HideOnFullscreen;
         StartWithWindows = _settings.StartWithWindows;

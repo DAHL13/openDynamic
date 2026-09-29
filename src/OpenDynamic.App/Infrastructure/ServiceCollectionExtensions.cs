@@ -79,6 +79,14 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<Core.Timer.ITimerController>(sp => sp.GetRequiredService<Core.Timer.TimerController>());
         services.AddSingleton<Widgets.Timer.TimerWidget>();
 
+        // Network Services & Widget (Priority 65, Transient)
+        services.AddSingleton<NetworkService>();
+        services.AddSingleton<Widgets.Network.NetworkWidget>();
+
+        // Device Services & Widget (Priority 60, Transient)
+        services.AddSingleton<DeviceService>();
+        services.AddSingleton<Widgets.Device.DeviceWidget>();
+
         // Settings Window & ViewModel
         services.AddSingleton<SettingsViewModel>(sp => new SettingsViewModel(
             sp.GetRequiredService<ISettingsService>(),
@@ -86,7 +94,9 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<WindowPositioner>(),
             sp.GetRequiredService<IHotkeyService>(),
             sp.GetRequiredService<IAutostartService>(),
-            () => sp.GetRequiredService<IslandWindow>()));
+            () => sp.GetRequiredService<IslandWindow>(),
+            sp.GetRequiredService<NetworkService>(),
+            sp.GetRequiredService<DeviceService>()));
         services.AddSingleton<SettingsWindow>();
 
         // System Tray Icon Manager

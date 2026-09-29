@@ -534,6 +534,108 @@
                                 </StackPanel>
                             </StackPanel>
                         </Border>
+
+                        <!-- Network Alerts Card (Phase 11) -->
+                        <Border Style="{StaticResource SettingCard}">
+                            <StackPanel>
+                                <Grid>
+                                    <StackPanel>
+                                        <TextBlock Text="🌐 Alertas de Red (Wi-Fi / Ethernet)" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Avisos transitorios al conectarse, desconectarse o cambiar de red Wi-Fi o cableada." Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <CheckBox IsChecked="{Binding EnableNetworkAlerts}"
+                                              HorizontalAlignment="Right" VerticalAlignment="Center"
+                                              AutomationProperties.Name="Activar alertas de red"/>
+                                </Grid>
+
+                                <StackPanel Margin="0,12,0,0">
+                                    <Grid>
+                                        <TextBlock Text="Prioridad de Red" Style="{StaticResource SettingDesc}"/>
+                                        <TextBlock Text="{Binding DefaultNetworkPriority}" Style="{StaticResource ValueBadge}"/>
+                                    </Grid>
+                                    <Slider Minimum="40" Maximum="80" Value="{Binding DefaultNetworkPriority}" SmallChange="5"
+                                            AutomationProperties.Name="Prioridad de alertas de red"/>
+                                </StackPanel>
+
+                                <StackPanel Margin="0,8,0,0">
+                                    <Grid>
+                                        <TextBlock Text="Duración del Aviso Transitorio" Style="{StaticResource SettingDesc}"/>
+                                        <TextBlock Text="{Binding NetworkTransientDurationSeconds, StringFormat='{}{0:0.0} s'}" Style="{StaticResource ValueBadge}"/>
+                                    </Grid>
+                                    <Slider Minimum="1.0" Maximum="10.0" Value="{Binding NetworkTransientDurationSeconds}" SmallChange="0.5"
+                                            AutomationProperties.Name="Duración del aviso transitorio de red"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Device Alerts Card (Phase 11) -->
+                        <Border Style="{StaticResource SettingCard}">
+                            <StackPanel>
+                                <Grid>
+                                    <StackPanel>
+                                        <TextBlock Text="🔌 Dispositivos USB y Bluetooth" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Avisos instantáneos al conectar o desconectar unidades USB, auriculares, ratones o teclados Bluetooth." Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <CheckBox IsChecked="{Binding EnableDeviceAlerts}"
+                                              HorizontalAlignment="Right" VerticalAlignment="Center"
+                                              AutomationProperties.Name="Activar alertas de dispositivos"/>
+                                </Grid>
+
+                                <StackPanel Margin="0,12,0,0">
+                                    <Grid>
+                                        <TextBlock Text="Prioridad de Dispositivos" Style="{StaticResource SettingDesc}"/>
+                                        <TextBlock Text="{Binding DefaultDevicePriority}" Style="{StaticResource ValueBadge}"/>
+                                    </Grid>
+                                    <Slider Minimum="30" Maximum="75" Value="{Binding DefaultDevicePriority}" SmallChange="5"
+                                            AutomationProperties.Name="Prioridad de alertas de dispositivos"/>
+                                </StackPanel>
+
+                                <StackPanel Margin="0,8,0,0">
+                                    <Grid>
+                                        <TextBlock Text="Duración del Aviso Transitorio" Style="{StaticResource SettingDesc}"/>
+                                        <TextBlock Text="{Binding DeviceTransientDurationSeconds, StringFormat='{}{0:0.0} s'}" Style="{StaticResource ValueBadge}"/>
+                                    </Grid>
+                                    <Slider Minimum="1.0" Maximum="10.0" Value="{Binding DeviceTransientDurationSeconds}" SmallChange="0.5"
+                                            AutomationProperties.Name="Duración del aviso transitorio de dispositivos"/>
+                                </StackPanel>
+
+                                <StackPanel Margin="0,12,0,0">
+                                    <TextBlock Text="Dispositivos Ignorados" FontSize="12.5" FontWeight="SemiBold" Foreground="#E2E8F0"/>
+                                    <TextBlock Text="No se emitirán notificaciones para los dispositivos cuyos nombres coincidan con esta lista." Style="{StaticResource SettingDesc}"/>
+
+                                    <Grid Margin="0,8,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox Text="{Binding NewIgnoredDeviceName, UpdateSourceTrigger=PropertyChanged}"
+                                                 Height="30" VerticalContentAlignment="Center"
+                                                 Padding="8,0" Margin="0,0,8,0"
+                                                 Background="#242732" Foreground="#FFFFFF" BorderBrush="#3B4252"
+                                                 AutomationProperties.Name="Nombre de dispositivo a ignorar"/>
+                                        <Button Grid.Column="1" Content="Añadir"
+                                                Command="{Binding AddIgnoredDeviceCommand}"
+                                                Height="30" Padding="14,0"
+                                                Background="#2563EB" Foreground="#FFFFFF" BorderThickness="0"
+                                                AutomationProperties.Name="Añadir dispositivo a lista de ignorados"/>
+                                    </Grid>
+
+                                    <ListBox ItemsSource="{Binding IgnoredDeviceNames}"
+                                             SelectedItem="{Binding SelectedIgnoredDevice}"
+                                             Height="80" Margin="0,8,0,0"
+                                             Background="#181A20" Foreground="#F0F2F5" BorderBrush="#2A2D36"
+                                             AutomationProperties.Name="Lista de dispositivos ignorados"/>
+
+                                    <Button Content="Eliminar Seleccionado"
+                                            Command="{Binding RemoveIgnoredDeviceCommand}"
+                                            CommandParameter="{Binding SelectedIgnoredDevice}"
+                                            Height="28" Margin="0,6,0,0" Padding="10,0"
+                                            Background="#252A36" Foreground="#EF4444" BorderBrush="#374151"
+                                            HorizontalAlignment="Left"
+                                            AutomationProperties.Name="Eliminar dispositivo seleccionado"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>

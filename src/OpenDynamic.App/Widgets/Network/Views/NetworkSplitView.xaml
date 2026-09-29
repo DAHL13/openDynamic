@@ -1,0 +1,81 @@
+<UserControl x:Class="OpenDynamic.App.Widgets.Network.Views.NetworkSplitView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             mc:Ignorable="d" 
+             Width="36"
+             Height="36"
+             Background="Transparent">
+    <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+        <Border Width="28"
+                Height="28"
+                CornerRadius="14"
+                ClipToBounds="True"
+                Background="#26FFFFFF">
+            <Grid HorizontalAlignment="Center" VerticalAlignment="Center" Width="16" Height="16">
+                <!-- Wi-Fi Icon -->
+                <Path Data="M12 4C7.31 4 3.07 5.9 0 8.98L12 21 24 8.98C20.93 5.9 16.69 4 12 4zm0 3.5c3.78 0 7.22 1.48 9.77 3.9L12 18.25 2.23 11.4C4.78 8.98 8.22 7.5 12 7.5z"
+                      Fill="#FF38BDF8"
+                      Stretch="Uniform"
+                      Width="14"
+                      Height="12">
+                    <Path.Style>
+                        <Style TargetType="Path">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding IsConnected}" Value="True" />
+                                        <Condition Binding="{Binding IsWiFi}" Value="True" />
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Path.Style>
+                </Path>
+
+                <!-- Ethernet Icon -->
+                <Path Data="M4 6h16v10H4V6zm2 2v6h12V8H6zm5 9h2v3h-2v-3z"
+                      Fill="#FF38BDF8"
+                      Stretch="Uniform"
+                      Width="14"
+                      Height="12">
+                    <Path.Style>
+                        <Style TargetType="Path">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding IsConnected}" Value="True" />
+                                        <Condition Binding="{Binding IsEthernet}" Value="True" />
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Path.Style>
+                </Path>
+
+                <!-- Disconnected Icon -->
+                <Path Data="M2.28 3L1 4.28l3.11 3.11C2.5 8.35 1.15 9.61 0 11.08L12 23.1l4.9-4.9 4.82 4.82 1.28-1.28L2.28 3zM12 4C7.31 4 3.07 5.9 0 8.98l2.67 2.68C4.54 9.17 8.08 7.7 12 7.7c2.3 0 4.47.53 6.39 1.48l2.25-2.25C18.15 4.97 15.22 4 12 4z"
+                      Fill="#FFEF4444"
+                      Stretch="Uniform"
+                      Width="14"
+                      Height="12">
+                    <Path.Style>
+                        <Style TargetType="Path">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsConnected}" Value="False">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Path.Style>
+                </Path>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

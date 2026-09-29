@@ -127,6 +127,18 @@ public sealed class SettingsService : ISettingsService
                         }
                     }
 
+                    if (loaded.SchemaVersion < 4)
+                    {
+                        // Migration v3 -> v4: Introduce Network & Device alert settings and ignore list.
+                        loaded.EnableNetworkAlerts = true;
+                        loaded.DefaultNetworkPriority = 65;
+                        loaded.NetworkTransientDurationSeconds = 3.0;
+                        loaded.EnableDeviceAlerts = true;
+                        loaded.DefaultDevicePriority = 60;
+                        loaded.DeviceTransientDurationSeconds = 3.0;
+                        loaded.IgnoredDeviceNames ??= new List<string>();
+                    }
+
                     loaded.SchemaVersion = AppSettings.CurrentSchemaVersion;
                     CurrentSettings = loaded;
                     WriteSettingsToDisk(CurrentSettings);

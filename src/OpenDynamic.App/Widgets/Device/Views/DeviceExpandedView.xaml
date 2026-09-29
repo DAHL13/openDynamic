@@ -1,0 +1,210 @@
+<UserControl x:Class="OpenDynamic.App.Widgets.Device.Views.DeviceExpandedView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             mc:Ignorable="d" 
+             Width="390"
+             Height="150"
+             Background="Transparent">
+    <Grid Margin="20,16,20,18">
+        <Grid.RowDefinitions>
+            <!-- Header -->
+            <RowDefinition Height="Auto" />
+            <!-- Main Content Card -->
+            <RowDefinition Height="*" />
+            <!-- Status Info Footer -->
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Grid Grid.Row="0" Margin="0,0,0,10">
+            <TextBlock Foreground="#88FFFFFF"
+                       FontSize="11"
+                       FontWeight="Medium">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Text" Value="Dispositivo Periférico" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsConnected}" Value="True">
+                                <Setter Property="Text" Value="Dispositivo Conectado" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsConnected}" Value="False">
+                                <Setter Property="Text" Value="Dispositivo Desconectado" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+        </Grid>
+
+        <!-- Center: Icon & Device Info Card -->
+        <Grid Grid.Row="1" VerticalAlignment="Center">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Large Category Icon Container -->
+            <Border Grid.Column="0"
+                    Width="48"
+                    Height="48"
+                    CornerRadius="24"
+                    Margin="0,0,16,0"
+                    VerticalAlignment="Center">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Background" Value="#2638BDF8" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsConnected}" Value="False">
+                                <Setter Property="Background" Value="#26EF4444" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+
+                <Grid HorizontalAlignment="Center" VerticalAlignment="Center" Width="24" Height="24">
+                    <!-- Audio Icon -->
+                    <Path Data="M12 3a9 9 0 0 0-9 9v7c0 1.66 1.34 3 3 3h1a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2H5v-2a7 7 0 0 1 14 0v2h-2a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h1c1.66 0 3-1.34 3-3v-7a9 9 0 0 0-9-9z"
+                          Fill="#FF38BDF8"
+                          Stretch="Uniform"
+                          Width="22"
+                          Height="22">
+                        <Path.Style>
+                            <Style TargetType="Path">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsAudio}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Path.Style>
+                    </Path>
+
+                    <!-- Keyboard Icon -->
+                    <Path Data="M20 5H4c-1.1 0-1.99.9-1.99 2L2 17c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zm-1 2H5v-2h2v2zm0-3H5V8h2v2zm9 7H8v-2h8v2zm0-4h-2v-2h2v2zm0-3h-2V8h2v2zm3 3h-2v-2h2v2zm0-3h-2V8h2v2z"
+                          Fill="#FF38BDF8"
+                          Stretch="Uniform"
+                          Width="22"
+                          Height="22">
+                        <Path.Style>
+                            <Style TargetType="Path">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsKeyboard}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Path.Style>
+                    </Path>
+
+                    <!-- Mouse Icon -->
+                    <Path Data="M13 2v8h6a7 7 0 0 0-6-8zm-2 0a7 7 0 0 0-6 8h6V2zm-6 10a7 7 0 0 0 14 0v-1H5v1z"
+                          Fill="#FF38BDF8"
+                          Stretch="Uniform"
+                          Width="20"
+                          Height="22">
+                        <Path.Style>
+                            <Style TargetType="Path">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsMouse}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Path.Style>
+                    </Path>
+
+                    <!-- Storage Icon -->
+                    <Path Data="M15 7v4h1v2h-3V5h2c.55 0 1 .45 1 1v1zm-7 6h3V5H9c-.55 0-1 .45-1 1v1h1v4zm8-8h-1V3c0-.55-.45-1-1-1H9c-.55 0-1 .45-1 1v2H7c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2z"
+                          Fill="#FF38BDF8"
+                          Stretch="Uniform"
+                          Width="20"
+                          Height="22">
+                        <Path.Style>
+                            <Style TargetType="Path">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsStorage}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Path.Style>
+                    </Path>
+
+                    <!-- Other Icon -->
+                    <Path Data="M15 7v4h1v2h-3V5h2c.55 0 1 .45 1 1zm-7 6h3V5H9c-.55 0-1 .45-1 1v1h1v4zm8-8h-1V3c0-.55-.45-1-1-1H9c-.55 0-1 .45-1 1v2H7c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2z"
+                          Fill="#FF38BDF8"
+                          Stretch="Uniform"
+                          Width="20"
+                          Height="20">
+                        <Path.Style>
+                            <Style TargetType="Path">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsOther}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Path.Style>
+                    </Path>
+                </Grid>
+            </Border>
+
+            <!-- Device Text Info -->
+            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                <TextBlock Text="{Binding Title}"
+                           Foreground="{DynamicResource AppTextPrimaryBrush}"
+                           FontSize="15"
+                           FontWeight="SemiBold"
+                           TextTrimming="CharacterEllipsis"
+                           AutomationProperties.LiveSetting="Polite"
+                           AutomationProperties.Name="{Binding Title}" />
+                <TextBlock Text="{Binding Subtitle}"
+                           Foreground="{DynamicResource AppTextSecondaryBrush}"
+                           FontSize="12"
+                           Margin="0,4,0,0"
+                           AutomationProperties.Name="{Binding Subtitle}" />
+            </StackPanel>
+        </Grid>
+
+        <!-- Footer: Battery or Status indicator -->
+        <Grid Grid.Row="2" Margin="0,8,0,0">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <Border Width="8"
+                        Height="8"
+                        CornerRadius="4"
+                        Margin="0,0,6,0">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Background" Value="#FF22C55E" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsConnected}" Value="False">
+                                    <Setter Property="Background" Value="#FFEF4444" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                </Border>
+                <TextBlock Foreground="#88FFFFFF"
+                           FontSize="10">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Text" Value="Dispositivo listo para su uso" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsConnected}" Value="False">
+                                    <Setter Property="Text" Value="Dispositivo desconectado de forma segura" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</UserControl>

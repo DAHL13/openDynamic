@@ -27,6 +27,8 @@ public partial class IslandWindow : Window
     private readonly IslandAnimator _animator;
     private readonly Services.PowerService? _powerService;
     private readonly FullscreenWatcher? _fullscreenWatcher;
+    private readonly Services.NetworkService? _networkService;
+    private readonly Services.DeviceService? _deviceService;
     private readonly Core.Settings.AppSettings _settings;
 
     private readonly DispatcherTimer _hoverEnterTimer;
@@ -45,7 +47,9 @@ public partial class IslandWindow : Window
         IslandOrchestrator orchestrator,
         Services.PowerService? powerService = null,
         FullscreenWatcher? fullscreenWatcher = null,
-        Core.Settings.AppSettings? settings = null)
+        Core.Settings.AppSettings? settings = null,
+        Services.NetworkService? networkService = null,
+        Services.DeviceService? deviceService = null)
     {
         _windowPositioner = windowPositioner ?? throw new ArgumentNullException(nameof(windowPositioner));
         _foregroundWatcher = foregroundWatcher ?? throw new ArgumentNullException(nameof(foregroundWatcher));
@@ -53,6 +57,8 @@ public partial class IslandWindow : Window
         _animator = orchestrator.Animator;
         _powerService = powerService;
         _fullscreenWatcher = fullscreenWatcher;
+        _networkService = networkService;
+        _deviceService = deviceService;
         _settings = settings ?? new Core.Settings.AppSettings();
 
         InitializeComponent();
@@ -112,6 +118,9 @@ public partial class IslandWindow : Window
             _fullscreenWatcher.FullscreenChanged += OnFullscreenChanged;
             _fullscreenWatcher.Start();
         }
+
+        _networkService?.Start();
+        _deviceService?.Start(_hwnd);
 
         Log.Information("IslandWindow initialized successfully with HWND: {Hwnd}", _hwnd);
     }
@@ -197,6 +206,11 @@ public partial class IslandWindow : Window
             case NativeMethods.WM_SETTINGCHANGE:
                 HandleSettingChange(wParam, lParam);
                 break;
+
+            // React to USB device arrival and removal
+            case NativeMethods.WM_DEVICECHANGE:
+                _deviceService?.HandleDeviceChange(wParam, lParam);
+                break;
         }
 
         return IntPtr.Zero;
@@ -269,6 +283,8 @@ public partial class IslandWindow : Window
                 _hoverEnterTimer.Stop();
                 _hoverLeaveTimer.Stop();
                 _orchestrator.SuspendForPower();
+                _networkService?.NotifySuspended();
+                _deviceService?.NotifySuspended();
                 break;
 
             case NativeMethods.PBT_APMRESUMEAUTOMATIC:
@@ -281,6 +297,8 @@ public partial class IslandWindow : Window
                     _windowPositioner.ReassertTopmost(_hwnd);
                 }
                 _powerService?.RefreshPowerStatus(isInitial: false);
+                _networkService?.NotifyResumed();
+                _deviceService?.NotifyResumed();
                 break;
 
             default:

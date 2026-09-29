@@ -12,6 +12,8 @@ public static class ActivityPriority
     public const int Media = 30;
     public const int Timer = 50;
     public const int Normal = 50;
+    public const int Device = 60;
+    public const int Network = 65;
     public const int Volume = 80;
     public const int Battery = 90;
     public const int TimerAlert = 100;

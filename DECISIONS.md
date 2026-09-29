@@ -393,8 +393,44 @@
      - Se incrementa la versión de esquema a `CurrentSchemaVersion = 3`. `SettingsService.Load()` detecta archivos de configuración previos con `SchemaVersion < 3`, preserva todos los ajustes de usuario existentes y asigna automáticamente `MotionMode = MotionMode.Auto`, persistiendo el archivo actualizado en disco.
      - Se integra un selector de modo de animación con ComboBox accesible y diagnóstico en tiempo real del estado de Windows en la pestaña "Atajos y Sistema" de `SettingsWindow.xaml`.
 
+---
 
+## ADR-019: Alertas Transitorias de Red y Dispositivos Periféricos (Fase 11)
 
+- **Estado:** Aceptado
+- **Fecha:** 2026-09-29
+- **Contexto:**
+  La Fase 11 incorpora en openDynamic el monitoreo reactivo y la visualización transitoria en la muesca (Dynamic Island) de cambios de conectividad de red (Wi-Fi, Ethernet, desconexión) y de periféricos externos (memorias/discos USB, auriculares, ratones, teclados y otros dispositivos Bluetooth). Se exige estricta pureza en Core (Regla de oro 5), consumo 0% CPU en reposo sin sondeo (Regla de oro 1), liberación completa de watchers al desactivar las funciones (Regla de oro 11), supresión total de avisos al iniciar y tras suspensión, anonimización absoluta de telemetría/logs y resolución coordinada en la jerarquía de prioridades.
 
+- **Decisiones Técnicas:**
 
+  1. **Aislamiento de la Lógica de Decisión en Core (Regla de Oro 5):**
+     - Se implementan `NetworkAlertPolicy` y `DeviceAlertPolicy` en `OpenDynamic.Core` sin dependencias de Windows ni WPF, utilizando `TimeProvider` inyectable para posibilitar pruebas unitarias 100% deterministas con `FakeTimeProvider`.
+     - `NetworkAlertPolicy`: Aplica un debounce de 1.0 s ante cambios rápidos o inestabilidad transitoria de interfaces, cooldown de 5.0 s entre alertas de igual estado/red para evitar spam de reconexión, supresión total del estado inicial como línea base y ventana de supresión de 10.0 s tras reanudación de energía (`OnPowerResumed`).
+     - `DeviceAlertPolicy`: Coalescencia de 800 ms para inserciones multifunción o ráfagas de periféricos compuestos, cooldown de 3.0 s, supresión de todos los dispositivos enumerados antes de `EnumerationCompleted` (evitando ruido al arrancar), supresión de 10.0 s tras suspensión y filtrado mediante lista configurable de nombres ignorados.
+
+  2. **Servicios de Plataforma Reactivos en App (Sin Polling):**
+     - `NetworkService`: Se suscribe de forma reactiva al evento WinRT `Windows.Networking.Connectivity.NetworkInformation.NetworkStatusChanged`. Para identificar la red activa se utiliza `ProfileName` del perfil de conexión a Internet, evitando la necesidad de solicitar permisos invasivos de ubicación que Windows 11 exige para consultar el SSID directo de Wi-Fi.
+     - `DeviceService`: Combina la notificación de ventana Win32 `WM_DEVICECHANGE` (`RegisterDeviceNotification` con `GUID_DEVINTERFACE_USB_DEVICE`) para detectar inserciones/extracciones inmediatas de almacenamiento USB en el bucle de mensajes de `IslandWindow`, junto con WinRT `DeviceWatcher` (`AssociationEndpoint`) para detectar la conexión y desconexión de periféricos Bluetooth en tiempo real.
+     - Lectura de Batería Bluetooth: Se extrae el nivel de carga a través de la propiedad de WinRT `System.Devices.BatteryLevel` (entero de 0 a 100) cuando el controlador del dispositivo lo proporciona; en caso contrario, se maneja de forma segura como `null` sin degradar la notificación.
+     - Suspensión y Reanudación de Energía: Se capturan los mensajes `WM_POWERBROADCAST` (`PBT_APMSUSPEND`, `PBT_APMRESUMEAUTOMATIC`, `PBT_APMRESUMESUSPEND`) en `IslandWindow.WndProc` y se notifican a `NetworkService` y `DeviceService` para silenciar falsas alertas durante el despertar del equipo.
+
+  3. **Gestión de Recursos y Desactivación Limpia (Regla de Oro 11 & Budget):**
+     - Al alternar los interruptores en la ventana de Ajustes o al cerrar la aplicación, se invoca `Stop()`:
+       * En `NetworkService`, se desuscribe el manejador `NetworkStatusChanged`.
+       * En `DeviceService`, se detiene el `DeviceWatcher`, se desuscriben sus eventos (`Added`, `Removed`, `Updated`, `EnumerationCompleted`, `Stopped`) y se cancela la notificación nativa de ventana mediante `UnregisterDeviceNotification`.
+
+  4. **Privacidad Estricta en Registros de Auditoría:**
+     - En conformidad con las directrices de privacidad del proyecto, se prohíbe taxativamente registrar nombres amigables de dispositivos periféricos en los archivos de log de Serilog. Solo se registran categorías sanitizadas (`DeviceCategory`), tipos de evento (`Connected`/`Disconnected`) y conteos agregados.
+
+  5. **Notificación en Muesca y Jerarquía de Prioridades:**
+     - Se integran `NetworkWidget` (Prioridad 65, 3.0 s transitorio) y `DeviceWidget` (Prioridad 60, 3.0 s transitorio), provistos de vistas XAML compactas, expandidas y de modo split adaptadas a la muesca superior (`NetworkCompactView`, `NetworkExpandedView`, `NetworkSplitView`, `DeviceCompactView`, `DeviceExpandedView`, `DeviceSplitView`).
+     - Se actualiza la jerarquía global de actividades en `ActivityPriority`:
+       `TimerAlert (100) > Battery (90) > Volume (80) > Network (65) > Device (60) > Timer (50) > Media (30) > Hardware (10)`.
+     - Validado exhaustivamente mediante pruebas unitarias en `PriorityResolverPhase11Tests`.
+
+  6. **Migración de Esquema de Configuración v4:**
+     - Se eleva `CurrentSchemaVersion = 4` en `AppSettings.cs`.
+     - `SettingsService.Load()` migra automáticamente configuraciones previas con `SchemaVersion < 4`, inicializando alertas de red (65, 3.0 s), alertas de dispositivos (60, 3.0 s) y lista de exclusión de dispositivos vacía.
+     - Se incorporan tarjetas de configuración con interruptores, deslizadores y gestión de lista de ignorados con accesibilidad completa (`AutomationProperties.Name`) en la pestaña "Widgets y Prioridades" de `SettingsWindow.xaml`.
 
