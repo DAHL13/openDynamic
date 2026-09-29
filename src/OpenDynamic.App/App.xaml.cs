@@ -65,6 +65,11 @@ public partial class App : Application
         var hardwareWidget = Services.GetRequiredService<Widgets.Hardware.HardwareWidget>();
         orchestrator.RegisterWidget(hardwareWidget);
 
+        // Register TimerWidget (Priority 50 running, Priority 100 on alert)
+        var timerWidget = Services.GetRequiredService<Widgets.Timer.TimerWidget>();
+        orchestrator.RegisterWidget(timerWidget);
+
+
 
 #if DEBUG
         // Register demo widgets for manual testing/fault injection from debug window

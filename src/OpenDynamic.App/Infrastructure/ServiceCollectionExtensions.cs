@@ -46,6 +46,11 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<OpenDynamic.Core.Hardware.IHardwareMonitor>(sp => sp.GetRequiredService<Services.HardwareService>());
         services.AddSingleton<Widgets.Hardware.HardwareWidget>();
 
+        // Timer & Pomodoro Services
+        services.AddSingleton<OpenDynamic.Core.Timer.TimerController>();
+        services.AddSingleton<OpenDynamic.Core.Timer.ITimerController>(sp => sp.GetRequiredService<OpenDynamic.Core.Timer.TimerController>());
+        services.AddSingleton<Widgets.Timer.TimerWidget>();
+
         return services;
     }
 }
