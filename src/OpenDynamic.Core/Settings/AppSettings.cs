@@ -2,10 +2,73 @@ namespace OpenDynamic.Core.Settings;
 
 /// <summary>
 /// Application settings for openDynamic.
-/// Holds configuration values for multimedia, volume, battery monitoring, hardware monitoring, timer, and fullscreen behavior.
+/// Holds configuration values for window placement, widgets, audio, power, hardware monitoring, timer, and hotkeys.
 /// </summary>
 public sealed class AppSettings
 {
+    /// <summary>
+    /// Current configuration schema version for migration tracking.
+    /// </summary>
+    public const int CurrentSchemaVersion = 1;
+
+    /// <summary>
+    /// Configuration schema version. Defaults to <see cref="CurrentSchemaVersion"/>.
+    /// </summary>
+    public int SchemaVersion { get; set; } = CurrentSchemaVersion;
+
+    #region Window and Placement Settings
+
+    /// <summary>
+    /// Index of the target monitor where the island is displayed (0 = Primary monitor).
+    /// </summary>
+    public int TargetMonitorIndex { get; set; } = 0;
+
+    /// <summary>
+    /// Horizontal offset in DIPs from the screen center.
+    /// Default is 0.0.
+    /// </summary>
+    public double OffsetX { get; set; } = 0.0;
+
+    /// <summary>
+    /// Vertical offset in DIPs from the top of the monitor area.
+    /// Default is 8.0.
+    /// </summary>
+    public double OffsetY { get; set; } = 8.0;
+
+    /// <summary>
+    /// Width of the capsule in compact mode in DIPs.
+    /// Default is 160.0.
+    /// </summary>
+    public double CapsuleWidth { get; set; } = 160.0;
+
+    /// <summary>
+    /// Height of the capsule in compact mode in DIPs.
+    /// Default is 36.0.
+    /// </summary>
+    public double CapsuleHeight { get; set; } = 36.0;
+
+    /// <summary>
+    /// Corner radius of the capsule in compact mode in DIPs.
+    /// Default is 18.0.
+    /// </summary>
+    public double CapsuleCornerRadius { get; set; } = 18.0;
+
+    /// <summary>
+    /// Custom scale factor multiplier applied to the island dimensions.
+    /// Default is 1.0 (100%).
+    /// </summary>
+    public double ScaleFactor { get; set; } = 1.0;
+
+    #endregion
+
+    #region Multimedia Settings
+
+    /// <summary>
+    /// Flag to enable or disable the multimedia widget.
+    /// Default is true.
+    /// </summary>
+    public bool EnableMediaWidget { get; set; } = true;
+
     /// <summary>
     /// Grace period in seconds to keep the media widget active after playback is paused.
     /// Default is 10 seconds.
@@ -18,6 +81,16 @@ public sealed class AppSettings
     /// </summary>
     public int DefaultMediaPriority { get; set; } = 30;
 
+    #endregion
+
+    #region Volume Settings
+
+    /// <summary>
+    /// Flag to enable or disable the volume widget.
+    /// Default is true.
+    /// </summary>
+    public bool EnableVolumeWidget { get; set; } = true;
+
     /// <summary>
     /// Default priority value for volume transient activities.
     /// Default is 80.
@@ -29,6 +102,16 @@ public sealed class AppSettings
     /// Default is 2.0 seconds.
     /// </summary>
     public double VolumeTransientDurationSeconds { get; set; } = 2.0;
+
+    #endregion
+
+    #region Battery Settings
+
+    /// <summary>
+    /// Flag to enable or disable the battery widget.
+    /// Default is true.
+    /// </summary>
+    public bool EnableBatteryWidget { get; set; } = true;
 
     /// <summary>
     /// Default priority value for battery and charger alerts.
@@ -60,11 +143,25 @@ public sealed class AppSettings
     /// </summary>
     public int BatteryCriticalThresholdPercent { get; set; } = 10;
 
+    #endregion
+
+    #region Fullscreen Settings
+
     /// <summary>
     /// Indicates whether the island should automatically hide when an application enters fullscreen mode.
     /// Default is true.
     /// </summary>
     public bool HideOnFullscreen { get; set; } = true;
+
+    #endregion
+
+    #region Hardware Settings
+
+    /// <summary>
+    /// Flag to enable hardware monitoring widget.
+    /// Default is false.
+    /// </summary>
+    public bool EnableHardwareMonitoring { get; set; } = false;
 
     /// <summary>
     /// Default priority value for the hardware monitor widget.
@@ -84,11 +181,15 @@ public sealed class AppSettings
     /// </summary>
     public bool EnableGpuMonitoring { get; set; } = false;
 
+    #endregion
+
+    #region Timer Settings
+
     /// <summary>
-    /// Flag to enable hardware monitoring widget.
-    /// Default is false.
+    /// Flag to enable or disable the timer widget.
+    /// Default is true.
     /// </summary>
-    public bool EnableHardwareMonitoring { get; set; } = false;
+    public bool EnableTimerWidget { get; set; } = true;
 
     /// <summary>
     /// Default priority value for active running countdown timer.
@@ -119,4 +220,115 @@ public sealed class AppSettings
     /// Default is 5 minutes.
     /// </summary>
     public int PomodoroBreakDurationMinutes { get; set; } = 5;
+
+    #endregion
+
+    #region Hotkeys and Autostart
+
+    /// <summary>
+    /// Key combination to toggle island visibility.
+    /// Default is "Win+Ctrl+I".
+    /// </summary>
+    public string ToggleIslandHotkey { get; set; } = "Win+Ctrl+I";
+
+    /// <summary>
+    /// Flag to enable or disable global hotkeys.
+    /// Default is true.
+    /// </summary>
+    public bool EnableGlobalHotkeys { get; set; } = true;
+
+    /// <summary>
+    /// Flag indicating whether openDynamic should start with Windows.
+    /// Default is false.
+    /// </summary>
+    public bool StartWithWindows { get; set; } = false;
+
+    #endregion
+
+    /// <summary>
+    /// Creates a deep copy of the current settings instance.
+    /// </summary>
+    public AppSettings Clone()
+    {
+        return new AppSettings
+        {
+            SchemaVersion = this.SchemaVersion,
+            TargetMonitorIndex = this.TargetMonitorIndex,
+            OffsetX = this.OffsetX,
+            OffsetY = this.OffsetY,
+            CapsuleWidth = this.CapsuleWidth,
+            CapsuleHeight = this.CapsuleHeight,
+            CapsuleCornerRadius = this.CapsuleCornerRadius,
+            ScaleFactor = this.ScaleFactor,
+            EnableMediaWidget = this.EnableMediaWidget,
+            MediaPauseGracePeriodSeconds = this.MediaPauseGracePeriodSeconds,
+            DefaultMediaPriority = this.DefaultMediaPriority,
+            EnableVolumeWidget = this.EnableVolumeWidget,
+            DefaultVolumePriority = this.DefaultVolumePriority,
+            VolumeTransientDurationSeconds = this.VolumeTransientDurationSeconds,
+            EnableBatteryWidget = this.EnableBatteryWidget,
+            DefaultBatteryPriority = this.DefaultBatteryPriority,
+            BatteryChargerTransientDurationSeconds = this.BatteryChargerTransientDurationSeconds,
+            BatteryWarningTransientDurationSeconds = this.BatteryWarningTransientDurationSeconds,
+            BatteryLowThresholdPercent = this.BatteryLowThresholdPercent,
+            BatteryCriticalThresholdPercent = this.BatteryCriticalThresholdPercent,
+            HideOnFullscreen = this.HideOnFullscreen,
+            EnableHardwareMonitoring = this.EnableHardwareMonitoring,
+            DefaultHardwarePriority = this.DefaultHardwarePriority,
+            HardwareSamplingIntervalSeconds = this.HardwareSamplingIntervalSeconds,
+            EnableGpuMonitoring = this.EnableGpuMonitoring,
+            EnableTimerWidget = this.EnableTimerWidget,
+            DefaultTimerPriority = this.DefaultTimerPriority,
+            DefaultTimerAlertPriority = this.DefaultTimerAlertPriority,
+            TimerAlertTransientDurationSeconds = this.TimerAlertTransientDurationSeconds,
+            PomodoroWorkDurationMinutes = this.PomodoroWorkDurationMinutes,
+            PomodoroBreakDurationMinutes = this.PomodoroBreakDurationMinutes,
+            ToggleIslandHotkey = this.ToggleIslandHotkey,
+            EnableGlobalHotkeys = this.EnableGlobalHotkeys,
+            StartWithWindows = this.StartWithWindows
+        };
+    }
+
+    /// <summary>
+    /// Copies all values from another <see cref="AppSettings"/> instance into this instance.
+    /// </summary>
+    public void CopyFrom(AppSettings other)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+
+        SchemaVersion = other.SchemaVersion;
+        TargetMonitorIndex = other.TargetMonitorIndex;
+        OffsetX = other.OffsetX;
+        OffsetY = other.OffsetY;
+        CapsuleWidth = other.CapsuleWidth;
+        CapsuleHeight = other.CapsuleHeight;
+        CapsuleCornerRadius = other.CapsuleCornerRadius;
+        ScaleFactor = other.ScaleFactor;
+        EnableMediaWidget = other.EnableMediaWidget;
+        MediaPauseGracePeriodSeconds = other.MediaPauseGracePeriodSeconds;
+        DefaultMediaPriority = other.DefaultMediaPriority;
+        EnableVolumeWidget = other.EnableVolumeWidget;
+        DefaultVolumePriority = other.DefaultVolumePriority;
+        VolumeTransientDurationSeconds = other.VolumeTransientDurationSeconds;
+        EnableBatteryWidget = other.EnableBatteryWidget;
+        DefaultBatteryPriority = other.DefaultBatteryPriority;
+        BatteryChargerTransientDurationSeconds = other.BatteryChargerTransientDurationSeconds;
+        BatteryWarningTransientDurationSeconds = other.BatteryWarningTransientDurationSeconds;
+        BatteryLowThresholdPercent = other.BatteryLowThresholdPercent;
+        BatteryCriticalThresholdPercent = other.BatteryCriticalThresholdPercent;
+        HideOnFullscreen = other.HideOnFullscreen;
+        EnableHardwareMonitoring = other.EnableHardwareMonitoring;
+        DefaultHardwarePriority = other.DefaultHardwarePriority;
+        HardwareSamplingIntervalSeconds = other.HardwareSamplingIntervalSeconds;
+        EnableGpuMonitoring = other.EnableGpuMonitoring;
+        EnableTimerWidget = other.EnableTimerWidget;
+        DefaultTimerPriority = other.DefaultTimerPriority;
+        DefaultTimerAlertPriority = other.DefaultTimerAlertPriority;
+        TimerAlertTransientDurationSeconds = other.TimerAlertTransientDurationSeconds;
+        PomodoroWorkDurationMinutes = other.PomodoroWorkDurationMinutes;
+        PomodoroBreakDurationMinutes = other.PomodoroBreakDurationMinutes;
+        ToggleIslandHotkey = other.ToggleIslandHotkey;
+        EnableGlobalHotkeys = other.EnableGlobalHotkeys;
+        StartWithWindows = other.StartWithWindows;
+    }
 }

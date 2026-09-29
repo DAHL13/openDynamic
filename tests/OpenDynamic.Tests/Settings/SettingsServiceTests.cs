@@ -1,0 +1,291 @@
+using System.Text.Json;
+using OpenDynamic.Core.Settings;
+using Xunit;
+
+namespace OpenDynamic.Tests.Settings;
+
+public sealed class SettingsServiceTests : IDisposable
+{
+    private readonly string _testDirectory;
+
+    public SettingsServiceTests()
+    {
+        _testDirectory = Path.Combine(Path.GetTempPath(), "OpenDynamic_Test_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(_testDirectory);
+    }
+
+    public void Dispose()
+    {
+        try
+        {
+            if (Directory.Exists(_testDirectory))
+            {
+                Directory.Delete(_testDirectory, recursive: true);
+            }
+        }
+        catch
+        {
+            // Ignore test cleanup exceptions
+        }
+    }
+
+    [Fact]
+    public void Load_WhenFileDoesNotExist_CreatesDefaultsAndSavesFile()
+    {
+        string filePath = Path.Combine(_testDirectory, "settings.json");
+        using var service = new SettingsService(filePath, debounceMilliseconds: 100);
+
+        Assert.False(File.Exists(filePath));
+
+        service.Load();
+
+        Assert.True(File.Exists(filePath));
+        Assert.NotNull(service.CurrentSettings);
+        Assert.Equal(AppSettings.CurrentSchemaVersion, service.CurrentSettings.SchemaVersion);
+        Assert.Equal(160.0, service.CurrentSettings.CapsuleWidth);
+        Assert.Equal(36.0, service.CurrentSettings.CapsuleHeight);
+        Assert.Equal("Win+Ctrl+I", service.CurrentSettings.ToggleIslandHotkey);
+    }
+
+    [Fact]
+    public void Load_WhenFileIsValid_LoadsAllConfiguredPropertiesCorrectly()
+    {
+        string filePath = Path.Combine(_testDirectory, "settings.json");
+        var custom = new AppSettings
+        {
+            SchemaVersion = 1,
+            CapsuleWidth = 190.0,
+            CapsuleHeight = 42.0,
+            OffsetX = 15.0,
+            OffsetY = 20.0,
+            TargetMonitorIndex = 2,
+            EnableHardwareMonitoring = true,
+            EnableGpuMonitoring = true,
+            DefaultHardwarePriority = 25,
+            ToggleIslandHotkey = "Ctrl+Shift+D",
+            StartWithWindows = true
+        };
+
+        File.WriteAllText(filePath, JsonSerializer.Serialize(custom));
+
+        using var service = new SettingsService(filePath, debounceMilliseconds: 100);
+        service.Load();
+
+        Assert.Equal(190.0, service.CurrentSettings.CapsuleWidth);
+        Assert.Equal(42.0, service.CurrentSettings.CapsuleHeight);
+        Assert.Equal(15.0, service.CurrentSettings.OffsetX);
+        Assert.Equal(20.0, service.CurrentSettings.OffsetY);
+        Assert.Equal(2, service.CurrentSettings.TargetMonitorIndex);
+        Assert.True(service.CurrentSettings.EnableHardwareMonitoring);
+        Assert.True(service.CurrentSettings.EnableGpuMonitoring);
+        Assert.Equal(25, service.CurrentSettings.DefaultHardwarePriority);
+        Assert.Equal("Ctrl+Shift+D", service.CurrentSettings.ToggleIslandHotkey);
+        Assert.True(service.CurrentSettings.StartWithWindows);
+    }
+
+    [Fact]
+    public void Load_WhenJsonIsCorrupt_CreatesBakFile_LogsWarning_AndRegeneratesDefaultsWithoutCrashing()
+    {
+        string filePath = Path.Combine(_testDirectory, "settings.json");
+        string bakPath = filePath + ".bak";
+        const string corruptContent = "{ this is completely invalid json broken content: 1234, ";
+
+        File.WriteAllText(filePath, corruptContent);
+
+        string? loggedWarning = null;
+        Exception? loggedEx = null;
+
+        using var service = new SettingsService(
+            filePath,
+            warningLogger: (msg, ex) =>
+            {
+                loggedWarning = msg;
+                loggedEx = ex;
+            },
+            debounceMilliseconds: 100);
+
+        // Act - should not throw!
+        service.Load();
+
+        // Assert
+        Assert.NotNull(loggedWarning);
+        Assert.Contains("corrupt or unreadable", loggedWarning);
+        Assert.NotNull(loggedEx);
+
+        // .bak must have been created containing the original corrupt text
+        Assert.True(File.Exists(bakPath));
+        Assert.Equal(corruptContent, File.ReadAllText(bakPath));
+
+        // settings.json must have been regenerated with valid defaults
+        Assert.True(File.Exists(filePath));
+        Assert.NotNull(service.CurrentSettings);
+        Assert.Equal(AppSettings.CurrentSchemaVersion, service.CurrentSettings.SchemaVersion);
+        Assert.Equal(160.0, service.CurrentSettings.CapsuleWidth);
+    }
+
+    [Fact]
+    public void Load_WhenSchemaVersionIsOutdated_MigratesToCurrentSchemaAndSaves()
+    {
+        string filePath = Path.Combine(_testDirectory, "settings.json");
+        // Legacy JSON schema with version 0 or missing
+        const string legacyJson = """
+        {
+            "SchemaVersion": 0,
+            "CapsuleWidth": 175.0,
+            "DefaultMediaPriority": 45
+        }
+        """;
+
+        File.WriteAllText(filePath, legacyJson);
+
+        string? migrationNotice = null;
+        using var service = new SettingsService(
+            filePath,
+            warningLogger: (msg, _) => migrationNotice = msg,
+            debounceMilliseconds: 100);
+
+        service.Load();
+
+        Assert.NotNull(migrationNotice);
+        Assert.Contains("Migrating settings schema", migrationNotice);
+        Assert.Equal(AppSettings.CurrentSchemaVersion, service.CurrentSettings.SchemaVersion);
+        Assert.Equal(175.0, service.CurrentSettings.CapsuleWidth);
+        Assert.Equal(45, service.CurrentSettings.DefaultMediaPriority);
+
+        // File should now contain SchemaVersion = 1
+        string reloadedJson = File.ReadAllText(filePath);
+        Assert.Contains("\"SchemaVersion\": 1", reloadedJson);
+    }
+
+    [Fact]
+    public async Task SaveDebounced_CollapsesMultipleRapidCalls_WritesOnlyAfterDelay()
+    {
+        string filePath = Path.Combine(_testDirectory, "settings.json");
+        using var service = new SettingsService(filePath, debounceMilliseconds: 120);
+
+        service.Load();
+        Assert.Equal(160.0, service.CurrentSettings.CapsuleWidth);
+
+        // Rapid changes in slider simulation
+        service.CurrentSettings.CapsuleWidth = 165.0;
+        service.SaveDebounced();
+
+        service.CurrentSettings.CapsuleWidth = 170.0;
+        service.SaveDebounced();
+
+        service.CurrentSettings.CapsuleWidth = 175.0;
+        service.SaveDebounced();
+
+        // Immediately after, disk file has not been written with 175 yet
+        string immediatelyAfter = File.ReadAllText(filePath);
+        Assert.DoesNotContain("175", immediatelyAfter);
+
+        // Wait for debounce period (120ms + buffer)
+        await Task.Delay(250);
+
+        string afterDebounce = File.ReadAllText(filePath);
+        Assert.Contains("175", afterDebounce);
+    }
+
+    [Fact]
+    public void SaveImmediate_FlushesChangesInstantly()
+    {
+        string filePath = Path.Combine(_testDirectory, "settings.json");
+        using var service = new SettingsService(filePath, debounceMilliseconds: 500);
+
+        service.Load();
+        service.CurrentSettings.CapsuleWidth = 220.0;
+        service.SaveImmediate();
+
+        string content = File.ReadAllText(filePath);
+        Assert.Contains("220", content);
+    }
+
+    [Fact]
+    public void Dispose_FlushesPendingChanges()
+    {
+        string filePath = Path.Combine(_testDirectory, "settings.json");
+        {
+            using var service = new SettingsService(filePath, debounceMilliseconds: 1000);
+            service.Load();
+            service.CurrentSettings.CapsuleWidth = 235.0;
+            service.SaveDebounced(); // Pending in 1000ms
+        } // Dispose called here
+
+        string content = File.ReadAllText(filePath);
+        Assert.Contains("235", content);
+    }
+
+    [Fact]
+    public void AppSettings_CloneAndCopyFrom_ProperlyDuplicatesAllProperties()
+    {
+        var original = new AppSettings
+        {
+            SchemaVersion = 1,
+            CapsuleWidth = 210.0,
+            CapsuleHeight = 44.0,
+            CapsuleCornerRadius = 22.0,
+            OffsetX = 12.0,
+            OffsetY = 16.0,
+            TargetMonitorIndex = 1,
+            ScaleFactor = 1.25,
+            EnableMediaWidget = false,
+            DefaultMediaPriority = 35,
+            MediaPauseGracePeriodSeconds = 15,
+            EnableVolumeWidget = false,
+            DefaultVolumePriority = 85,
+            VolumeTransientDurationSeconds = 2.5,
+            EnableBatteryWidget = false,
+            DefaultBatteryPriority = 95,
+            BatteryChargerTransientDurationSeconds = 4.0,
+            BatteryWarningTransientDurationSeconds = 4.0,
+            BatteryLowThresholdPercent = 25,
+            BatteryCriticalThresholdPercent = 12,
+            HideOnFullscreen = false,
+            EnableHardwareMonitoring = true,
+            DefaultHardwarePriority = 15,
+            HardwareSamplingIntervalSeconds = 3.0,
+            EnableGpuMonitoring = true,
+            EnableTimerWidget = false,
+            DefaultTimerPriority = 55,
+            DefaultTimerAlertPriority = 105,
+            TimerAlertTransientDurationSeconds = 6.0,
+            PomodoroWorkDurationMinutes = 30,
+            PomodoroBreakDurationMinutes = 10,
+            ToggleIslandHotkey = "Win+Alt+O",
+            EnableGlobalHotkeys = false,
+            StartWithWindows = true
+        };
+
+        var cloned = original.Clone();
+
+        Assert.Equal(original.CapsuleWidth, cloned.CapsuleWidth);
+        Assert.Equal(original.CapsuleHeight, cloned.CapsuleHeight);
+        Assert.Equal(original.CapsuleCornerRadius, cloned.CapsuleCornerRadius);
+        Assert.Equal(original.OffsetX, cloned.OffsetX);
+        Assert.Equal(original.OffsetY, cloned.OffsetY);
+        Assert.Equal(original.TargetMonitorIndex, cloned.TargetMonitorIndex);
+        Assert.Equal(original.ScaleFactor, cloned.ScaleFactor);
+        Assert.Equal(original.EnableMediaWidget, cloned.EnableMediaWidget);
+        Assert.Equal(original.DefaultMediaPriority, cloned.DefaultMediaPriority);
+        Assert.Equal(original.MediaPauseGracePeriodSeconds, cloned.MediaPauseGracePeriodSeconds);
+        Assert.Equal(original.EnableVolumeWidget, cloned.EnableVolumeWidget);
+        Assert.Equal(original.DefaultVolumePriority, cloned.DefaultVolumePriority);
+        Assert.Equal(original.VolumeTransientDurationSeconds, cloned.VolumeTransientDurationSeconds);
+        Assert.Equal(original.EnableBatteryWidget, cloned.EnableBatteryWidget);
+        Assert.Equal(original.DefaultBatteryPriority, cloned.DefaultBatteryPriority);
+        Assert.Equal(original.BatteryLowThresholdPercent, cloned.BatteryLowThresholdPercent);
+        Assert.Equal(original.EnableHardwareMonitoring, cloned.EnableHardwareMonitoring);
+        Assert.Equal(original.EnableGpuMonitoring, cloned.EnableGpuMonitoring);
+        Assert.Equal(original.PomodoroWorkDurationMinutes, cloned.PomodoroWorkDurationMinutes);
+        Assert.Equal(original.ToggleIslandHotkey, cloned.ToggleIslandHotkey);
+        Assert.Equal(original.StartWithWindows, cloned.StartWithWindows);
+
+        var destination = new AppSettings();
+        destination.CopyFrom(original);
+
+        Assert.Equal(original.CapsuleWidth, destination.CapsuleWidth);
+        Assert.Equal(original.ToggleIslandHotkey, destination.ToggleIslandHotkey);
+        Assert.Equal(original.StartWithWindows, destination.StartWithWindows);
+    }
+}
