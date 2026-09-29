@@ -23,6 +23,13 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<PriorityResolver>();
         services.AddSingleton<IslandOrchestrator>();
         services.AddSingleton<IslandWindow>();
+
+        // Media & Settings Services
+        services.AddSingleton<OpenDynamic.Core.Settings.AppSettings>();
+        services.AddSingleton<Services.MediaService>();
+        services.AddSingleton<OpenDynamic.Core.Media.IMediaService>(sp => sp.GetRequiredService<Services.MediaService>());
+        services.AddSingleton<Widgets.Media.MediaWidget>();
+
         return services;
     }
 }

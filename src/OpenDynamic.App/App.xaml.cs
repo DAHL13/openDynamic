@@ -44,10 +44,19 @@ public partial class App : Application
         var islandWindow = Services.GetRequiredService<Windowing.IslandWindow>();
         islandWindow.Show();
 
-#if DEBUG
         var orchestrator = Services.GetRequiredService<Orchestration.IslandOrchestrator>();
-        var demoA = new Widgets.Demo.DemoWidgetA(priority: 70);
-        var demoB = new Widgets.Demo.DemoWidgetB(priority: 50);
+
+        // Initialize Media GSMTC Service & Register MediaWidget
+        var mediaService = Services.GetRequiredService<Services.MediaService>();
+        _ = mediaService.InitializeAsync();
+
+        var mediaWidget = Services.GetRequiredService<Widgets.Media.MediaWidget>();
+        orchestrator.RegisterWidget(mediaWidget);
+
+#if DEBUG
+        // Register demo widgets for manual testing/fault injection from debug window
+        var demoA = new Widgets.Demo.DemoWidgetA(priority: 70, startActive: false);
+        var demoB = new Widgets.Demo.DemoWidgetB(priority: 50, startActive: false);
         orchestrator.RegisterWidget(demoA);
         orchestrator.RegisterWidget(demoB);
 #endif
