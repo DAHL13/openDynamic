@@ -35,6 +35,11 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<OpenDynamic.Core.Audio.IVolumeController>(sp => sp.GetRequiredService<Services.VolumeService>());
         services.AddSingleton<Widgets.Volume.VolumeWidget>();
 
+        // Power & Battery Services
+        services.AddSingleton<Services.PowerService>();
+        services.AddSingleton<OpenDynamic.Core.Power.IBatteryMonitor>(sp => sp.GetRequiredService<Services.PowerService>());
+        services.AddSingleton<Widgets.Battery.BatteryWidget>();
+
         return services;
     }
 }

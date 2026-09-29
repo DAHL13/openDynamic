@@ -22,6 +22,7 @@ public partial class IslandWindow : Window
     private readonly ForegroundWatcher _foregroundWatcher;
     private readonly IslandOrchestrator _orchestrator;
     private readonly IslandAnimator _animator;
+    private readonly Services.PowerService? _powerService;
 
     private readonly DispatcherTimer _hoverEnterTimer;
     private readonly DispatcherTimer _hoverLeaveTimer;
@@ -33,12 +34,17 @@ public partial class IslandWindow : Window
     private IslandDebugWindow? _debugWindow;
 #endif
 
-    public IslandWindow(WindowPositioner windowPositioner, ForegroundWatcher foregroundWatcher, IslandOrchestrator orchestrator)
+    public IslandWindow(
+        WindowPositioner windowPositioner,
+        ForegroundWatcher foregroundWatcher,
+        IslandOrchestrator orchestrator,
+        Services.PowerService? powerService = null)
     {
         _windowPositioner = windowPositioner ?? throw new ArgumentNullException(nameof(windowPositioner));
         _foregroundWatcher = foregroundWatcher ?? throw new ArgumentNullException(nameof(foregroundWatcher));
         _orchestrator = orchestrator ?? throw new ArgumentNullException(nameof(orchestrator));
         _animator = orchestrator.Animator;
+        _powerService = powerService;
 
         InitializeComponent();
 
@@ -87,6 +93,8 @@ public partial class IslandWindow : Window
         _foregroundWatcher.ForegroundWindowChanged += OnForegroundWindowChanged;
         _foregroundWatcher.Start();
 
+        _powerService?.RegisterWindowNotifications(_hwnd);
+
         Log.Information("IslandWindow initialized successfully with HWND: {Hwnd}", _hwnd);
     }
 
@@ -130,6 +138,11 @@ public partial class IslandWindow : Window
             case NativeMethods.WM_DPICHANGED:
                 Log.Information("WM_DPICHANGED received. Repositioning IslandWindow...");
                 _windowPositioner.PositionWindow(_hwnd);
+                break;
+
+            // React to system power and battery broadcasts (0% CPU polling)
+            case NativeMethods.WM_POWERBROADCAST:
+                _powerService?.HandlePowerBroadcast(wParam, lParam);
                 break;
         }
 

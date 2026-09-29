@@ -1,0 +1,130 @@
+<UserControl x:Class="OpenDynamic.App.Widgets.Battery.Views.BatteryCompactView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:power="clr-namespace:OpenDynamic.Core.Power;assembly=OpenDynamic.Core"
+             mc:Ignorable="d" 
+             Height="36"
+             Background="Transparent">
+    <Grid Margin="12,0,12,0" VerticalAlignment="Center">
+        <Grid.ColumnDefinitions>
+            <!-- Battery Icon -->
+            <ColumnDefinition Width="Auto" />
+            <!-- Status & Title Details -->
+            <ColumnDefinition Width="*" />
+            <!-- Lightning / Percentage Accent -->
+            <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Battery Visual Icon -->
+        <Grid Grid.Column="0" Margin="0,0,8,0" VerticalAlignment="Center">
+            <!-- Battery Body and Positive Terminal -->
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <!-- Outer Battery Shell -->
+                <Border Width="22"
+                        Height="12"
+                        CornerRadius="2.5"
+                        BorderBrush="#B3FFFFFF"
+                        BorderThickness="1.5"
+                        Padding="1.5"
+                        Background="#22000000">
+                    <!-- Dynamic Fill Level -->
+                    <ProgressBar Minimum="0"
+                                 Maximum="100"
+                                 Value="{Binding Percent, Mode=OneWay}"
+                                 Height="6"
+                                 VerticalAlignment="Center">
+                        <ProgressBar.Template>
+                            <ControlTemplate TargetType="ProgressBar">
+                                <Grid>
+                                    <Border x:Name="PART_Indicator"
+                                            HorizontalAlignment="Left"
+                                            CornerRadius="1">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <!-- Default White Fill -->
+                                                <Setter Property="Background" Value="#FFFFFFFF" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsCharging}" Value="True">
+                                                        <Setter Property="Background" Value="#FF22C55E" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding AlertKind}" Value="{x:Static power:BatteryAlertKind.LowBattery}">
+                                                        <Setter Property="Background" Value="#FFF59E0B" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding AlertKind}" Value="{x:Static power:BatteryAlertKind.CriticalBattery}">
+                                                        <Setter Property="Background" Value="#FFEF4444" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                    </Border>
+                                </Grid>
+                            </ControlTemplate>
+                        </ProgressBar.Template>
+                    </ProgressBar>
+                </Border>
+                <!-- Terminal Bump -->
+                <Border Width="2"
+                        Height="5"
+                        CornerRadius="0,1,1,0"
+                        Background="#B3FFFFFF"
+                        VerticalAlignment="Center" />
+            </StackPanel>
+        </Grid>
+
+        <!-- Textual Alert Details -->
+        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,6,0">
+            <TextBlock Text="{Binding Title}"
+                       Foreground="#FFFFFFFF"
+                       FontSize="10.5"
+                       FontWeight="SemiBold"
+                       TextTrimming="CharacterEllipsis"
+                       TextWrapping="NoWrap" />
+            <TextBlock Text="{Binding Subtitle}"
+                       Foreground="#FFAAAAAA"
+                       FontSize="9"
+                       TextTrimming="CharacterEllipsis"
+                       TextWrapping="NoWrap" />
+        </StackPanel>
+
+        <!-- Right Accent (Lightning bolt if charging, or percent) -->
+        <Grid Grid.Column="2" VerticalAlignment="Center">
+            <!-- Lightning Bolt when Charging -->
+            <Path Data="M7 2v11h3v9l7-12h-4l4-8z"
+                  Fill="#FF22C55E"
+                  Stretch="Uniform"
+                  Width="11"
+                  Height="13"
+                  HorizontalAlignment="Right">
+                <Path.Style>
+                    <Style TargetType="Path">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsCharging}" Value="True">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Path.Style>
+            </Path>
+
+            <!-- Percent Text when not charging -->
+            <TextBlock Text="{Binding Percent, StringFormat='{}{0}%'}"
+                       Foreground="#FFFFFFFF"
+                       FontSize="11"
+                       FontWeight="SemiBold">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Visibility" Value="Visible" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsCharging}" Value="True">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+        </Grid>
+    </Grid>
+</UserControl>

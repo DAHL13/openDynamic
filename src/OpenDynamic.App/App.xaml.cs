@@ -57,6 +57,10 @@ public partial class App : Application
         var volumeWidget = Services.GetRequiredService<Widgets.Volume.VolumeWidget>();
         orchestrator.RegisterWidget(volumeWidget);
 
+        // Register BatteryWidget (Priority 90, Transient)
+        var batteryWidget = Services.GetRequiredService<Widgets.Battery.BatteryWidget>();
+        orchestrator.RegisterWidget(batteryWidget);
+
 #if DEBUG
         // Register demo widgets for manual testing/fault injection from debug window
         var demoA = new Widgets.Demo.DemoWidgetA(priority: 70, startActive: false);
