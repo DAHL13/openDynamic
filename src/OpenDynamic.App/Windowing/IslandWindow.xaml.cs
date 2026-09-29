@@ -185,12 +185,14 @@ public partial class IslandWindow : Window
         {
             if (isFullscreen)
             {
-                Log.Information("Fullscreen detected. Suppressing island.");
+                Log.Information("Fullscreen detected. Suppressing island and collapsing view.");
                 _orchestrator.SuspendForFullscreen();
+                IslandHostView.Visibility = Visibility.Collapsed;
             }
             else
             {
                 Log.Information("Fullscreen exited. Restoring island.");
+                IslandHostView.Visibility = Visibility.Visible;
                 _orchestrator.ResumeFromFullscreen();
                 if (_hwnd != IntPtr.Zero && IsVisible)
                 {

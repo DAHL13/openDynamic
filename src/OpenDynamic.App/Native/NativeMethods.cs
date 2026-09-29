@@ -42,6 +42,8 @@ public static class NativeMethods
 
     // WinEvent Constants
     public const uint EVENT_SYSTEM_FOREGROUND = 0x0003;
+    public const uint EVENT_OBJECT_LOCATIONCHANGE = 0x800B;
+    public const int OBJID_WINDOW = 0x00000000;
     public const uint WINEVENT_OUTOFCONTEXT = 0x0000;
     public const uint WINEVENT_SKIPOWNPROCESS = 0x0002;
 

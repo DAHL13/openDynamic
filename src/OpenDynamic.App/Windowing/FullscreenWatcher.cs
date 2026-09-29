@@ -8,14 +8,15 @@ namespace OpenDynamic.App.Windowing;
 /// <summary>
 /// Reactively detects exclusive fullscreen and borderless maximized fullscreen applications
 /// (e.g. DirectX games, YouTube in browser, VLC media player) using SHQueryUserNotificationState
-/// and WinEvent hooks (EVENT_SYSTEM_FOREGROUND).
+/// and WinEvent hooks (EVENT_SYSTEM_FOREGROUND and EVENT_OBJECT_LOCATIONCHANGE).
 /// Adheres strictly to Golden Rule 1 (CPU ~0% at rest, zero continuous timers).
 /// </summary>
 public sealed class FullscreenWatcher : IDisposable
 {
     private readonly AppSettings _settings;
     private readonly NativeMethods.WinEventProc _winEventProc;
-    private IntPtr _hookHandle = IntPtr.Zero;
+    private IntPtr _foregroundHookHandle = IntPtr.Zero;
+    private IntPtr _locationChangeHookHandle = IntPtr.Zero;
     private bool _isFullscreenActive;
     private bool _isDisposed;
 
@@ -36,18 +37,18 @@ public sealed class FullscreenWatcher : IDisposable
     }
 
     /// <summary>
-    /// Installs the WinEvent hook for EVENT_SYSTEM_FOREGROUND.
+    /// Installs the WinEvent hooks for EVENT_SYSTEM_FOREGROUND and EVENT_OBJECT_LOCATIONCHANGE.
     /// </summary>
     public void Start()
     {
-        if (_hookHandle != IntPtr.Zero || _isDisposed)
+        if (_foregroundHookHandle != IntPtr.Zero || _isDisposed)
         {
             return;
         }
 
         try
         {
-            _hookHandle = NativeMethods.SetWinEventHook(
+            _foregroundHookHandle = NativeMethods.SetWinEventHook(
                 NativeMethods.EVENT_SYSTEM_FOREGROUND,
                 NativeMethods.EVENT_SYSTEM_FOREGROUND,
                 IntPtr.Zero,
@@ -56,14 +57,33 @@ public sealed class FullscreenWatcher : IDisposable
                 0,
                 NativeMethods.WINEVENT_OUTOFCONTEXT | NativeMethods.WINEVENT_SKIPOWNPROCESS);
 
-            if (_hookHandle == IntPtr.Zero)
+            if (_foregroundHookHandle == IntPtr.Zero)
             {
                 int error = Marshal.GetLastWin32Error();
                 Log.Warning("FullscreenWatcher: Failed to install SetWinEventHook for EVENT_SYSTEM_FOREGROUND. Error: {ErrorCode}", error);
             }
             else
             {
-                Log.Debug("FullscreenWatcher successfully installed SetWinEventHook (HookHandle: {HookHandle})", _hookHandle);
+                Log.Debug("FullscreenWatcher successfully installed SetWinEventHook for EVENT_SYSTEM_FOREGROUND (HookHandle: {HookHandle})", _foregroundHookHandle);
+            }
+
+            _locationChangeHookHandle = NativeMethods.SetWinEventHook(
+                NativeMethods.EVENT_OBJECT_LOCATIONCHANGE,
+                NativeMethods.EVENT_OBJECT_LOCATIONCHANGE,
+                IntPtr.Zero,
+                _winEventProc,
+                0,
+                0,
+                NativeMethods.WINEVENT_OUTOFCONTEXT | NativeMethods.WINEVENT_SKIPOWNPROCESS);
+
+            if (_locationChangeHookHandle == IntPtr.Zero)
+            {
+                int error = Marshal.GetLastWin32Error();
+                Log.Warning("FullscreenWatcher: Failed to install SetWinEventHook for EVENT_OBJECT_LOCATIONCHANGE. Error: {ErrorCode}", error);
+            }
+            else
+            {
+                Log.Debug("FullscreenWatcher successfully installed SetWinEventHook for EVENT_OBJECT_LOCATIONCHANGE (HookHandle: {HookHandle})", _locationChangeHookHandle);
             }
 
             // Evaluate current state upon start
@@ -80,24 +100,41 @@ public sealed class FullscreenWatcher : IDisposable
     }
 
     /// <summary>
-    /// Unhooks the WinEvent listener.
+    /// Unhooks the WinEvent listeners.
     /// </summary>
     public void Stop()
     {
-        if (_hookHandle != IntPtr.Zero)
+        if (_foregroundHookHandle != IntPtr.Zero)
         {
             try
             {
-                NativeMethods.UnhookWinEvent(_hookHandle);
-                Log.Debug("FullscreenWatcher unhooked successfully.");
+                NativeMethods.UnhookWinEvent(_foregroundHookHandle);
+                Log.Debug("FullscreenWatcher foreground hook unhooked successfully.");
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Error unhooking WinEvent in FullscreenWatcher.");
+                Log.Error(ex, "Error unhooking foreground WinEvent in FullscreenWatcher.");
             }
             finally
             {
-                _hookHandle = IntPtr.Zero;
+                _foregroundHookHandle = IntPtr.Zero;
+            }
+        }
+
+        if (_locationChangeHookHandle != IntPtr.Zero)
+        {
+            try
+            {
+                NativeMethods.UnhookWinEvent(_locationChangeHookHandle);
+                Log.Debug("FullscreenWatcher location change hook unhooked successfully.");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Error unhooking location change WinEvent in FullscreenWatcher.");
+            }
+            finally
+            {
+                _locationChangeHookHandle = IntPtr.Zero;
             }
         }
     }
@@ -114,6 +151,15 @@ public sealed class FullscreenWatcher : IDisposable
         if (eventType == NativeMethods.EVENT_SYSTEM_FOREGROUND && hwnd != IntPtr.Zero)
         {
             EvaluateFullscreenState(hwnd);
+        }
+        else if (eventType == NativeMethods.EVENT_OBJECT_LOCATIONCHANGE && idObject == NativeMethods.OBJID_WINDOW && hwnd != IntPtr.Zero)
+        {
+            // Efficiency filter: only evaluate if the resizing/moving window is currently the foreground window
+            IntPtr foregroundHwnd = NativeMethods.GetForegroundWindow();
+            if (hwnd == foregroundHwnd)
+            {
+                EvaluateFullscreenState(hwnd);
+            }
         }
     }
 

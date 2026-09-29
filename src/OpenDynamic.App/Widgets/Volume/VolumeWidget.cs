@@ -49,8 +49,19 @@ public sealed class VolumeWidget : IslandWidgetBase
     public bool IsMuted
     {
         get => _isMuted;
-        private set => SetProperty(ref _isMuted, value);
+        private set
+        {
+            if (SetProperty(ref _isMuted, value))
+            {
+                OnPropertyChanged(nameof(MuteButtonText));
+            }
+        }
     }
+
+    /// <summary>
+    /// Semantic text for the mute toggle action button ("Silenciar" / "Silenciado").
+    /// </summary>
+    public string MuteButtonText => IsMuted ? "Silenciado" : "Silenciar";
 
     public VolumeIconType IconType
     {

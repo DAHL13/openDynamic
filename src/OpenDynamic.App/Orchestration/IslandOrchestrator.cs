@@ -33,6 +33,15 @@ public sealed class IslandOrchestrator : IDisposable
     private IIslandWidget? _activePrimaryWidget;
     private IIslandWidget? _activeSecondaryWidget;
 
+    // View reuse cache to prevent layered window flickering on property changes
+    private UserControl? _currentPrimaryView;
+    private string? _currentPrimaryWidgetId;
+    private WidgetDisplayMode? _currentPrimaryMode;
+
+    private UserControl? _currentSecondaryView;
+    private string? _currentSecondaryWidgetId;
+    private WidgetDisplayMode? _currentSecondaryMode;
+
     public IslandStateMachine StateMachine => _stateMachine;
     public IslandAnimator Animator => _animator;
     public PriorityResolver PriorityResolver => _priorityResolver;
@@ -90,6 +99,12 @@ public sealed class IslandOrchestrator : IDisposable
     public void AttachView(IslandView islandView)
     {
         _islandView = islandView ?? throw new ArgumentNullException(nameof(islandView));
+        _currentPrimaryView = null;
+        _currentPrimaryWidgetId = null;
+        _currentPrimaryMode = null;
+        _currentSecondaryView = null;
+        _currentSecondaryWidgetId = null;
+        _currentSecondaryMode = null;
         UpdateOrchestration();
     }
 
@@ -144,6 +159,19 @@ public sealed class IslandOrchestrator : IDisposable
             }
 
             widget.Changed -= OnWidgetChanged;
+        }
+
+        if (_currentPrimaryWidgetId == widget.Id)
+        {
+            _currentPrimaryView = null;
+            _currentPrimaryWidgetId = null;
+            _currentPrimaryMode = null;
+        }
+        if (_currentSecondaryWidgetId == widget.Id)
+        {
+            _currentSecondaryView = null;
+            _currentSecondaryWidgetId = null;
+            _currentSecondaryMode = null;
         }
 
         try
@@ -279,7 +307,7 @@ public sealed class IslandOrchestrator : IDisposable
             }
         }
 
-        // Render views with fault isolation
+        // Render views with fault isolation and view reuse to eliminate flickering
         UserControl? primaryView = null;
         UserControl? secondaryView = null;
 
@@ -289,12 +317,50 @@ public sealed class IslandOrchestrator : IDisposable
                 ? WidgetDisplayMode.Expanded
                 : WidgetDisplayMode.Compact;
 
-            primaryView = SafeCreateView(_activePrimaryWidget, primaryMode);
+            if (_currentPrimaryView != null &&
+                _currentPrimaryWidgetId == _activePrimaryWidget.Id &&
+                _currentPrimaryMode == primaryMode)
+            {
+                // Reuse existing view instance to prevent flicker on property updates
+                primaryView = _currentPrimaryView;
+            }
+            else
+            {
+                primaryView = SafeCreateView(_activePrimaryWidget, primaryMode);
+                _currentPrimaryView = primaryView;
+                _currentPrimaryWidgetId = _activePrimaryWidget.Id;
+                _currentPrimaryMode = primaryMode;
+            }
+        }
+        else
+        {
+            _currentPrimaryView = null;
+            _currentPrimaryWidgetId = null;
+            _currentPrimaryMode = null;
         }
 
         if (_activeSecondaryWidget != null && targetState == IslandState.Split)
         {
-            secondaryView = SafeCreateView(_activeSecondaryWidget, WidgetDisplayMode.Split);
+            const WidgetDisplayMode secondaryMode = WidgetDisplayMode.Split;
+            if (_currentSecondaryView != null &&
+                _currentSecondaryWidgetId == _activeSecondaryWidget.Id &&
+                _currentSecondaryMode == secondaryMode)
+            {
+                secondaryView = _currentSecondaryView;
+            }
+            else
+            {
+                secondaryView = SafeCreateView(_activeSecondaryWidget, secondaryMode);
+                _currentSecondaryView = secondaryView;
+                _currentSecondaryWidgetId = _activeSecondaryWidget.Id;
+                _currentSecondaryMode = secondaryMode;
+            }
+        }
+        else
+        {
+            _currentSecondaryView = null;
+            _currentSecondaryWidgetId = null;
+            _currentSecondaryMode = null;
         }
 
         // Deliver views to IslandView
@@ -336,6 +402,19 @@ public sealed class IslandOrchestrator : IDisposable
             _quarantinedWidgetIds.Add(widget.Id);
         }
 
+        if (_currentPrimaryWidgetId == widget.Id)
+        {
+            _currentPrimaryView = null;
+            _currentPrimaryWidgetId = null;
+            _currentPrimaryMode = null;
+        }
+        if (_currentSecondaryWidgetId == widget.Id)
+        {
+            _currentSecondaryView = null;
+            _currentSecondaryWidgetId = null;
+            _currentSecondaryMode = null;
+        }
+
         try
         {
             widget.Dispose();
@@ -357,6 +436,12 @@ public sealed class IslandOrchestrator : IDisposable
     /// </summary>
     public bool TransitionTo(IslandState targetState)
     {
+        if (_isFullscreenSuppressed && targetState != IslandState.Hidden)
+        {
+            Log.Debug("Transition to {TargetState} suppressed because fullscreen is active.", targetState);
+            return false;
+        }
+
         if (_stateMachine.CurrentState == targetState)
         {
             return true;
@@ -498,6 +583,13 @@ public sealed class IslandOrchestrator : IDisposable
         _transientTimer = null;
 
         WeakReferenceMessenger.Default.UnregisterAll(this);
+
+        _currentPrimaryView = null;
+        _currentPrimaryWidgetId = null;
+        _currentPrimaryMode = null;
+        _currentSecondaryView = null;
+        _currentSecondaryWidgetId = null;
+        _currentSecondaryMode = null;
 
         lock (_widgets)
         {

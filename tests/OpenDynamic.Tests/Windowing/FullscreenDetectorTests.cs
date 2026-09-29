@@ -77,4 +77,41 @@ public class FullscreenDetectorTests
 
         Assert.False(isFullscreen);
     }
+
+    [Fact]
+    public void IsWindowBoundsFullscreen_SecondaryMonitorFullscreen()
+    {
+        // 2nd monitor situated to the right: (1920, 0) to (3840, 1080)
+        bool isFullscreen = FullscreenDetector.IsWindowBoundsFullscreen(
+            winLeft: 1920, winTop: 0, winRight: 3840, winBottom: 1080,
+            monLeft: 1920, monTop: 0, monRight: 3840, monBottom: 1080,
+            isShellOrDesktop: false);
+
+        Assert.True(isFullscreen);
+    }
+
+    [Fact]
+    public void IsWindowBoundsFullscreen_DynamicToggle_EntersAndExitsFullscreen()
+    {
+        // YouTube window before 'F' / 'F11' keypress
+        bool normalWindow = FullscreenDetector.IsWindowBoundsFullscreen(
+            winLeft: 200, winTop: 150, winRight: 1400, winBottom: 900,
+            monLeft: 0, monTop: 0, monRight: 1920, monBottom: 1080,
+            isShellOrDesktop: false);
+        Assert.False(normalWindow);
+
+        // YouTube enters fullscreen via 'F' keypress
+        bool fullscreenWindow = FullscreenDetector.IsWindowBoundsFullscreen(
+            winLeft: 0, winTop: 0, winRight: 1920, winBottom: 1080,
+            monLeft: 0, monTop: 0, monRight: 1920, monBottom: 1080,
+            isShellOrDesktop: false);
+        Assert.True(fullscreenWindow);
+
+        // YouTube exits fullscreen back to normal window
+        bool exitedWindow = FullscreenDetector.IsWindowBoundsFullscreen(
+            winLeft: 200, winTop: 150, winRight: 1400, winBottom: 900,
+            monLeft: 0, monTop: 0, monRight: 1920, monBottom: 1080,
+            isShellOrDesktop: false);
+        Assert.False(exitedWindow);
+    }
 }
