@@ -20,7 +20,7 @@ public sealed class DemoWidgetA : IslandWidgetBase
     public DemoWidgetA(int priority = 70, bool startActive = true) : base(priority)
     {
         CurrentActivity = new IslandActivity(
-            SourceId: Id,
+            Id: Id,
             Title: "Bohemian Rhapsody",
             Subtitle: "Queen - A Night at the Opera",
             Priority: priority);
@@ -197,7 +197,7 @@ public sealed class DemoWidgetB : IslandWidgetBase
     public DemoWidgetB(int priority = 50, bool startActive = true) : base(priority)
     {
         CurrentActivity = new IslandActivity(
-            SourceId: Id,
+            Id: Id,
             Title: "Temporizador",
             Subtitle: "12:45 restantes",
             Priority: priority);
