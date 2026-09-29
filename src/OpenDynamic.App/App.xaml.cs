@@ -72,6 +72,14 @@ public partial class App : Application
         var timerWidget = Services.GetRequiredService<Widgets.Timer.TimerWidget>();
         orchestrator.RegisterWidget(timerWidget);
 
+        // Register NetworkWidget (Priority 65, Transient)
+        var networkWidget = Services.GetRequiredService<Widgets.Network.NetworkWidget>();
+        orchestrator.RegisterWidget(networkWidget);
+
+        // Register DeviceWidget (Priority 60, Transient)
+        var deviceWidget = Services.GetRequiredService<Widgets.Device.DeviceWidget>();
+        orchestrator.RegisterWidget(deviceWidget);
+
         // Initialize System Tray Icon Manager (H.NotifyIcon.Wpf) stored in class field to prevent GC collection
         _trayIconManager = Services.GetRequiredService<TrayIconManager>();
         _trayIconManager.Initialize();

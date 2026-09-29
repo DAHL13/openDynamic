@@ -1,0 +1,11 @@
+using System.Windows.Controls;
+
+namespace OpenDynamic.App.Widgets.Device.Views;
+
+public partial class DeviceCompactView : UserControl
+{
+    public DeviceCompactView()
+    {
+        InitializeComponent();
+    }
+}
