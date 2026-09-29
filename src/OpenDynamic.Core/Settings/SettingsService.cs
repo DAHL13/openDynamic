@@ -1,0 +1,254 @@
+using System.Text.Json;
+
+namespace OpenDynamic.Core.Settings;
+
+/// <summary>
+/// Service responsible for persisting and loading <see cref="AppSettings"/> with schema versioning,
+/// fault tolerance against corrupt files (automatic .bak generation and default regeneration),
+/// and debounced writing (500 ms) to avoid SSD wear.
+/// </summary>
+public sealed class SettingsService : ISettingsService
+{
+    private readonly object _syncLock = new();
+    private readonly Action<string, Exception?>? _warningLogger;
+    private readonly int _debounceMilliseconds;
+    private readonly JsonSerializerOptions _jsonOptions;
+
+    private System.Threading.Timer? _debounceTimer;
+    private bool _isSavePending;
+    private bool _isDisposed;
+
+    /// <summary>
+    /// Gets the current loaded application settings.
+    /// </summary>
+    public AppSettings CurrentSettings { get; private set; }
+
+    /// <summary>
+    /// Gets the target settings file path.
+    /// </summary>
+    public string SettingsFilePath { get; }
+
+    /// <summary>
+    /// Gets the backup file path used when corruption is detected.
+    /// </summary>
+    public string BackupFilePath { get; }
+
+    /// <summary>
+    /// Event fired whenever settings are reloaded, migrated, or updated.
+    /// </summary>
+    public event EventHandler<AppSettings>? SettingsChanged;
+
+    /// <summary>
+    /// Initializes a new instance of <see cref="SettingsService"/>.
+    /// </summary>
+    /// <param name="customFilePath">Optional custom file path for testing or override.</param>
+    /// <param name="warningLogger">Optional logging callback for warnings and corruption notices.</param>
+    /// <param name="debounceMilliseconds">Debounce interval in milliseconds. Defaults to 500 ms.</param>
+    public SettingsService(
+        string? customFilePath = null,
+        Action<string, Exception?>? warningLogger = null,
+        int debounceMilliseconds = 500)
+    {
+        _warningLogger = warningLogger;
+        _debounceMilliseconds = Math.Max(10, debounceMilliseconds);
+
+        if (!string.IsNullOrWhiteSpace(customFilePath))
+        {
+            SettingsFilePath = customFilePath;
+        }
+        else
+        {
+            string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            string folder = Path.Combine(appData, "openDynamic");
+            SettingsFilePath = Path.Combine(folder, "settings.json");
+        }
+
+        BackupFilePath = SettingsFilePath + ".bak";
+        CurrentSettings = new AppSettings();
+
+        _jsonOptions = new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            PropertyNameCaseInsensitive = true
+        };
+    }
+
+    /// <inheritdoc />
+    public void Load()
+    {
+        lock (_syncLock)
+        {
+            EnsureDirectoryExists();
+
+            if (!File.Exists(SettingsFilePath))
+            {
+                // First run: save defaults immediately
+                CurrentSettings = new AppSettings();
+                WriteSettingsToDisk(CurrentSettings);
+                SettingsChanged?.Invoke(this, CurrentSettings);
+                return;
+            }
+
+            try
+            {
+                string json = File.ReadAllText(SettingsFilePath);
+                var loaded = JsonSerializer.Deserialize<AppSettings>(json, _jsonOptions);
+
+                if (loaded == null)
+                {
+                    throw new JsonException("Deserialized AppSettings instance was null.");
+                }
+
+                // Check schema version migration
+                if (loaded.SchemaVersion < AppSettings.CurrentSchemaVersion)
+                {
+                    _warningLogger?.Invoke(
+                        $"Migrating settings schema from v{loaded.SchemaVersion} to v{AppSettings.CurrentSchemaVersion}.",
+                        null);
+
+                    loaded.SchemaVersion = AppSettings.CurrentSchemaVersion;
+                    CurrentSettings = loaded;
+                    WriteSettingsToDisk(CurrentSettings);
+                }
+                else
+                {
+                    CurrentSettings = loaded;
+                }
+
+                SettingsChanged?.Invoke(this, CurrentSettings);
+            }
+            catch (Exception ex) when (ex is JsonException or FormatException or IOException)
+            {
+                _warningLogger?.Invoke(
+                    $"Settings file at '{SettingsFilePath}' was corrupt or unreadable. Backing up to '{BackupFilePath}' and regenerating defaults.",
+                    ex);
+
+                BackupCorruptFile();
+
+                // Recreate default configuration
+                CurrentSettings = new AppSettings();
+                WriteSettingsToDisk(CurrentSettings);
+                SettingsChanged?.Invoke(this, CurrentSettings);
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    public Task LoadAsync()
+    {
+        return Task.Run(Load);
+    }
+
+    /// <inheritdoc />
+    public void SaveDebounced()
+    {
+        lock (_syncLock)
+        {
+            if (_isDisposed) return;
+
+            _isSavePending = true;
+
+            if (_debounceTimer == null)
+            {
+                _debounceTimer = new System.Threading.Timer(OnDebounceTimerElapsed, null, _debounceMilliseconds, Timeout.Infinite);
+            }
+            else
+            {
+                _debounceTimer.Change(_debounceMilliseconds, Timeout.Infinite);
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    public void SaveImmediate()
+    {
+        lock (_syncLock)
+        {
+            if (_isDisposed) return;
+
+            _debounceTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+            _isSavePending = false;
+
+            WriteSettingsToDisk(CurrentSettings);
+            SettingsChanged?.Invoke(this, CurrentSettings);
+        }
+    }
+
+    /// <inheritdoc />
+    public Task SaveImmediateAsync()
+    {
+        return Task.Run(SaveImmediate);
+    }
+
+    private void OnDebounceTimerElapsed(object? state)
+    {
+        lock (_syncLock)
+        {
+            if (_isDisposed || !_isSavePending) return;
+
+            _isSavePending = false;
+            WriteSettingsToDisk(CurrentSettings);
+            SettingsChanged?.Invoke(this, CurrentSettings);
+        }
+    }
+
+    private void WriteSettingsToDisk(AppSettings settings)
+    {
+        try
+        {
+            EnsureDirectoryExists();
+            string json = JsonSerializer.Serialize(settings, _jsonOptions);
+
+            string tempFile = SettingsFilePath + ".tmp";
+            File.WriteAllText(tempFile, json);
+            File.Move(tempFile, SettingsFilePath, overwrite: true);
+        }
+        catch (Exception ex)
+        {
+            _warningLogger?.Invoke($"Failed to write settings to '{SettingsFilePath}'.", ex);
+        }
+    }
+
+    private void BackupCorruptFile()
+    {
+        try
+        {
+            if (File.Exists(SettingsFilePath))
+            {
+                File.Copy(SettingsFilePath, BackupFilePath, overwrite: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            _warningLogger?.Invoke($"Failed to create backup copy at '{BackupFilePath}'.", ex);
+        }
+    }
+
+    private void EnsureDirectoryExists()
+    {
+        string? dir = Path.GetDirectoryName(SettingsFilePath);
+        if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+        {
+            Directory.CreateDirectory(dir);
+        }
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        lock (_syncLock)
+        {
+            if (_isDisposed) return;
+            _isDisposed = true;
+
+            if (_isSavePending)
+            {
+                _isSavePending = false;
+                WriteSettingsToDisk(CurrentSettings);
+            }
+
+            _debounceTimer?.Dispose();
+            _debounceTimer = null;
+        }
+    }
+}

@@ -18,7 +18,7 @@ Repositorio oficial: [https://github.com/DAHL13/openDynamic](https://github.com/
 | **Fase 4** | **Widget multimedia GSMTC (Windows.Media.Control, 0% CPU, Freeze thumbnails, 10s Grace)** | **Completada** |
 | **Fase 5** | **Volumen (NAudio/CoreAudio), batería sin polling (WM_POWERBROADCAST) y pantalla completa (M3)** | **Completada** |
 | **Fase 6** | **Hardware (GetSystemTimes/GlobalMemoryStatusEx), Temporizador/Pomodoro y Modo Split con intercambio (M4)** | **Completada** |
-| Fase 7 | Configuración, persistencia y bandeja del sistema (*System Tray*) | Pendiente |
+| **Fase 7** | **Bandeja del sistema (H.NotifyIcon), Ajustes (MVVM), Atajos Win32 e Inicio automático (M5)** | **Completada** |
 | Fase 8 | Empaquetado y distribución (Inno Setup, publicación Release) | Pendiente |
 
 
@@ -38,6 +38,9 @@ Repositorio oficial: [https://github.com/DAHL13/openDynamic](https://github.com/
 - **Patrón Arquitectónico:** MVVM mediante `CommunityToolkit.Mvvm`
 - **Inyección de Dependencias:** `Microsoft.Extensions.DependencyInjection`
 - **Audio:** `NAudio` (`MMDeviceEnumerator`, `AudioEndpointVolume`) con detección en caliente (`IMMNotificationClient`)
+- **Bandeja del Sistema (Tray):** `H.NotifyIcon.Wpf` (cero WinForms)
+- **Atajos Globales:** Win32 `RegisterHotKey` / `UnregisterHotKey` mediante WndProc
+- **Configuración y Persistencia:** `System.Text.Json` en `%AppData%\openDynamic\settings.json` (versión de esquema y debounce 500ms)
 - **Registro de Eventos (Logging):** `Serilog` y `Serilog.Sinks.File` en `%LocalAppData%\openDynamic\logs`
 - **Pruebas Unitarias:** `xUnit`
 
@@ -109,8 +112,17 @@ openDynamic/
 │  │   │   └─ TimerState.cs
 │  │   ├─ Windowing/               # Detección geométrica y de estado de pantalla completa pura
 │  │   │   └─ FullscreenDetector.cs
-│  │   ├─ Settings/                # Configuración de aplicación (Grace periods, umbrales y prioridades)
-│  │   │   └─ AppSettings.cs
+│  │   ├─ Settings/                # Configuración persistente, versionado de esquema y debounce (500ms)
+│  │   │   ├─ AppSettings.cs
+│  │   │   ├─ ISettingsService.cs
+│  │   │   └─ SettingsService.cs
+│  │   ├─ Hotkeys/                 # Definición y análisis puro de atajos de teclado sin hooks
+│  │   │   ├─ HotkeyDefinition.cs
+│  │   │   └─ HotkeyParser.cs
+│  │   ├─ Autostart/               # Abstracción y lógica de arranque con Windows (HKCU Run)
+│  │   │   ├─ IRegistryAccessor.cs
+│  │   │   ├─ IAutostartService.cs
+│  │   │   └─ AutostartServiceCore.cs
 │  │   └─ Positioning/             # Cálculo puro de posicionamiento geométrico y DPI
 │  │       ├─ IslandPositionCalculator.cs
 │  │       ├─ MonitorArea.cs
@@ -119,8 +131,8 @@ openDynamic/
 │  │       └─ CalculatedWindowPlacement.cs
 │  └─ OpenDynamic.App/              # WPF, net10.0-windows10.0.19041.0
 │      ├─ app.manifest              # PerMonitorV2 DPI awareness
-│      ├─ App.xaml / App.xaml.cs    # Ciclo de vida, DI, manejadores de excepción globales
-│      ├─ Native/                   # P/Invoke a Win32 (estilos, DPI, energía, hardware, pantalla completa)
+│      ├─ App.xaml / App.xaml.cs    # Ciclo de vida, DI, bandeja, atajos y arranque
+│      ├─ Native/                   # P/Invoke a Win32 (RegisterHotKey, monitores, hardware, energía, estilos)
 │      │   └─ NativeMethods.cs
 │      ├─ Animation/                # Coordinador de animación y suscripción a CompositionTarget.Rendering
 │      │   └─ IslandAnimator.cs
@@ -131,38 +143,39 @@ openDynamic/
 │      │   ├─ WindowPositioner.cs
 │      │   ├─ ForegroundWatcher.cs
 │      │   └─ FullscreenWatcher.cs
-│      ├─ Services/                 # Servicios nativos: GSMTC, NAudio CoreAudio, Windows Power y Hardware
+│      ├─ Services/                 # Servicios nativos: GSMTC, NAudio, Energía, Hardware, Hotkeys y Autostart
 │      │   ├─ MediaService.cs
 │      │   ├─ WinRtMediaSession.cs
 │      │   ├─ VolumeService.cs
 │      │   ├─ PowerService.cs
-│      │   └─ HardwareService.cs
-│      ├─ Views/                    # Renderizado elástico y soporte visual Split (satélite circular)
-│      │   ├─ IslandView.xaml
-│      │   └─ IslandView.xaml.cs
+│      │   ├─ HardwareService.cs
+│      │   ├─ IHotkeyService.cs / HotkeyService.cs
+│      │   └─ AutostartService.cs
+│      ├─ ViewModels/               # Arquitectura MVVM para ventana de configuración
+│      │   ├─ SettingsViewModel.cs
+│      │   └─ SettingsConverters.cs
+│      ├─ Views/                    # Renderizado elástico y ventana independiente de ajustes
+│      │   ├─ IslandView.xaml / IslandView.xaml.cs
+│      │   └─ SettingsWindow.xaml / SettingsWindow.xaml.cs
 │      ├─ Widgets/                  # Contrato base, mensajería, widgets multimedia, volumen, batería, hardware y temporizador
 │      │   ├─ IIslandWidget.cs
 │      │   ├─ IslandWidgetBase.cs
 │      │   ├─ Messages/ActivityMessages.cs
 │      │   ├─ Media/                # Widget GSMTC: vistas Compact, Expanded y Split satélite
-│      │   │   ├─ MediaWidget.cs
-│      │   │   └─ Views/
 │      │   ├─ Volume/               # Widget Volumen: vistas Compact, Expanded y Split satélite
-│      │   │   ├─ VolumeWidget.cs
-│      │   │   └─ Views/
 │      │   ├─ Battery/              # Widget Batería: vistas Compact, Expanded y Split satélite
-│      │   │   ├─ BatteryWidget.cs
-│      │   │   └─ Views/
 │      │   ├─ Hardware/             # Widget Hardware: vistas Compact, Expanded y Split satélite (0% CPU reposo)
-│      │   │   ├─ HardwareWidget.cs
-│      │   │   └─ Views/
 │      │   ├─ Timer/                # Widget Temporizador/Pomodoro: vistas Compact, Expanded y Split satélite
-│      │   │   ├─ TimerWidget.cs
-│      │   │   └─ Views/
 │      │   └─ Demo/DemoWidgets.cs   # Condicionado a #if DEBUG
-│      └─ Infrastructure/           # DI, SingleInstance, Logging
+│      ├─ Resources/                # Icono de cápsula integrado
+│      │   └─ app.ico
+│      └─ Infrastructure/           # DI, SingleInstance, Logging, TrayIconManager (H.NotifyIcon)
+│          ├─ ServiceCollectionExtensions.cs
+│          ├─ SingleInstanceManager.cs
+│          ├─ LoggingConfiguration.cs
+│          └─ TrayIconManager.cs
 └─ tests/
-   └─ OpenDynamic.Tests/            # xUnit probando Core (resortes, FSM, prioridades, posicionamiento, temporizador, hardware)
+   └─ OpenDynamic.Tests/            # xUnit probando Core (resortes, FSM, prioridades, settings, hotkeys, autostart)
        ├─ InfrastructureTests.cs
        ├─ Animation/
        │   └─ SpringTests.cs
@@ -178,6 +191,12 @@ openDynamic/
        ├─ Timer/
        │   ├─ FakeTimeProvider.cs
        │   └─ TimerControllerTests.cs
+       ├─ Settings/
+       │   └─ SettingsServiceTests.cs
+       ├─ Hotkeys/
+       │   └─ HotkeyParserTests.cs
+       ├─ Autostart/
+       │   └─ AutostartServiceTests.cs
        └─ Positioning/
            └─ IslandPositionCalculatorTests.cs
 ```

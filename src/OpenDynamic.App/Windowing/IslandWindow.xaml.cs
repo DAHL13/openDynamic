@@ -95,7 +95,7 @@ public partial class IslandWindow : Window
         _hwndSource?.AddHook(WndProc);
 
         ApplyWin32Styles();
-        _windowPositioner.PositionWindow(_hwnd);
+        ApplySettingsAndReposition();
 
         _foregroundWatcher.ForegroundWindowChanged += OnForegroundWindowChanged;
         _foregroundWatcher.Start();
@@ -109,6 +109,28 @@ public partial class IslandWindow : Window
         }
 
         Log.Information("IslandWindow initialized successfully with HWND: {Hwnd}", _hwnd);
+    }
+
+    /// <summary>
+    /// Gets the native window handle (HWND) for this window.
+    /// </summary>
+    public IntPtr Hwnd => _hwnd;
+
+    /// <summary>
+    /// Applies updated settings for monitor, offsets, and capsule dimensions in real-time.
+    /// </summary>
+    public void ApplySettingsAndReposition()
+    {
+        _windowPositioner.TargetMonitorIndex = _settings.TargetMonitorIndex;
+        _windowPositioner.OffsetXDip = _settings.OffsetX;
+        _windowPositioner.TopMarginDip = _settings.OffsetY;
+        _animator.Layout.Compact = new(_settings.CapsuleWidth, _settings.CapsuleHeight, _settings.CapsuleCornerRadius, 1.0);
+        _animator.AnimateTo(_animator.Layout.GetDimensions(_animator.StateMachine.CurrentState));
+
+        if (_hwnd != IntPtr.Zero)
+        {
+            _windowPositioner.PositionWindow(_hwnd);
+        }
     }
 
     /// <summary>
@@ -208,6 +230,19 @@ public partial class IslandWindow : Window
         MouseButtonEventHandler openMenu = (s, e) =>
         {
             var menu = new ContextMenu();
+
+            var settingsItem = new MenuItem
+            {
+                Header = "⚙ Abrir Ajustes...",
+                FontWeight = FontWeights.SemiBold
+            };
+            settingsItem.Click += (_, _) =>
+            {
+                var settingsWindow = ((App)Application.Current).Services.GetService(typeof(Views.SettingsWindow)) as Views.SettingsWindow;
+                settingsWindow?.ShowSettings();
+            };
+            menu.Items.Add(settingsItem);
+            menu.Items.Add(new Separator());
 
             var hwWidget = _orchestrator.RegisteredWidgets.OfType<HardwareWidget>().FirstOrDefault();
             if (hwWidget != null)

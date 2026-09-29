@@ -221,4 +221,40 @@
     - Clic en Cápsula Principal: Si la cápsula está en Split, el clic sobre la cápsula principal expande la actividad primaria actualmente activa (`RequestExpand()`).
     - Al expirar actividades o ingresar alertas transitorias (batería P=90 o volumen P=80), la alerta toma la cápsula y al expirar se restaura el estado Split continuo de forma automática.
 
+---
+
+## ADR-015: Persistencia Robusta (settings.json), Bandeja del Sistema (H.NotifyIcon.Wpf), Ventana de Ajustes MVVM y Atajos Globales Win32 (RegisterHotKey) - Hito M5
+
+- **Estado:** Aceptado
+- **Fecha:** 2026-09-29
+- **Contexto:** La Fase 7 (Hito M5) requiere persistencia de configuración de usuario con tolerancia a fallos, icono de bandeja nativo de WPF sin WinForms, panel de ajustes con entrada de texto aislada y aplicación de cambios en tiempo real, atajos de teclado globales pacíficos sin hooks de bajo nivel y arranque con Windows sin elevación UAC.
+- **Decisiones:**
+  - **Persistencia Robusta de Configuración (settings.json):**
+    - Ubicación estándar en `%AppData%\openDynamic\settings.json`.
+    - Versionado de esquema con `SchemaVersion = 1` y migración automática transparente.
+    - Tolerancia a fallos: Si el archivo está corrupto o ilegible, crea un respaldo automático `settings.json.bak`, registra la advertencia estructurada en Serilog y regenera los valores predeterminados sin colapsar la aplicación.
+    - Escritura con debounce (500 ms) utilizando temporizadores de un solo disparo para proteger unidades SSD ante movimientos continuos de controles deslizantes (sliders).
+    - Métodos `SaveImmediate()` y `Dispose()` para garantizar el vaciado inmediato a disco durante el cierre de la app o antes de la finalización de procesos.
+    - Pruebas unitarias exhaustivas en `OpenDynamic.Tests.Settings.SettingsServiceTests` (serialización, carga, respaldo `.bak` ante JSON corrupto, migración de esquema y debounce).
+  - **Icono en la Bandeja del Sistema (`H.NotifyIcon.Wpf`):**
+    - Prohibición estricta de `System.Windows.Forms` (Regla de oro 3).
+    - Clic izquierdo sobre el icono alterna suavemente la cápsula entre visible (`Compact`) y oculta (`Hidden`).
+    - Clic derecho despliega un menú contextual completo con diseño oscuro: *Abrir Ajustes*, *Conmutar Monitor de Hardware*, *Reiniciar Posición* y *Salir de openDynamic*.
+    - Limpieza garantizada: Al salir de la aplicación, el icono se elimina inmediatamente de la bandeja mediante `Dispose()` explícito, evitando iconos fantasma al pasar el puntero del ratón.
+  - **Ventana de Ajustes (`SettingsWindow`) y Aislamiento de Foco:**
+    - Ventana WPF tradicional con arquitectura MVVM (`SettingsViewModel`).
+    - **Regla de oro de entrada:** Toda entrada de texto o numérica reside EXCLUSIVAMENTE en `SettingsWindow`. La cápsula flotante `IslandWindow` mantiene intacto su estilo `WS_EX_NOACTIVATE` y jamás roba el foco de teclado ni contiene `TextBox`.
+    - Aplicación en vivo (*Live Updates*): Los cambios en monitor, márgenes (X/Y), ancho/alto/radio de cápsula, switches de widgets (Hardware, GPU, etc.) y atajos se aplican al instante sobre la cápsula activa sin necesidad de reiniciar la app.
+    - Ocultamiento reactivo: Al presionar "Cerrar" o la 'X', la ventana intercepta `OnClosing` y se oculta (`Hide()`) preservando el ciclo de vida de la aplicación.
+  - **Atajos de Teclado Globales (`HotkeyService`):**
+    - Prohibición estricta de hooks de teclado globales de bajo nivel (`WH_KEYBOARD_LL`) por consumo de CPU y latencia (Regla de oro 2).
+    - Implementación mediante la API nativa de Win32 `RegisterHotKey` y `UnregisterHotKey` vinculada al procedimiento de ventana (`WndProc`) a través del `HwndSource` de `IslandWindow`.
+    - Atajo predeterminado: `Win+Ctrl+I` para alternar la visibilidad de la isla.
+    - Manejo pacífico de colisiones: Si otra aplicación tiene registrado el atajo (código de error Win32 1409), se notifica pacíficamente en la UI de Ajustes sin lanzar excepciones no controladas.
+  - **Arranque con Windows (`AutostartService`):**
+    - Modificación de la clave de registro del usuario actual: `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`.
+    - Sin elevación de privilegios UAC (Regla de oro 3).
+    - Verificación y corrección automática de la ruta del ejecutable si la aplicación cambió de directorio.
+
+
 

@@ -150,4 +150,28 @@ public class IslandPositionCalculatorTests
         Assert.Equal(1920, area.Right);
         Assert.Equal(1080, area.Bottom);
     }
+
+    [Fact]
+    public void CalculatePlacement_WithCustomOffsets_AppliesDpiScaledOffsetsCorrectly()
+    {
+        var monitor = new MonitorArea(0, 0, 1920, 1080);
+        var dpi = DisplayDpi.FromScale(1.5); // 150% scale
+        double topMargin = 20.0;
+        double offsetX = 50.0;
+
+        var placement = IslandPositionCalculator.CalculatePlacement(
+            monitor,
+            dpi,
+            WindowDimensions.DefaultIsland,
+            topMarginDip: topMargin,
+            offsetXDip: offsetX);
+
+        // Physical width: 640 * 1.5 = 960
+        Assert.Equal(960, placement.Width);
+        // Base centered X: (1920 - 960) / 2 = 480. Offset: 50 * 1.5 = 75. Expected X: 480 + 75 = 555
+        Assert.Equal(555, placement.X);
+        // Expected Y: 20 * 1.5 = 30
+        Assert.Equal(30, placement.Y);
+    }
 }
+
