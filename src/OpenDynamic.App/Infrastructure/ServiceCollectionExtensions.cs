@@ -1,5 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
+using OpenDynamic.App.Animation;
 using OpenDynamic.App.Windowing;
+using OpenDynamic.Core.State;
 
 namespace OpenDynamic.App.Infrastructure;
 
@@ -13,7 +15,11 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<SingleInstanceManager>();
         services.AddSingleton<WindowPositioner>();
         services.AddSingleton<ForegroundWatcher>();
+        services.AddSingleton<IslandStateMachine>();
+        services.AddSingleton<IslandLayout>();
+        services.AddSingleton<IslandAnimator>();
         services.AddSingleton<IslandWindow>();
         return services;
     }
 }
+
