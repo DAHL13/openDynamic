@@ -225,6 +225,9 @@ public partial class IslandWindow : Window
         _animator.ApplyProfile(resolvedProfile);
         IslandHostView.UpdateMotionProfile(resolvedProfile);
 
+        CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger.Default.Send(
+            new Widgets.Messages.MotionProfileChangedMessage(resolvedProfile));
+
         Log.Information("MotionProfile updated live. Mode: {MotionMode}, Windows Animations: {SystemAnimations}, Stiffness: {Stiffness}, AllowDecorative: {AllowDecorative}",
             _settings.MotionMode, systemAnimations, resolvedProfile.Stiffness, resolvedProfile.AllowDecorative);
     }

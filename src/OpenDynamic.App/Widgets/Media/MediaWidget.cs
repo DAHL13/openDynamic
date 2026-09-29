@@ -2,8 +2,10 @@ using System.Windows.Controls;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Messaging;
 using OpenDynamic.App.Services;
 using OpenDynamic.App.Widgets.Media.Views;
+using OpenDynamic.App.Widgets.Messages;
 using OpenDynamic.Core.Media;
 using OpenDynamic.Core.Settings;
 using OpenDynamic.Core.Widgets;
@@ -78,11 +80,41 @@ public sealed class MediaWidget : IslandWidgetBase
         private set => SetProperty(ref _hasThumbnail, value);
     }
 
+    private bool _isDecorativeAllowed = true;
+
     public bool IsPlaying
     {
         get => _isPlaying;
-        private set => SetProperty(ref _isPlaying, value);
+        private set
+        {
+            if (SetProperty(ref _isPlaying, value))
+            {
+                OnPropertyChanged(nameof(EqualizerVisibility));
+            }
+        }
     }
+
+    /// <summary>
+    /// Indicates whether decorative animations (such as equalizer bars) are permitted.
+    /// In reduced motion mode, decorative animations are suppressed (Task 4).
+    /// </summary>
+    public bool IsDecorativeAllowed
+    {
+        get => _isDecorativeAllowed;
+        set
+        {
+            if (SetProperty(ref _isDecorativeAllowed, value))
+            {
+                OnPropertyChanged(nameof(EqualizerVisibility));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Equalizer bars are visible ONLY if decorative animations are allowed and music is playing.
+    /// </summary>
+    public System.Windows.Visibility EqualizerVisibility =>
+        (_isDecorativeAllowed && _isPlaying) ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
 
     public TimeSpan CurrentPosition
     {
@@ -170,6 +202,14 @@ public sealed class MediaWidget : IslandWidgetBase
         SkipPreviousCommand = new AsyncRelayCommand(ExecuteSkipPreviousAsync);
         SkipNextCommand = new AsyncRelayCommand(ExecuteSkipNextAsync);
         ActivateAppCommand = new RelayCommand(ExecuteActivateApp);
+
+        WeakReferenceMessenger.Default.Register<MotionProfileChangedMessage>(this, (_, msg) =>
+        {
+            _dispatcher.InvokeAsync(() =>
+            {
+                IsDecorativeAllowed = msg.Value.AllowDecorative;
+            });
+        });
     }
 
     public override void Initialize()

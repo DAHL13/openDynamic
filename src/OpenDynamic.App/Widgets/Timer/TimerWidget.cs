@@ -103,6 +103,23 @@ public sealed class TimerWidget : IslandWidgetBase
             Interval = TimeSpan.FromSeconds(1)
         };
         _tickTimer.Tick += OnTickTimerTick;
+
+        CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger.Default.Register<Messages.MotionProfileChangedMessage>(this, (_, msg) =>
+        {
+            IsDecorativeAllowed = msg.Value.AllowDecorative;
+        });
+    }
+
+    private bool _isDecorativeAllowed = true;
+
+    /// <summary>
+    /// Indicates whether decorative animations are permitted.
+    /// In reduced motion mode, alert animations are kept strictly static (Task 4).
+    /// </summary>
+    public bool IsDecorativeAllowed
+    {
+        get => _isDecorativeAllowed;
+        set => SetProperty(ref _isDecorativeAllowed, value);
     }
 
     public override void Initialize()

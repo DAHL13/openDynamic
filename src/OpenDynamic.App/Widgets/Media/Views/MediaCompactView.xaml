@@ -59,12 +59,13 @@
                        TextWrapping="NoWrap" />
         </StackPanel>
 
-        <!-- Audio Equalizer Wave Bars -->
+        <!-- Audio Equalizer Wave Bars (hidden in reduced motion mode) -->
         <StackPanel Grid.Column="2"
                     Orientation="Horizontal"
                     VerticalAlignment="Center"
                     Height="12"
-                    Width="14">
+                    Width="14"
+                    Visibility="{Binding EqualizerVisibility}">
             <Border Width="2" Height="6" CornerRadius="1" Background="#FF1ED760" Margin="0,0,1.2,0" VerticalAlignment="Center" />
             <Border Width="2" Height="12" CornerRadius="1" Background="#FF1ED760" Margin="0,0,1.2,0" VerticalAlignment="Center" />
             <Border Width="2" Height="8" CornerRadius="1" Background="#FF1ED760" Margin="0,0,1.2,0" VerticalAlignment="Center" />
