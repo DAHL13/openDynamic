@@ -3,6 +3,39 @@
 Todas las modificaciones notables en este proyecto serán documentadas en este archivo.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y cumple con [SemVer](https://semver.org/).
 
+## [0.8.0] - 2026-09-29 (Fase 7: Bandeja, Ajustes, Atajos e Inicio Automático - Hito M5)
+
+### Añadido
+- Persistencia robusta y versionada de configuración en `OpenDynamic.Core.Settings`:
+  - `AppSettings`: Versionado de esquema (`SchemaVersion = 1`), propiedades para monitor, desplazamientos X/Y, dimensiones de cápsula (ancho/alto/radio), factores de escala, umbrales, atajos y arranque.
+  - `ISettingsService` y `SettingsService`: Carga y guardado en `%AppData%\openDynamic\settings.json`.
+  - Tolerancia a fallos: Respaldo automático `settings.json.bak` si el archivo está corrupto o ilegible, registro en Serilog y regeneración limpia de valores predeterminados sin colapsar la app.
+  - Escritura con debounce de 500 ms mediante temporizadores para evitar el desgaste innecesario de unidades SSD durante el arrastre de sliders.
+  - Métodos `SaveImmediate()` y `Dispose()` para vaciado instantáneo antes del cierre.
+- Integración de bandeja del sistema en `OpenDynamic.App.Infrastructure.TrayIconManager`:
+  - Uso exclusivo de `H.NotifyIcon.Wpf` cumpliendo estrictamente con la Regla de Oro 3 (cero WinForms).
+  - Clic izquierdo para alternar la visibilidad de la isla entre visible y oculta (`Hidden`).
+  - Menú contextual completo con tema oscuro: *Abrir Ajustes*, *Conmutar Monitor de Hardware*, *Reiniciar Posición* y *Salir de openDynamic*.
+  - Limpieza garantizada: Liberación explícita con `Dispose()` sin dejar iconos fantasma al pasar el puntero.
+- Panel de configuración independiente en `OpenDynamic.App.Views.SettingsWindow`:
+  - Arquitectura MVVM completa con `SettingsViewModel` (`CommunityToolkit.Mvvm`).
+  - Regla de oro de entrada: Entradas de texto y controles de configuración aislados estrictamente a esta ventana; la cápsula flotante jamás roba foco ni aloja `TextBox`.
+  - Aplicación de cambios en tiempo real (*Live Updates*): Ajustar sliders (offsets, ancho, alto, radio), switches de hardware/GPU o temporizador se refleja en vivo en la isla sin necesidad de reiniciar la app.
+  - Ocultamiento reactivo al cerrar la ventana (`Hide()`) para preservar el estado y ciclo de vida de la aplicación.
+- Atajos de teclado globales en `OpenDynamic.App.Services.HotkeyService`:
+  - API nativa Win32 `RegisterHotKey` / `UnregisterHotKey` vinculada al procedimiento de ventana (`WndProc`) vía `HwndSource`. Prohibidos hooks globales de bajo nivel (Regla de oro 2).
+  - Atajo predeterminado `Win+Ctrl+I` para alternar la visibilidad de la isla.
+  - Parser y normalizador de acordes `HotkeyParser` en `OpenDynamic.Core.Hotkeys`.
+  - Detección pacífica de colisiones (error Win32 1409) con aviso visual en la UI de Ajustes sin lanzar excepciones.
+- Servicio de inicio con Windows en `OpenDynamic.App.Services.AutostartService`:
+  - Modificación del registro `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` sin elevación de privilegios UAC (Regla de oro 3).
+  - Verificación y corrección automática de la ruta del ejecutable ante cambios de ubicación de la app.
+- Batería de 30 nuevas pruebas unitarias en `OpenDynamic.Tests` (total 193 en verde):
+  - `SettingsServiceTests`: Creación por defecto, carga válida, respaldo `.bak` ante JSON corrupto, migración de esquema, debounce de 500ms, vaciado inmediato y clonación.
+  - `HotkeyParserTests`: Parser de teclas, validación de combinaciones con modificadores, flag `NoRepeat` y normalización.
+  - `AutostartServiceTests`: Verificación de clave de registro, adición con comillas, eliminación y sincronización ante cambio de ruta ejecutable.
+  - `IslandPositionCalculatorTests`: Cálculo geométrico con `offsetXDip` y DPI scaling.
+
 ## [0.7.0] - 2026-09-28 (Fase 6: Hardware, Temporizador y Modo Split Multitasking - Hito M4)
 
 ### Añadido
