@@ -44,6 +44,14 @@ public partial class App : Application
         var islandWindow = Services.GetRequiredService<Windowing.IslandWindow>();
         islandWindow.Show();
 
+#if DEBUG
+        var orchestrator = Services.GetRequiredService<Orchestration.IslandOrchestrator>();
+        var demoA = new Widgets.Demo.DemoWidgetA(priority: 70);
+        var demoB = new Widgets.Demo.DemoWidgetB(priority: 50);
+        orchestrator.RegisterWidget(demoA);
+        orchestrator.RegisterWidget(demoB);
+#endif
+
         SetupTemporaryShutdownMechanisms(e.Args);
     }
 
