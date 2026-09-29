@@ -135,7 +135,47 @@
   - **Tiempo de gracia tras pausa (10 segundos):** Al pausar la reproducción, la actividad se mantiene visible durante 10 segundos antes de desactivarse (`IsActive = false`), cancelándose el temporizador si se reanuda la música antes de los 10 segundos. Si el reproductor se cierra (`SessionClosed`), la actividad se retira inmediatamente sin esperar. Configurable mediante `AppSettings.MediaPauseGracePeriodSeconds`.
   - **Activación de App emisora (PrimaryAction):** Búsqueda de ventanas y activación a primer plano (`SetForegroundWindow`, `ShowWindow`) a partir del `SourceAppUserModelId` o nombre de proceso de forma pacífica en `try/catch`.
 
+---
 
+## ADR-010: Control y Monitoreo Reactivo de Audio (NAudio / CoreAudio), Detección en Caliente (IMMNotificationClient) y Actividad Transitoria con Rueda del Ratón
 
+- **Estado:** Aceptado
+- **Fecha:** 2026-09-28
+- **Contexto:** La Fase 5 demanda control y visualización de volumen en tiempo real mediante NAudio, captura de eventos nativos de Windows y teclas multimedia, reconexión inmediata al cambiar de dispositivo de audio predeterminado (auriculares USB, Bluetooth, DAC) y ajuste de volumen interactivo sobre la cápsula reiniciando el tiempo de gracia.
+- **Decisiones:**
+  - **Aislamiento en Core (Regla de oro 5):** `IVolumeController`, `VolumeChangedEventArgs`, `VolumeCalculator` y `VolumeIconType` en `OpenDynamic.Core.Audio` sin dependencias de UI ni Windows. Las operaciones de normalización, pasos de rueda (`CalculateLevelStep`) y redondeo se validan con pruebas unitarias exhaustivas en `OpenDynamic.Tests`.
+  - **Servicio Nativo CoreAudio (NAudio):** `VolumeService` utiliza `MMDeviceEnumerator` y `AudioEndpointVolume`. Todas las invocaciones a interfaces COM se blindan bajo bloques `try/catch` con log en Serilog (Regla de oro 4).
+  - **Reconexión en caliente mediante COM nativo:** Implementa `IMMNotificationClient` registrado sobre la interfaz COM `IMMDeviceEnumerator` con GUIDs estándar. Al dispararse `OnDefaultDeviceChanged`, desengancha el endpoint anterior, enlaza el nuevo dispositivo predeterminado y actualiza el nivel y mute sin interrupciones.
+  - **Actividad Transitoria y Prolongación:** `VolumeWidget` opera como actividad transitoria con prioridad 80 y duración de 2.0 s. La interacción con la rueda del ratón (`MouseWheel`) sobre la cápsula ajusta el volumen y reinicia el temporizador de auto-expiración de 2 segundos, impidiendo transiciones indeseadas de colapso/expansión.
 
+---
+
+## ADR-011: Monitorización de Energía y Alertas de Batería sin Polling (WM_POWERBROADCAST) con Supresión de Re-notificaciones
+
+- **Estado:** Aceptado
+- **Fecha:** 2026-09-28
+- **Contexto:** Las alertas de cargador y batería baja exigen cumplimiento estricto de la Regla de Oro 1 (CPU ~0% en reposo, prohibición absoluta de temporizadores de sondeo cada segundo) y garantía de emitir exactamente una sola alerta por cruce de umbral (20% y 10%) sin spam ante fluctuaciones de voltaje.
+- **Decisiones:**
+  - **Cero Polling (Regla de oro 1):** Prohibido el uso de timers periódicos de batería. La detección se basa exclusivamente en eventos de Windows: intercepción de `WM_POWERBROADCAST` en el `WndProc` de `IslandWindow` y registro de notificaciones con `RegisterPowerSettingNotification` (`GUID_ACDC_POWER_SOURCE` y `GUID_BATTERY_PERCENTAGE_REMAINING`). La consulta `GetSystemPowerStatus` se ejecuta únicamente ante dichos eventos.
+  - **Tracker de umbrales con histéresis en Core (Regla de oro 5):** `BatteryThresholdTracker` gestiona de forma pura las transiciones:
+    - Emite `LowBattery` (<= 20%) exactamente una sola vez por ciclo de descarga.
+    - Emite `CriticalBattery` (<= 10%) exactamente una sola vez por ciclo de descarga.
+    - Las fluctuaciones de voltaje (ej. 19% -> 20% -> 19%) no re-emiten alertas gracias a una banda de histéresis (2%).
+    - Al conectar el cargador (`ChargerConnected`), se resetean las banderas para habilitar nuevas alertas en el siguiente ciclo.
+    - En PCs de escritorio sin batería (`HasBattery == false`), se ignoran las alertas.
+  - **Prioridad 90:** `BatteryWidget` se presenta como actividad transitoria de 3.0 s superando a volumen (80) y música (30).
+
+---
+
+## ADR-012: Detección Reactiva de Pantalla Completa (SHQueryUserNotificationState + SetWinEventHook) y Suspensión Total
+
+- **Estado:** Aceptado
+- **Fecha:** 2026-09-28
+- **Contexto:** Cuando el usuario ejecuta juegos o reproduce videos a pantalla completa (YouTube en navegador, VLC), la Dynamic Island debe ocultarse de inmediato sin robar foco ni superponerse, suspendiendo todas las animaciones y timers activos (Regla de oro 1).
+- **Decisiones:**
+  - **Detección híbrida reactiva:** `FullscreenWatcher` escucha `EVENT_SYSTEM_FOREGROUND` con `SetWinEventHook` (cero timers de sondeo). Al activarse una nueva ventana en primer plano:
+    - Evalúa `SHQueryUserNotificationState`: si el estado es `QUNS_BUSY`, `QUNS_RUNNING_D3D_FULL_SCREEN` o `QUNS_PRESENTATION_MODE`, se clasifica como pantalla completa.
+    - Evalúa dimensiones de ventana vs monitor: si la ventana cubre el monitor y no es el escritorio ni el shell, detecta pantalla completa sin bordes.
+  - **Suspensión de Orchestrator y Resortes:** Al entrar en pantalla completa, `IslandOrchestrator.SuspendForFullscreen()` detiene de inmediato el temporizador transitorio activo, cancela cualquier solicitud pendiente y congela el animador (`IslandAnimator.SnapTo(IslandState.Hidden)`), desuscribiéndose de `CompositionTarget.Rendering` (0% CPU).
+  - **Restauración al salir:** Al recuperar el escritorio o cambiar a una ventana normal, `ResumeFromFullscreen()` evalúa nuevamente las fuentes de actividad y restaura la cápsula con su estado previo de forma suave. Configurable mediante `AppSettings.HideOnFullscreen` (por defecto activo).
 

@@ -16,7 +16,7 @@ Repositorio oficial: [https://github.com/DAHL13/openDynamic](https://github.com/
 | **Fase 2** | **Motor de física de animación de resorte (*Spring physics*) y máquina de estados (M2)** | **Completada** |
 | **Fase 3** | **Arquitectura de widgets, resolución de prioridades y Orchestrator (M4 Base)** | **Completada** |
 | **Fase 4** | **Widget multimedia GSMTC (Windows.Media.Control, 0% CPU, Freeze thumbnails, 10s Grace)** | **Completada** |
-| Fase 5 | Interacciones avanzadas y expansión de cápsula (Hover, Gestos, Menú contextual) | Pendiente |
+| **Fase 5** | **Volumen (NAudio/CoreAudio), batería sin polling (WM_POWERBROADCAST) y pantalla completa (M3)** | **Completada** |
 | Fase 6 | Configuración, persistencia y bandeja del sistema (*System Tray*) | Pendiente |
 | Fase 7 | Optimización de rendimiento (CPU ~0% en reposo, consumo de RAM) | Pendiente |
 | Fase 8 | Empaquetado y distribución (Inno Setup, publicación Release) | Pendiente |
@@ -36,6 +36,7 @@ Repositorio oficial: [https://github.com/DAHL13/openDynamic](https://github.com/
 - **Interfaz de Usuario:** WPF (`net10.0-windows10.0.19041.0`) con soporte `PerMonitorV2` DPI
 - **Patrón Arquitectónico:** MVVM mediante `CommunityToolkit.Mvvm`
 - **Inyección de Dependencias:** `Microsoft.Extensions.DependencyInjection`
+- **Audio:** `NAudio` (`MMDeviceEnumerator`, `AudioEndpointVolume`) con detección en caliente (`IMMNotificationClient`)
 - **Registro de Eventos (Logging):** `Serilog` y `Serilog.Sinks.File` en `%LocalAppData%\openDynamic\logs`
 - **Pruebas Unitarias:** `xUnit`
 
@@ -84,7 +85,20 @@ openDynamic/
 │  │   │   ├─ MediaPropertiesInfo.cs
 │  │   │   ├─ MediaProgressCalculator.cs
 │  │   │   └─ MediaActivityController.cs
-│  │   ├─ Settings/                # Configuración de aplicación (Grace period, prioridades)
+│  │   ├─ Audio/                   # Control de audio puro, pasos por rueda de ratón y tipos de icono
+│  │   │   ├─ IVolumeController.cs
+│  │   │   ├─ VolumeChangedEventArgs.cs
+│  │   │   ├─ VolumeIconType.cs
+│  │   │   └─ VolumeCalculator.cs
+│  │   ├─ Power/                   # Monitorización de batería, snapshots y tracker de umbrales puro
+│  │   │   ├─ IBatteryMonitor.cs
+│  │   │   ├─ BatterySnapshot.cs
+│  │   │   ├─ BatteryAlertKind.cs
+│  │   │   ├─ BatteryAlertEventArgs.cs
+│  │   │   └─ BatteryThresholdTracker.cs
+│  │   ├─ Windowing/               # Detección geométrica y de estado de pantalla completa pura
+│  │   │   └─ FullscreenDetector.cs
+│  │   ├─ Settings/                # Configuración de aplicación (Grace periods, umbrales y prioridades)
 │  │   │   └─ AppSettings.cs
 │  │   └─ Positioning/             # Cálculo puro de posicionamiento geométrico y DPI
 │  │       ├─ IslandPositionCalculator.cs
@@ -95,36 +109,39 @@ openDynamic/
 │  └─ OpenDynamic.App/              # WPF, net10.0-windows10.0.19041.0
 │      ├─ app.manifest              # PerMonitorV2 DPI awareness
 │      ├─ App.xaml / App.xaml.cs    # Ciclo de vida, DI, manejadores de excepción globales
-│      ├─ Native/                   # P/Invoke a Win32 (estilos, DPI, monitores, activación)
+│      ├─ Native/                   # P/Invoke a Win32 (estilos, DPI, energía, pantalla completa)
 │      │   └─ NativeMethods.cs
 │      ├─ Animation/                # Coordinador de animación y suscripción a CompositionTarget.Rendering
 │      │   └─ IslandAnimator.cs
-│      ├─ Orchestration/            # Autoridad exclusiva de transiciones y entrega de vistas
+│      ├─ Orchestration/            # Autoridad exclusiva de transiciones, suspensión y entrega de vistas
 │      │   └─ IslandOrchestrator.cs
-│      ├─ Services/                 # Servicios de sistema WinRT GSMTC y sesiones nativas
+│      ├─ Windowing/                # Ventana overlay, posicionamiento, detección en primer plano y pantalla completa
+│      │   ├─ IslandWindow.xaml / IslandWindow.xaml.cs
+│      │   ├─ WindowPositioner.cs
+│      │   ├─ ForegroundWatcher.cs
+│      │   └─ FullscreenWatcher.cs
+│      ├─ Services/                 # Servicios nativos: GSMTC, NAudio CoreAudio y Windows Power
 │      │   ├─ MediaService.cs
-│      │   └─ WinRtMediaSession.cs
+│      │   ├─ WinRtMediaSession.cs
+│      │   ├─ VolumeService.cs
+│      │   └─ PowerService.cs
 │      ├─ Views/                    # Renderizado elástico y soporte visual Split (satélite circular)
 │      │   ├─ IslandView.xaml
 │      │   └─ IslandView.xaml.cs
-│      ├─ Widgets/                  # Contrato base, mensajería, widget multimedia y demos DEBUG
+│      ├─ Widgets/                  # Contrato base, mensajería, widgets multimedia, volumen y batería
 │      │   ├─ IIslandWidget.cs
 │      │   ├─ IslandWidgetBase.cs
 │      │   ├─ Messages/ActivityMessages.cs
 │      │   ├─ Media/                # Widget GSMTC: vistas Compact, Expanded y Split satélite
 │      │   │   ├─ MediaWidget.cs
 │      │   │   └─ Views/
-│      │   │       ├─ MediaCompactView.xaml
-│      │   │       ├─ MediaExpandedView.xaml
-│      │   │       └─ MediaSplitView.xaml
+│      │   ├─ Volume/               # Widget Volumen: vistas Compact, Expanded y Split satélite
+│      │   │   ├─ VolumeWidget.cs
+│      │   │   └─ Views/
+│      │   ├─ Battery/              # Widget Batería: vistas Compact, Expanded y Split satélite
+│      │   │   ├─ BatteryWidget.cs
+│      │   │   └─ Views/
 │      │   └─ Demo/DemoWidgets.cs   # Condicionado a #if DEBUG
-│      ├─ Windowing/                # IslandWindow overlay, ForegroundWatcher, WindowPositioner, Debug
-│      │   ├─ IslandWindow.xaml
-│      │   ├─ IslandWindow.xaml.cs
-│      │   ├─ IslandDebugWindow.cs  # Panel de depuración condicionado estrictamente a #if DEBUG
-│      │   ├─ ForegroundWatcher.cs
-│      │   └─ WindowPositioner.cs
-│      │   └─ TargetMonitorMode.cs
 │      └─ Infrastructure/           # DI, SingleInstance, Logging
 └─ tests/
    └─ OpenDynamic.Tests/            # xUnit probando Core (resortes, FSM, prioridades, posicionamiento)

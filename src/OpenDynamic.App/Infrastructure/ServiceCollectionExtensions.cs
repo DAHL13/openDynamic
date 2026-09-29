@@ -17,6 +17,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<SingleInstanceManager>();
         services.AddSingleton<WindowPositioner>();
         services.AddSingleton<ForegroundWatcher>();
+        services.AddSingleton<FullscreenWatcher>();
         services.AddSingleton<IslandStateMachine>();
         services.AddSingleton<IslandLayout>();
         services.AddSingleton<IslandAnimator>();
@@ -29,6 +30,16 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<Services.MediaService>();
         services.AddSingleton<OpenDynamic.Core.Media.IMediaService>(sp => sp.GetRequiredService<Services.MediaService>());
         services.AddSingleton<Widgets.Media.MediaWidget>();
+
+        // Audio & Volume Services
+        services.AddSingleton<Services.VolumeService>();
+        services.AddSingleton<OpenDynamic.Core.Audio.IVolumeController>(sp => sp.GetRequiredService<Services.VolumeService>());
+        services.AddSingleton<Widgets.Volume.VolumeWidget>();
+
+        // Power & Battery Services
+        services.AddSingleton<Services.PowerService>();
+        services.AddSingleton<OpenDynamic.Core.Power.IBatteryMonitor>(sp => sp.GetRequiredService<Services.PowerService>());
+        services.AddSingleton<Widgets.Battery.BatteryWidget>();
 
         return services;
     }
