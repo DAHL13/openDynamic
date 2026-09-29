@@ -293,4 +293,93 @@ public class PriorityResolverTests
         Assert.Null(result.Secondary);
         Assert.Equal(IslandState.Compact, result.SuggestedState);
     }
+
+    [Fact]
+    public void Resolve_TwoTransientActivities_HigherPriorityWinsAsPrimary()
+    {
+        var now = new DateTimeOffset(2026, 9, 28, 18, 0, 0, TimeSpan.Zero);
+
+        var notice1 = new MockActivitySource
+        {
+            Id = "notice-1",
+            Priority = 200,
+            IsActive = true,
+            IsTransient = true,
+            LastActivatedUtc = now,
+            TransientDuration = TimeSpan.FromSeconds(3)
+        };
+
+        var notice2 = new MockActivitySource
+        {
+            Id = "notice-2",
+            Priority = 250,
+            IsActive = true,
+            IsTransient = true,
+            LastActivatedUtc = now,
+            TransientDuration = TimeSpan.FromSeconds(2)
+        };
+
+        var result = _resolver.Resolve(new[] { notice1, notice2 }, now);
+
+        Assert.Same(notice2, result.Primary); // 250 > 200
+        Assert.Null(result.Secondary);        // Preempts exclusively
+        Assert.Equal(IslandState.Compact, result.SuggestedState);
+        Assert.Equal(now.AddSeconds(2), result.NextExpirationUtc);
+    }
+
+    [Fact]
+    public void Resolve_SingleTransientExpires_ReturnsHidden()
+    {
+        var startTime = new DateTimeOffset(2026, 9, 28, 18, 0, 0, TimeSpan.Zero);
+
+        var notice = new MockActivitySource
+        {
+            Id = "notice",
+            Priority = 200,
+            IsActive = true,
+            IsTransient = true,
+            LastActivatedUtc = startTime,
+            TransientDuration = TimeSpan.FromSeconds(3)
+        };
+
+        var expiredTime = startTime.AddSeconds(3.5);
+        var result = _resolver.Resolve(new[] { notice }, expiredTime);
+
+        Assert.Null(result.Primary);
+        Assert.Null(result.Secondary);
+        Assert.False(result.HasActiveActivity);
+        Assert.Equal(IslandState.Hidden, result.SuggestedState);
+    }
+
+    [Fact]
+    public void Resolve_MultipleTransients_CalculatesEarliestUpcomingExpiration()
+    {
+        var now = new DateTimeOffset(2026, 9, 28, 18, 0, 0, TimeSpan.Zero);
+
+        var shortNotice = new MockActivitySource
+        {
+            Id = "short",
+            Priority = 100,
+            IsActive = true,
+            IsTransient = true,
+            LastActivatedUtc = now,
+            TransientDuration = TimeSpan.FromSeconds(2)
+        };
+
+        var longNotice = new MockActivitySource
+        {
+            Id = "long",
+            Priority = 200,
+            IsActive = true,
+            IsTransient = true,
+            LastActivatedUtc = now,
+            TransientDuration = TimeSpan.FromSeconds(5)
+        };
+
+        var result = _resolver.Resolve(new[] { shortNotice, longNotice }, now);
+
+        Assert.Same(longNotice, result.Primary);
+        Assert.Equal(now.AddSeconds(2), result.NextExpirationUtc);
+    }
 }
+
