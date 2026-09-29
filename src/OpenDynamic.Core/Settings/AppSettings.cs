@@ -12,8 +12,9 @@ public sealed class AppSettings
     /// <summary>
     /// Current configuration schema version for migration tracking.
     /// Version 3 introduces the MotionMode setting (Auto, Reduced, Full).
+    /// Version 4 introduces Network and Device alert settings, priorities, and ignored devices.
     /// </summary>
-    public const int CurrentSchemaVersion = 3;
+    public const int CurrentSchemaVersion = 4;
 
     /// <summary>
     /// Configuration schema version. Defaults to <see cref="CurrentSchemaVersion"/>.
@@ -240,6 +241,55 @@ public sealed class AppSettings
 
     #endregion
 
+    #region Network Settings
+
+    /// <summary>
+    /// Flag to enable or disable network connectivity alerts.
+    /// Default is true.
+    /// </summary>
+    public bool EnableNetworkAlerts { get; set; } = true;
+
+    /// <summary>
+    /// Default priority value for network transient notices.
+    /// Default is 65.
+    /// </summary>
+    public int DefaultNetworkPriority { get; set; } = 65;
+
+    /// <summary>
+    /// Lifespan in seconds for network transient alerts.
+    /// Default is 3.0 seconds.
+    /// </summary>
+    public double NetworkTransientDurationSeconds { get; set; } = 3.0;
+
+    #endregion
+
+    #region Device Settings
+
+    /// <summary>
+    /// Flag to enable or disable peripheral device connection and disconnection alerts.
+    /// Default is true.
+    /// </summary>
+    public bool EnableDeviceAlerts { get; set; } = true;
+
+    /// <summary>
+    /// Default priority value for device transient notices.
+    /// Default is 60.
+    /// </summary>
+    public int DefaultDevicePriority { get; set; } = 60;
+
+    /// <summary>
+    /// Lifespan in seconds for device transient alerts.
+    /// Default is 3.0 seconds.
+    /// </summary>
+    public double DeviceTransientDurationSeconds { get; set; } = 3.0;
+
+    /// <summary>
+    /// List of friendly device names or device IDs ignored from transient alert notifications.
+    /// </summary>
+    public List<string> IgnoredDeviceNames { get; set; } = new();
+
+    #endregion
+
     #region Hotkeys and Autostart
 
     /// <summary>
@@ -303,7 +353,14 @@ public sealed class AppSettings
             ToggleIslandHotkey = this.ToggleIslandHotkey,
             EnableGlobalHotkeys = this.EnableGlobalHotkeys,
             StartWithWindows = this.StartWithWindows,
-            MotionMode = this.MotionMode
+            MotionMode = this.MotionMode,
+            EnableNetworkAlerts = this.EnableNetworkAlerts,
+            DefaultNetworkPriority = this.DefaultNetworkPriority,
+            NetworkTransientDurationSeconds = this.NetworkTransientDurationSeconds,
+            EnableDeviceAlerts = this.EnableDeviceAlerts,
+            DefaultDevicePriority = this.DefaultDevicePriority,
+            DeviceTransientDurationSeconds = this.DeviceTransientDurationSeconds,
+            IgnoredDeviceNames = new List<string>(this.IgnoredDeviceNames)
         };
     }
 
@@ -349,5 +406,12 @@ public sealed class AppSettings
         ToggleIslandHotkey = other.ToggleIslandHotkey;
         EnableGlobalHotkeys = other.EnableGlobalHotkeys;
         StartWithWindows = other.StartWithWindows;
+        EnableNetworkAlerts = other.EnableNetworkAlerts;
+        DefaultNetworkPriority = other.DefaultNetworkPriority;
+        NetworkTransientDurationSeconds = other.NetworkTransientDurationSeconds;
+        EnableDeviceAlerts = other.EnableDeviceAlerts;
+        DefaultDevicePriority = other.DefaultDevicePriority;
+        DeviceTransientDurationSeconds = other.DeviceTransientDurationSeconds;
+        IgnoredDeviceNames = new List<string>(other.IgnoredDeviceNames ?? Enumerable.Empty<string>());
     }
 }

@@ -154,10 +154,12 @@ public sealed class SettingsServiceTests : IDisposable
         Assert.Equal(175.0, service.CurrentSettings.CapsuleWidth);
         Assert.Equal(45, service.CurrentSettings.DefaultMediaPriority);
         Assert.Equal(OpenDynamic.Core.Animation.MotionMode.Auto, service.CurrentSettings.MotionMode);
+        Assert.True(service.CurrentSettings.EnableNetworkAlerts);
+        Assert.True(service.CurrentSettings.EnableDeviceAlerts);
 
-        // File should now contain SchemaVersion = 3
+        // File should now contain SchemaVersion = 4
         string reloadedJson = File.ReadAllText(filePath);
-        Assert.Contains("\"SchemaVersion\": 3", reloadedJson);
+        Assert.Contains("\"SchemaVersion\": 4", reloadedJson);
     }
 
     [Fact]
@@ -179,20 +181,22 @@ public sealed class SettingsServiceTests : IDisposable
         using var service = new SettingsService(filePath, debounceMilliseconds: 100);
         service.Load();
 
-        Assert.Equal(3, service.CurrentSettings.SchemaVersion);
+        Assert.Equal(4, service.CurrentSettings.SchemaVersion);
         Assert.Equal(0.0, service.CurrentSettings.OffsetY);
         Assert.Equal(14.0, service.CurrentSettings.CapsuleCornerRadius);
         Assert.Equal(200.0, service.CurrentSettings.CapsuleWidth);
         Assert.Equal(OpenDynamic.Core.Animation.MotionMode.Auto, service.CurrentSettings.MotionMode);
+        Assert.True(service.CurrentSettings.EnableNetworkAlerts);
+        Assert.True(service.CurrentSettings.EnableDeviceAlerts);
 
         string reloadedJson = File.ReadAllText(filePath);
-        Assert.Contains("\"SchemaVersion\": 3", reloadedJson);
+        Assert.Contains("\"SchemaVersion\": 4", reloadedJson);
         Assert.Contains("\"OffsetY\": 0", reloadedJson);
         Assert.Contains("\"CapsuleCornerRadius\": 14", reloadedJson);
     }
 
     [Fact]
-    public void Load_WhenSchemaVersionIs2_MigratesToSchemaVersion3_SetsDefaultMotionModeAuto()
+    public void Load_WhenSchemaVersionIs2_MigratesToSchemaVersion4_SetsDefaultMotionModeAuto()
     {
         string filePath = Path.Combine(_testDirectory, "settings_v2.json");
         // Legacy JSON schema with version 2 (Phase 9 notch settings without MotionMode)
@@ -211,15 +215,53 @@ public sealed class SettingsServiceTests : IDisposable
         using var service = new SettingsService(filePath, debounceMilliseconds: 100);
         service.Load();
 
-        Assert.Equal(3, service.CurrentSettings.SchemaVersion);
+        Assert.Equal(4, service.CurrentSettings.SchemaVersion);
         Assert.Equal(OpenDynamic.Core.Animation.MotionMode.Auto, service.CurrentSettings.MotionMode);
         Assert.Equal(0.0, service.CurrentSettings.OffsetY);
         Assert.Equal(14.0, service.CurrentSettings.CapsuleCornerRadius);
         Assert.True(service.CurrentSettings.EnableMediaWidget);
+        Assert.True(service.CurrentSettings.EnableNetworkAlerts);
+        Assert.True(service.CurrentSettings.EnableDeviceAlerts);
 
         string reloadedJson = File.ReadAllText(filePath);
-        Assert.Contains("\"SchemaVersion\": 3", reloadedJson);
+        Assert.Contains("\"SchemaVersion\": 4", reloadedJson);
         Assert.Contains("\"MotionMode\": \"Auto\"", reloadedJson);
+    }
+
+    [Fact]
+    public void Load_WhenSchemaVersionIs3_MigratesToSchemaVersion4_SetsDefaultNetworkAndDeviceAlerts()
+    {
+        string filePath = Path.Combine(_testDirectory, "settings_v3.json");
+        // Schema version 3 (Phase 10 with MotionMode but without Network and Device alerts)
+        const string v3Json = """
+        {
+            "SchemaVersion": 3,
+            "MotionMode": "Reduced",
+            "CapsuleWidth": 220.0
+        }
+        """;
+
+        File.WriteAllText(filePath, v3Json);
+
+        using var service = new SettingsService(filePath, debounceMilliseconds: 100);
+        service.Load();
+
+        Assert.Equal(4, service.CurrentSettings.SchemaVersion);
+        Assert.Equal(OpenDynamic.Core.Animation.MotionMode.Reduced, service.CurrentSettings.MotionMode);
+        Assert.Equal(220.0, service.CurrentSettings.CapsuleWidth);
+        Assert.True(service.CurrentSettings.EnableNetworkAlerts);
+        Assert.Equal(65, service.CurrentSettings.DefaultNetworkPriority);
+        Assert.Equal(3.0, service.CurrentSettings.NetworkTransientDurationSeconds);
+        Assert.True(service.CurrentSettings.EnableDeviceAlerts);
+        Assert.Equal(60, service.CurrentSettings.DefaultDevicePriority);
+        Assert.Equal(3.0, service.CurrentSettings.DeviceTransientDurationSeconds);
+        Assert.NotNull(service.CurrentSettings.IgnoredDeviceNames);
+        Assert.Empty(service.CurrentSettings.IgnoredDeviceNames);
+
+        string reloadedJson = File.ReadAllText(filePath);
+        Assert.Contains("\"SchemaVersion\": 4", reloadedJson);
+        Assert.Contains("\"EnableNetworkAlerts\": true", reloadedJson);
+        Assert.Contains("\"EnableDeviceAlerts\": true", reloadedJson);
     }
 
     [Fact]
