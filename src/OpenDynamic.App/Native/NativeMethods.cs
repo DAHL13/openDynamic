@@ -314,5 +314,41 @@ public static class NativeMethods
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool EnumDisplayMonitors(IntPtr hdc, IntPtr lprcClip, MonitorEnumProc lpfnEnum, IntPtr dwData);
+
+    // Device Notifications (WM_DEVICECHANGE)
+    public const int WM_DEVICECHANGE = 0x0219;
+    public const int DBT_DEVICEARRIVAL = 0x8000;
+    public const int DBT_DEVICEREMOVECOMPLETE = 0x8004;
+    public const int DBT_DEVTYP_DEVICEINTERFACE = 0x00000005;
+    public const uint DEVICE_NOTIFY_ALL_INTERFACE_CLASSES = 0x00000004;
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct DEV_BROADCAST_HDR
+    {
+        public int dbch_size;
+        public int dbch_devicetype;
+        public int dbch_reserved;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+    public struct DEV_BROADCAST_DEVICEINTERFACE
+    {
+        public int dbcc_size;
+        public int dbcc_devicetype;
+        public int dbcc_reserved;
+        public Guid dbcc_classguid;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 255)]
+        public string dbcc_name;
+    }
+
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+    public static extern IntPtr RegisterDeviceNotification(
+        IntPtr hRecipient,
+        ref DEV_BROADCAST_DEVICEINTERFACE notificationFilter,
+        uint flags);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool UnregisterDeviceNotification(IntPtr handle);
 }
 
