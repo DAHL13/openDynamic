@@ -3,6 +3,41 @@
 Todas las modificaciones notables en este proyecto serán documentadas en este archivo.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y cumple con [SemVer](https://semver.org/).
 
+## [1.0.0] - 2026-09-29 (Fase 9: Empaquetado, Documentación y Release Beta - Hito M6)
+
+### Añadido
+- **Instalador de Windows de Alta Fidelidad (Inno Setup 6):**
+  - Script oficial `installer/setup.iss` para compilar el instalador `openDynamic-setup.exe`.
+  - **Regla de Oro 3 cumplida (Cero privilegios UAC):** Instalación por usuario (`PrivilegesRequired=lowest`), instalando de forma predeterminada en `{localappdata}\Programs\openDynamic` (`{autopf}\openDynamic`) sin requerir permisos de administrador.
+  - **Desinstalador limpio y respetuoso:**
+    - Purga incondicional de la entrada de autostart en el registro de Windows (`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`).
+    - Eliminación completa de binarios y accesos directos.
+    - Cuadro de diálogo interactivo que consulta al usuario si desea conservar o eliminar sus datos de configuración (`%AppData%\openDynamic\settings.json`) y registros (`%LocalAppData%\openDynamic\logs`).
+  - **Detección inteligente del runtime:** Verificación en el registro de la presencia de Microsoft .NET 10 Desktop Runtime (x64) con enlace de descarga oficial en un solo clic si no se encuentra instalado.
+- **Flujo de Trabajo Automatizado de CI/CD para GitHub Releases (`.github/workflows/release.yml`):**
+  - Disparo automático en GitHub Actions al empujar tags con patrón `v*` (ej. `v1.0.0`).
+  - Pipeline en `windows-latest`: Checkout, Setup .NET 10, compilación en Release con `TreatWarningsAsErrors=true`, ejecución completa de la suite de 198 pruebas unitarias en verde, publicación ReadyToRun (R2R), empaquetado de archivo portátil (.zip), compilación del instalador con Inno Setup y publicación de ambos artefactos adjuntos a la GitHub Release oficial mediante `softprops/action-gh-release@v2`.
+- **Documentación Técnica Profunda (`docs/arquitectura.md`):**
+  - Diagrama conceptual de capas (Core vs. App) en Mermaid detallando el desacoplamiento total de `OpenDynamic.Core` (net10.0, cero dependencias de Windows/WPF) y `OpenDynamic.App` (WPF, Win32 P/Invoke, WinRT).
+  - Diagrama de flujo y orquestación del `IslandOrchestrator`, arbitraje determinista de prioridades y gestión de actividades transitorias y continuas.
+  - Diagrama de estados FSM (`Hidden`, `Compact`, `Expanded`, `Split`) y geometría adaptativa del Notch.
+  - **Guía de 10 pasos para desarrolladores externos:** Manual exhaustivo con código de ejemplo de extremo a extremo para implementar un widget nuevo (`WeatherWidget`) con su servicio, modelo, interfaz `IWidget`, vistas XAML, registro DI y pruebas unitarias.
+- **Registro de Decisiones de Arquitectura:**
+  - `ADR-016`: Justificación formal y análisis comparativo entre distribución dependiente de framework (.NET 10 Desktop Runtime) vs. auto-contenido (Self-Contained), analizando tamaño final (~11 MB vs ~75 MB), consumo de memoria, seguridad y portabilidad.
+  - `ADR-017`: Rediseño estético y geométrico de píldora flotante a muesca rectangular superior (Notch) anclada al bisel de la pantalla a 0 DIP.
+- **Rediseño Visual a Muesca Rectangular Superior (Upper Notch UI):**
+  - Anclaje exacto al marco superior absoluto de la pantalla (`OffsetY = 0.0 DIP`).
+  - Esquinas asimétricas: esquinas superiores ortogonales a 0 DIP pegadas al bisel, esquinas inferiores redondeadas (14 DIP en compacto/split, 16 DIP en expandido).
+  - Recorte geométrico exacto (`CreateNotchClipGeometry`) con `PathGeometry` congelada para eliminar desbordamientos visuales.
+  - Migración automática a Schema v2 en `SettingsService`.
+- **Cierre Consolidado de Hitos:**
+  - Hito M1: Overlay transparente, Z-order topmost reactivo, click-through por píxel y soporte PerMonitorV2 DPI.
+  - Hito M2: Motor de física de resortes elásticos (Spring physics), máquina de estados FSM y bucle de render reactivo (0.0% CPU en reposo).
+  - Hito M3: Integración multimedia WinRT (GSMTC), control de volumen en tiempo real (NAudio CoreAudio), alertas de batería sin polling (WM_POWERBROADCAST) y detección reactiva de pantalla completa.
+  - Hito M4: Monitorización nativa de hardware (Win32 GetSystemTimes/GlobalMemoryStatusEx), temporizador por marca de tiempo objetivo (Pomodoro) y modo Split multitasking con intercambio de satélite.
+  - Hito M5: Persistencia settings.json con debounce, bandeja del sistema (H.NotifyIcon), ventana de Ajustes MVVM con tema oscuro y atajos de teclado globales Win32 (RegisterHotKey).
+  - Hito M6: Empaquetado oficial con Inno Setup, CI/CD de releases y documentación de arquitectura v1.0.0.
+
 ## [0.9.0] - 2026-09-29 (Fase 8: Optimización y Pruebas de Rendimiento - Hito Previo a M6)
 
 ### Añadido

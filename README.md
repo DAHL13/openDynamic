@@ -1,13 +1,52 @@
 # openDynamic
 
-> **Dynamic Island para Windows (WPF, .NET 10)**  
-> Una cápsula flotante, contextual e interactiva (música, volumen, batería, hardware, temporizador) con animaciones de resorte fluidas y consumo ultra bajo de recursos.
+[![CI](https://github.com/DAHL13/openDynamic/actions/workflows/ci.yml/badge.svg)](https://github.com/DAHL13/openDynamic/actions/workflows/ci.yml)
+[![Release](https://github.com/DAHL13/openDynamic/actions/workflows/release.yml/badge.svg)](https://github.com/DAHL13/openDynamic/actions/workflows/release.yml)
+[![.NET 10](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/download)
+[![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?logo=windows)](https://www.microsoft.com/windows)
+[![Platform](https://img.shields.io/badge/Platform-win--x64-lightgrey)]()
+[![RAM](https://img.shields.io/badge/RAM-%3C%2030%20MB-brightgreen)]()
+[![CPU](https://img.shields.io/badge/CPU%20Idle-0.0%25-brightgreen)]()
+
+> **Dynamic Island / Upper Notch para Windows (WPF, .NET 10)**  
+> Una muesca rectangular superior interactiva y contextual (música, volumen, batería, hardware, temporizador) anclada al marco superior de la pantalla, con animaciones de física de resortes elásticos y consumo ultra bajo de recursos.
 
 Repositorio oficial: [https://github.com/DAHL13/openDynamic](https://github.com/DAHL13/openDynamic)
 
 ---
 
-## Estado del Proyecto
+## Rediseño Visual: Upper Notch UI
+
+openDynamic adopta una estética de **muesca rectangular superior (Notch)** pegada directamente al marco superior de la pantalla (`OffsetY = 0.0 DIP`), con esquinas superiores ortogonales a 0 DIP y esquinas inferiores suavemente curvadas (14–16 DIP):
+
+```
+┌────────────────────────────────────────────────────────────────────────┐  ◄── Bisel Superior de la Pantalla
+│                        ┌────────────────────┐                          │
+│                        │  🎵 Bohemian Rhap  │                          │  ◄── Modo Compacto (200x36 DIP)
+│                        └─┬────────────────┬─┘                          │      Esquinas inferiores: 14 DIP
+│                          └────────────────┘                            │
+└────────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────────┐  ◄── Bisel Superior
+│                   ┌──────────────────────┐  ┌──────┐                   │
+│                   │  ⏱️ 24:59 (Pomodoro)  │  │  🎵  │                   │  ◄── Modo Split Multitasking (280 DIP)
+│                   └─┬──────────────────┬─┘  └─┬──┬─┘                   │      Intercambio interactivo al clic
+└─────────────────────┴──────────────────┴──────┴──┴─────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────────┐  ◄── Bisel Superior
+│                   ┌────────────────────────────────┐                   │
+│                   │ 🎵 Queen - A Night at the Opera │                   │
+│                   │ ━━━━━━━━━━━●━━━━━━━━━━━━━━━━━━ │                   │  ◄── Modo Expandido (400x160 DIP)
+│                   │      ⏮️      ⏸️      ⏭️         │                   │      Esquinas inferiores: 16 DIP
+│                   └─┬────────────────────────────┬─┘                   │
+└─────────────────────┴────────────────────────────┴─────────────────────┘
+```
+
+> 📷 *Capturas de interfaz y demostraciones visuales disponibles en [`docs/img/`](./docs/).*
+
+---
+
+## Estado del Proyecto (Hito M6 - Release Beta v1.0.0)
 
 | Fase | Descripción | Estado |
 |---|---|:---:|
@@ -20,217 +59,47 @@ Repositorio oficial: [https://github.com/DAHL13/openDynamic](https://github.com/
 | **Fase 6** | **Hardware (GetSystemTimes/GlobalMemoryStatusEx), Temporizador/Pomodoro y Modo Split con intercambio (M4)** | **Completada** |
 | **Fase 7** | **Bandeja del sistema (H.NotifyIcon), Ajustes (MVVM), Atajos Win32 e Inicio automático (M5)** | **Completada** |
 | **Fase 8** | **Optimización, robustez, eventos del sistema y pruebas de rendimiento (Previo a M6)** | **Completada** |
-
+| **Notch UI** | **Rediseño geométrico a muesca rectangular superior con esquinas asimétricas (ADR-017)** | **Completada** |
+| **Fase 9** | **Empaquetado Inno Setup, decisión de runtime (ADR-016), CI/CD y documentación técnica (M6)** | **Completada** |
 
 ---
 
-## Requisitos
+## Requisitos del Sistema
 
 - **Sistema Operativo:** Windows 10 (versión 2004 / compilación 19041 o superior) o Windows 11.
-- **SDK:** [.NET 10 SDK](https://dotnet.microsoft.com/download) instalado.
+- **Arquitectura:** x64 (64 bits).
+- **Runtime:** [Microsoft .NET 10 Desktop Runtime (x64)](https://aka.ms/dotnet/10.0/windowsdesktop-runtime-win-x64.exe) instalado en el sistema.
+- **Para Compilar desde el Código Fuente:** [.NET 10 SDK](https://dotnet.microsoft.com/download).
 
 ---
 
-## Stack Tecnológico
+## Guía de Instalación
 
-- **Lenguaje / Runtime:** C# 13+, .NET 10
-- **Interfaz de Usuario:** WPF (`net10.0-windows10.0.19041.0`) con soporte `PerMonitorV2` DPI
-- **Patrón Arquitectónico:** MVVM mediante `CommunityToolkit.Mvvm`
-- **Inyección de Dependencias:** `Microsoft.Extensions.DependencyInjection`
-- **Audio:** `NAudio` (`MMDeviceEnumerator`, `AudioEndpointVolume`) con detección en caliente (`IMMNotificationClient`)
-- **Bandeja del Sistema (Tray):** `H.NotifyIcon.Wpf` (cero WinForms)
-- **Atajos Globales:** Win32 `RegisterHotKey` / `UnregisterHotKey` mediante WndProc
-- **Configuración y Persistencia:** `System.Text.Json` en `%AppData%\openDynamic\settings.json` (versión de esquema y debounce 500ms)
-- **Registro de Eventos (Logging):** `Serilog` y `Serilog.Sinks.File` en `%LocalAppData%\openDynamic\logs`
-- **Pruebas Unitarias:** `xUnit`
+### Opción 1: Instalador Oficial de Windows (Recomendado)
+1. Descarga el instalador oficial `openDynamic-setup.exe` desde [Releases](https://github.com/DAHL13/openDynamic/releases).
+2. Ejecuta el archivo.
+   - **Cero permisos de Administrador (UAC lowest):** Se instala de forma segura y aislada en `%LocalAppData%\Programs\openDynamic`.
+   - Si no cuentas con .NET 10 Desktop Runtime, el instalador lo detecta automáticamente y te ofrece descargarlo en un clic.
+   - Puedes activar accesos directos e inicio automático con Windows.
+3. Al desinstalar, el desinstalador purga las claves de registro de autostart y te consulta si deseas conservar o eliminar tu archivo de configuración (`%AppData%\openDynamic\settings.json`).
 
-Para más detalles sobre las directrices y restricciones de arquitectura, consulta [`DECISIONS.md`](./DECISIONS.md).
-
----
-
-## Estructura de la Solución
-
-```
-openDynamic/
-├─ openDynamic.sln
-├─ Directory.Build.props            # Nullable, LangVersion latest, ImplicitUsings
-├─ .editorconfig
-├─ .gitignore
-├─ DECISIONS.md                    # Registro de Decisiones de Arquitectura (ADR)
-├─ CHANGELOG.md                    # Historial de cambios por versión
-├─ README.md                       # Documentación principal
-├─ docs/
-│  └─ pruebas.md                   # Matriz de validación y pruebas de sistema
-├─ .github/
-│  └─ workflows/
-│      └─ ci.yml                   # CI en windows-latest (restore, build, test)
-├─ src/
-│  ├─ OpenDynamic.Core/             # net10.0 — Lógica pura sin dependencias de Windows ni WPF
-│  │   ├─ CoreInfo.cs
-│  │   ├─ Animation/               # Física de resortes con sub-stepping y conservación de inercia
-│  │   │   └─ Spring.cs
-│  │   ├─ State/                   # Máquina de estados finita y layout de dimensiones de cápsula
-│  │   │   ├─ IslandState.cs
-│  │   │   ├─ IslandStateMachine.cs
-│  │   │   ├─ IslandStateChangedEventArgs.cs
-│  │   │   └─ IslandLayout.cs
-│  │   ├─ Widgets/                 # Modelos de actividad y resolución pura de prioridades
-│  │   │   ├─ IActivitySource.cs
-│  │   │   ├─ IslandActivity.cs
-│  │   │   ├─ ActivityPriority.cs
-│  │   │   ├─ WidgetDisplayMode.cs
-│  │   │   ├─ PriorityResult.cs
-│  │   │   └─ PriorityResolver.cs
-│  │   ├─ Media/                   # Modelos inmutables de reproducción, control y extrapolación pura
-│  │   │   ├─ IMediaSession.cs
-│  │   │   ├─ IMediaService.cs
-│  │   │   ├─ MediaPlaybackStatus.cs
-│  │   │   ├─ MediaPlaybackCapabilities.cs
-│  │   │   ├─ MediaPlaybackInfo.cs
-│  │   │   ├─ MediaTimelineInfo.cs
-│  │   │   ├─ MediaPropertiesInfo.cs
-│  │   │   ├─ MediaProgressCalculator.cs
-│  │   │   └─ MediaActivityController.cs
-│  │   ├─ Audio/                   # Control de audio puro, pasos por rueda de ratón y tipos de icono
-│  │   │   ├─ IVolumeController.cs
-│  │   │   ├─ VolumeChangedEventArgs.cs
-│  │   │   ├─ VolumeIconType.cs
-│  │   │   └─ VolumeCalculator.cs
-│  │   ├─ Power/                   # Monitorización de batería, snapshots y tracker de umbrales puro
-│  │   │   ├─ IBatteryMonitor.cs
-│  │   │   ├─ BatterySnapshot.cs
-│  │   │   ├─ BatteryAlertKind.cs
-│  │   │   ├─ BatteryAlertEventArgs.cs
-│  │   │   └─ BatteryThresholdTracker.cs
-│  │   ├─ Hardware/                # Rendimiento de hardware puro, deltas Win32 y snapshots
-│  │   │   ├─ IHardwareMonitor.cs
-│  │   │   ├─ HardwareSnapshot.cs
-│  │   │   └─ HardwareCalculator.cs
-│  │   ├─ Timer/                   # Temporizador por marca de tiempo objetivo y Pomodoro sin deriva
-│  │   │   ├─ ITimerController.cs
-│  │   │   ├─ TimerController.cs
-│  │   │   ├─ TimerSnapshot.cs
-│  │   │   ├─ TimerMode.cs
-│  │   │   └─ TimerState.cs
-│  │   ├─ Windowing/               # Detección geométrica y de estado de pantalla completa pura
-│  │   │   └─ FullscreenDetector.cs
-│  │   ├─ Settings/                # Configuración persistente, versionado de esquema y debounce (500ms)
-│  │   │   ├─ AppSettings.cs
-│  │   │   ├─ ISettingsService.cs
-│  │   │   └─ SettingsService.cs
-│  │   ├─ Hotkeys/                 # Definición y análisis puro de atajos de teclado sin hooks
-│  │   │   ├─ HotkeyDefinition.cs
-│  │   │   └─ HotkeyParser.cs
-│  │   ├─ Autostart/               # Abstracción y lógica de arranque con Windows (HKCU Run)
-│  │   │   ├─ IRegistryAccessor.cs
-│  │   │   ├─ IAutostartService.cs
-│  │   │   └─ AutostartServiceCore.cs
-│  │   └─ Positioning/             # Cálculo puro de posicionamiento geométrico y DPI
-│  │       ├─ IslandPositionCalculator.cs
-│  │       ├─ MonitorArea.cs
-│  │       ├─ DisplayDpi.cs
-│  │       ├─ WindowDimensions.cs
-│  │       └─ CalculatedWindowPlacement.cs
-│  └─ OpenDynamic.App/              # WPF, net10.0-windows10.0.19041.0
-│      ├─ app.manifest              # PerMonitorV2 DPI awareness
-│      ├─ App.xaml / App.xaml.cs    # Ciclo de vida, DI, bandeja, atajos y arranque
-│      ├─ Native/                   # P/Invoke a Win32 (RegisterHotKey, monitores, hardware, energía, estilos)
-│      │   └─ NativeMethods.cs
-│      ├─ Animation/                # Coordinador de animación y suscripción a CompositionTarget.Rendering
-│      │   └─ IslandAnimator.cs
-│      ├─ Orchestration/            # Autoridad exclusiva de transiciones, suspensión y entrega de vistas
-│      │   └─ IslandOrchestrator.cs
-│      ├─ Windowing/                # Ventana overlay, posicionamiento, detección en primer plano y pantalla completa
-│      │   ├─ IslandWindow.xaml / IslandWindow.xaml.cs
-│      │   ├─ WindowPositioner.cs
-│      │   ├─ ForegroundWatcher.cs
-│      │   └─ FullscreenWatcher.cs
-│      ├─ Services/                 # Servicios nativos: GSMTC, NAudio, Energía, Hardware, Hotkeys y Autostart
-│      │   ├─ MediaService.cs
-│      │   ├─ WinRtMediaSession.cs
-│      │   ├─ VolumeService.cs
-│      │   ├─ PowerService.cs
-│      │   ├─ HardwareService.cs
-│      │   ├─ IHotkeyService.cs / HotkeyService.cs
-│      │   └─ AutostartService.cs
-│      ├─ ViewModels/               # Arquitectura MVVM para ventana de configuración
-│      │   ├─ SettingsViewModel.cs
-│      │   └─ SettingsConverters.cs
-│      ├─ Views/                    # Renderizado elástico y ventana independiente de ajustes
-│      │   ├─ IslandView.xaml / IslandView.xaml.cs
-│      │   └─ SettingsWindow.xaml / SettingsWindow.xaml.cs
-│      ├─ Widgets/                  # Contrato base, mensajería, widgets multimedia, volumen, batería, hardware y temporizador
-│      │   ├─ IIslandWidget.cs
-│      │   ├─ IslandWidgetBase.cs
-│      │   ├─ Messages/ActivityMessages.cs
-│      │   ├─ Media/                # Widget GSMTC: vistas Compact, Expanded y Split satélite
-│      │   ├─ Volume/               # Widget Volumen: vistas Compact, Expanded y Split satélite
-│      │   ├─ Battery/              # Widget Batería: vistas Compact, Expanded y Split satélite
-│      │   ├─ Hardware/             # Widget Hardware: vistas Compact, Expanded y Split satélite (0% CPU reposo)
-│      │   ├─ Timer/                # Widget Temporizador/Pomodoro: vistas Compact, Expanded y Split satélite
-│      │   └─ Demo/DemoWidgets.cs   # Condicionado a #if DEBUG
-│      ├─ Resources/                # Icono de cápsula integrado
-│      │   └─ app.ico
-│      └─ Infrastructure/           # DI, SingleInstance, Logging, TrayIconManager (H.NotifyIcon)
-│          ├─ ServiceCollectionExtensions.cs
-│          ├─ SingleInstanceManager.cs
-│          ├─ LoggingConfiguration.cs
-│          └─ TrayIconManager.cs
-└─ tests/
-   └─ OpenDynamic.Tests/            # xUnit probando Core (resortes, FSM, prioridades, settings, hotkeys, autostart)
-       ├─ InfrastructureTests.cs
-       ├─ Animation/
-       │   └─ SpringTests.cs
-       ├─ State/
-       │   ├─ IslandStateMachineTests.cs
-       │   └─ IslandLayoutTests.cs
-       ├─ Widgets/
-       │   ├─ PriorityResolverTests.cs
-       │   ├─ PriorityResolverPhase5Tests.cs
-       │   └─ PriorityResolverPhase6Tests.cs
-       ├─ Hardware/
-       │   └─ HardwareCalculatorTests.cs
-       ├─ Timer/
-       │   ├─ FakeTimeProvider.cs
-       │   └─ TimerControllerTests.cs
-       ├─ Settings/
-       │   └─ SettingsServiceTests.cs
-       ├─ Hotkeys/
-       │   └─ HotkeyParserTests.cs
-       ├─ Autostart/
-       │   └─ AutostartServiceTests.cs
-       └─ Positioning/
-           └─ IslandPositionCalculatorTests.cs
-```
+### Opción 2: Paquete Portátil (.ZIP)
+1. Descarga `openDynamic-portable-win-x64.zip` desde [Releases](https://github.com/DAHL13/openDynamic/releases).
+2. Descomprime el archivo en la carpeta que desees.
+3. Ejecuta `OpenDynamic.App.exe`. No requiere instalación previa.
 
 ---
 
-## Compilación y Pruebas
+## Atajos de Teclado e Interacción
 
-### Restaurar dependencias:
-```powershell
-dotnet restore openDynamic.sln
-```
-
-### Compilar la solución en Release:
-```powershell
-dotnet build openDynamic.sln -c Release
-```
-
-### Ejecutar las pruebas unitarias:
-```powershell
-dotnet test openDynamic.sln -c Release
-```
-
-### Ejecutar la aplicación en modo de verificación (humo):
-```powershell
-dotnet run --project src/OpenDynamic.App/OpenDynamic.App.csproj -- --smoke-test
-```
-
-### Publicar con optimización ReadyToRun (R2R):
-```powershell
-dotnet publish src/OpenDynamic.App/OpenDynamic.App.csproj -c Release -r win-x64 -p:PublishReadyToRun=true --self-contained false
-```
+| Acción | Control / Atajo | Descripción |
+|---|---|---|
+| **Mostrar / Ocultar Notch** | `Win + Ctrl + I` | Atajo global configurable mediante la API nativa `RegisterHotKey` (sin hooks globales). |
+| **Control Rápido de Volumen** | **Rueda del ratón** sobre el Notch | Gira la rueda hacia arriba/abajo sobre la muesca para ajustar el volumen maestro. |
+| **Expandir Actividad** | **Clic izquierdo** o **Hover** (>250ms) | Despliega los controles completos e información extendida (400x160 DIP). |
+| **Colapsar Actividad** | **Clic fuera** o **Hover leave** (>350ms) | Regresa fluidamente al tamaño compacto o split mediante animación de resortes. |
+| **Intercambiar en Modo Split** | **Clic en la burbuja satélite** | Intercambia inmediatamente la actividad principal y la secundaria. |
+| **Menú de la Bandeja** | **Clic derecho en icono del Tray** | Acceso a Ajustes, monitor de hardware, reinicio de posición y salida limpia. |
 
 ---
 
@@ -247,5 +116,56 @@ En estricto cumplimiento de la **Regla de Oro 1** (0% CPU en reposo y consumo m�
 | **Suscripción al Bucle de Composición WPF** | Desuscrito en reposo | **0 suscripciones** a `CompositionTarget.Rendering` al asentarse | ✔ **Cero bucles ocultos** |
 | **Compilación Estricta** | 0 advertencias, 0 errores | **0 advertencias, 0 errores** (`TreatWarningsAsErrors=true`) | ✔ **Código limpio** |
 
-> [!NOTE]
-> Para consultar la matriz exhaustiva de casos de prueba de sistema (1080p/1440p/4K, DPI mixto, desconexión de pantallas, suspensión/reanudación y reinicio de la Shell de Windows), consulta [`docs/pruebas.md`](./docs/pruebas.md).
+---
+
+## Documentación Técnica
+
+- **[Arquitectura y Guía para Desarrolladores (`docs/arquitectura.md`)](./docs/arquitectura.md):** Diagramas conceptuales de capas (Core vs. App), flujo del `IslandOrchestrator`, ciclo de vida de la FSM y la **Guía de 10 pasos** para crear e integrar nuevos widgets desde cero.
+- **[Registro de Decisiones de Arquitectura (`DECISIONS.md`)](./DECISIONS.md):** Registro histórico y justificación de las 17 decisiones técnicas (ADR-001 a ADR-017).
+- **[Matriz de Validación y Pruebas (`docs/pruebas.md`)](./docs/pruebas.md):** 198 pruebas unitarias automatizadas y 16 casos de prueba manual de sistema (DPI, multimonitor, suspensión, pantalla completa).
+
+---
+
+## Stack Tecnológico
+
+- **Lenguaje / Runtime:** C# 13+, .NET 10
+- **Interfaz de Usuario:** WPF (`net10.0-windows10.0.19041.0`) con soporte `PerMonitorV2` DPI
+- **Patrón Arquitectónico:** MVVM mediante `CommunityToolkit.Mvvm`
+- **Inyección de Dependencias:** `Microsoft.Extensions.DependencyInjection`
+- **Audio:** `NAudio` (`MMDeviceEnumerator`, `AudioEndpointVolume`) con detección en caliente (`IMMNotificationClient`)
+- **Multimedia:** WinRT `Windows.Media.Control` (GSMTC) con extrapolación continua y miniaturas congeladas
+- **Bandeja del Sistema (Tray):** `H.NotifyIcon.Wpf` (cero WinForms)
+- **Atajos Globales:** Win32 `RegisterHotKey` / `UnregisterHotKey` mediante WndProc
+- **Configuración y Persistencia:** `System.Text.Json` en `%AppData%\openDynamic\settings.json` (esquema v2 y debounce de 500ms)
+- **Registro de Eventos (Logging):** `Serilog` y `Serilog.Sinks.File` en `%LocalAppData%\openDynamic\logs`
+- **Pruebas Unitarias:** `xUnit`
+- **Instalador:** Inno Setup 6 (distribución ReadyToRun)
+
+---
+
+## Compilación y Pruebas para Desarrolladores
+
+### Restaurar dependencias:
+```powershell
+dotnet restore openDynamic.sln
+```
+
+### Compilar la solución en Release (TreatWarningsAsErrors):
+```powershell
+dotnet build openDynamic.sln -c Release
+```
+
+### Ejecutar las pruebas unitarias:
+```powershell
+dotnet test openDynamic.sln -c Release
+```
+
+### Ejecutar la aplicación en modo de verificación (humo):
+```powershell
+dotnet run --project src/OpenDynamic.App/OpenDynamic.App.csproj -- --smoke-test
+```
+
+### Publicar con optimización ReadyToRun (R2R):
+```powershell
+dotnet publish src/OpenDynamic.App/OpenDynamic.App.csproj -c Release -r win-x64 -p:PublishReadyToRun=true --self-contained false -o publish
+```
