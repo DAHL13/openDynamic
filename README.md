@@ -191,7 +191,7 @@ dotnet publish src/OpenDynamic.App/OpenDynamic.App.csproj -c Release -r win-x64 
 
 ## Autoría y Créditos
 
-- **Desarrollador Principal y Autor del Proyecto:** [Diego Ángel Hernández Lezama (@DAHL13)](https://github.com/DAHL13)
+- **Desarrollador Principal y Autor del Proyecto:** (https://github.com/DAHL13)
 - **Asistencia de Inteligencia Artificial:** El desarrollo de openDynamic contó con la asistencia de Inteligencia Artificial como copiloto técnico para el diseño arquitectónico, implementación de código y control de calidad (QA).
 
 ---
