@@ -13,16 +13,18 @@
         Height="240"
         Title="openDynamic Island">
     <Grid Background="{x:Null}">
-        <!-- Dynamic Island Capsule: initial compact pill (160x36 DIP) -->
+        <!-- Dynamic Island Capsule: Margin="0" ensures offset is determined solely by IslandPositionCalculator -->
         <Border x:Name="CapsuleBorder"
                 Width="160"
                 Height="36"
                 Background="#FF000000"
                 CornerRadius="18"
+                ClipToBounds="True"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Top"
-                Margin="0,8,0,0">
-            <Grid />
+                Margin="0"
+                Cursor="Hand">
+            <Grid x:Name="CapsuleContentGrid" ClipToBounds="True" />
         </Border>
     </Grid>
 </Window>
