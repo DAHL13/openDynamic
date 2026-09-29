@@ -28,9 +28,10 @@ public class IslandLayoutTests
         Assert.Equal(1.0, split.Opacity);
 
         var hidden = layout.GetDimensions(IslandState.Hidden);
-        Assert.Equal(0.0, hidden.Width);
-        Assert.Equal(0.0, hidden.Height);
-        Assert.Equal(0.0, hidden.Opacity);
+        Assert.Equal(80.0, hidden.Width);
+        Assert.Equal(4.0, hidden.Height);
+        Assert.Equal(2.0, hidden.CornerRadius);
+        Assert.Equal(0.01, hidden.Opacity);
     }
 
     [Fact]

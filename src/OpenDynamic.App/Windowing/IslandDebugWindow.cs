@@ -115,7 +115,7 @@ public sealed class IslandDebugWindow : Window
             }
             _animator.AnimateTo(IslandState.Split);
         }));
-        statesGrid.Children.Add(CreateButton("Hidden (0x0)", () => _animator.AnimateTo(IslandState.Hidden)));
+        statesGrid.Children.Add(CreateButton("Hidden (80x4)", () => _animator.AnimateTo(IslandState.Hidden)));
 
         mainPanel.Children.Add(statesGrid);
 
