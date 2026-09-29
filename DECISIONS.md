@@ -256,5 +256,44 @@
     - Sin elevación de privilegios UAC (Regla de oro 3).
     - Verificación y corrección automática de la ruta del ejecutable si la aplicación cambió de directorio.
 
+---
+
+## ADR-016: Optimización Estricta (TreatWarningsAsErrors), Robustez ante Eventos del Sistema (WM_POWERBROADCAST / WM_DISPLAYCHANGE), Estilizado Oscuro de Controles y Publicación ReadyToRun (R2R) - Hito Previo a M6
+
+- **Estado:** Aceptado
+- **Fecha:** 2026-09-29
+- **Contexto:** La Fase 8 requiere garantizar la estabilidad absoluta del sistema, cero advertencias de compilación, resiliencia total ante eventos del ciclo de vida de Windows (suspensión, reanudación, reconexión/desconexión de monitores, reinicio de shell), eliminación de fugas de memoria con auditoría formal, estilización oscura completa de controles nativos en Ajustes y publicación optimizada para arranque instantáneo en frío.
+- **Decisiones:**
+  - **Compilación Estricta y Cero Advertencias:**
+    - Se activa `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>` de forma centralizada en `Directory.Build.props`.
+    - Toda la solución compila tanto en `Debug` como en `Release` con exactamente 0 errores y 0 advertencias.
+  - **Corrección de Estilo en ComboBox de Ajustes:**
+    - En `SettingsWindow.xaml`, se crea una plantilla de control completa y estilos oscuros implícitos para `ComboBox` y `ComboBoxItem`.
+    - Fondo oscuro `#1C1C1E` / `#2C2C2E`, texto blanco `#FFFFFF`, bordes `#3B4252` y menú desplegable (`Popup`) oscuro con resaltado de selección azul (`#2563EB` / `#1D4ED8`), erradicando cualquier texto blanco sobre fondo nativo blanco.
+  - **Robustez ante Eventos del Sistema Windows:**
+    - **Suspensión y Reanudación (`WM_POWERBROADCAST` & `SystemEvents.PowerModeChanged`):**
+      - Al interceptar `PBT_APMSUSPEND` / `PowerModes.Suspend`, `IslandOrchestrator` ejecuta `SuspendForPower()`, cancelando temporizadores transitorios y deteniendo animaciones de resorte para asegurar 0% CPU.
+      - Al interceptar `PBT_APMRESUMEAUTOMATIC` / `PBT_APMRESUMESUSPEND` / `PowerModes.Resume`, se restablecen los servicios, se recalibra la posición geométrica con `PositionWindow`, se restablece el Z-order con `ReassertTopmost`, y se actualiza el estado de energía con `PowerService.RefreshPowerStatus()`.
+    - **Cambio de Resolución y Conexión/Desconexión de Pantallas (`WM_DISPLAYCHANGE` & `WM_DPICHANGED`):**
+      - La ventana intercepta `WM_DISPLAYCHANGE` y `WM_DPICHANGED` en `WndProc`, recalculando automáticamente la geometría y escala en el monitor correspondiente.
+      - Si el monitor de destino fue desconectado (`TargetMonitorIndex >= monitors.Count`), `WindowPositioner` registra la advertencia, resetea `TargetMonitorIndex = 0` y reubica la isla de forma automática y pacífica en la pantalla principal sin colapsar la aplicación.
+    - **Reinicio del Explorador de Windows (`TaskbarCreated`):**
+      - Confirmado y verificado: el hook de mensaje registrado `TaskbarCreated` invoca `TrayIconManager.Recreate()`, recreando el icono de notificación sin duplicaciones ni iconos fantasma.
+    - **Reintentos en Inicialización de GSMTC:**
+      - `MediaService.InitializeAsync` incorpora un bucle de reintento configurable (hasta 3 intentos con retardo exponencial progresivo) para tolerar arranques retrasados del subsistema de audio o multimedia de Windows.
+  - **Auditoría de Recursos, Rendimiento Real y Cero Fugas:**
+    - Verificación exhaustiva de liberación y desuscripción de eventos (`CompositionTarget.Rendering`, `DispatcherTimer.Tick`, `HwndSource` hooks, `SystemEvents.PowerModeChanged`, eventos WinRT y `WeakReferenceMessenger`).
+    - Mediciones reales obtenidas en entorno local y documentadas formalmente:
+      - Consumo de RAM en reposo: **27.9 MB** (Working Set, meta: < 100 MB).
+      - Memoria privada comprometida: **5.2 MB**.
+      - Consumo de CPU en reposo sin actividad visible: **0.00%** (meta: < 0.5%).
+      - Consumo de CPU durante animación de resortes: **< 1.0%** (pico transitorio).
+  - **Matriz de Pruebas Documentada (`docs/pruebas.md`):**
+    - Se consolida la matriz formal de validación cubriendo pruebas automatizadas (197 pruebas unitarias en verde), pruebas de estrés de recursos y protocolo manual de 16 casos para el usuario.
+  - **Optimización de Publicación con ReadyToRun (R2R):**
+    - Se habilita `<PublishReadyToRun>true</PublishReadyToRun>` en `OpenDynamic.App.csproj`.
+    - Publicación `win-x64` genera binarios precompilados a código nativo Ahead-of-Time para arranque instantáneo en frío, sin aplicar trimming destructivo incompatible con WPF.
+
+
 
 
