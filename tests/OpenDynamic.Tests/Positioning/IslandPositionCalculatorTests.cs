@@ -173,5 +173,37 @@ public class IslandPositionCalculatorTests
         // Expected Y: 20 * 1.5 = 30
         Assert.Equal(30, placement.Y);
     }
+
+    [Fact]
+    public void CalculatePlacement_OnSecondaryMonitorRightOfPrimary_ComputesCorrectAbsolutePlacement()
+    {
+        // Primary: 1920x1080 at (0, 0). Secondary: 2560x1440 at (1920, 0) with 100% scale
+        var secondaryMonitor = new MonitorArea(1920, 0, 2560, 1440);
+        var dpi = DisplayDpi.FromScale(1.0);
+
+        var placement = IslandPositionCalculator.CalculatePlacement(secondaryMonitor, dpi);
+
+        // Island centered on secondary monitor: 1920 + (2560 - 640)/2 = 1920 + 960 = 2880
+        Assert.Equal(2880, placement.X);
+        Assert.Equal(8, placement.Y);
+        Assert.Equal(640, placement.Width);
+        Assert.Equal(240, placement.Height);
+    }
+
+    [Fact]
+    public void CalculatePlacement_OnPortraitSecondaryMonitor_CentersHorizontallyOnPortraitBounds()
+    {
+        // Portrait secondary monitor: 1080x1920 at (-1080, 0) with 100% scale
+        var portraitMonitor = new MonitorArea(-1080, 0, 1080, 1920);
+        var dpi = DisplayDpi.FromScale(1.0);
+
+        var placement = IslandPositionCalculator.CalculatePlacement(portraitMonitor, dpi);
+
+        // Island centered on portrait monitor: -1080 + (1080 - 640)/2 = -1080 + 220 = -860
+        Assert.Equal(-860, placement.X);
+        Assert.Equal(8, placement.Y);
+        Assert.Equal(640, placement.Width);
+        Assert.Equal(240, placement.Height);
+    }
 }
 

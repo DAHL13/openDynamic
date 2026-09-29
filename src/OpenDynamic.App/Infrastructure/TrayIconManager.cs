@@ -1,7 +1,6 @@
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
 using H.NotifyIcon;
 using OpenDynamic.App.Orchestration;
 using OpenDynamic.App.Widgets.Hardware;
@@ -57,20 +56,64 @@ public sealed class TrayIconManager : IDisposable
 
         try
         {
+            var icon = GetOrCreateIcon();
             _taskbarIcon = new TaskbarIcon
             {
                 ToolTipText = "openDynamic - Dynamic Island para Windows",
-                Icon = GetOrCreateIcon()
+                Icon = icon
             };
 
             _taskbarIcon.TrayLeftMouseDown += OnTrayLeftMouseDown;
             _taskbarIcon.ContextMenu = BuildContextMenu();
 
-            Log.Information("System tray icon initialized successfully using H.NotifyIcon.Wpf.");
+            // Register taskbar icon in Application.Current.Resources so WPF visual/resource tree anchors it
+            if (Application.Current?.Resources != null)
+            {
+                Application.Current.Resources["OpenDynamicTaskbarIcon"] = _taskbarIcon;
+            }
+
+            // Explicitly force creation of native taskbar icon (Shell_NotifyIcon NIM_ADD)
+            try
+            {
+                _taskbarIcon.ForceCreate();
+                Log.Information("System tray icon initialized successfully using H.NotifyIcon.Wpf.");
+            }
+            catch (InvalidOperationException ex)
+            {
+                // In automated CI, headless test environments, or when Explorer taskbar is not yet ready,
+                // Shell_NotifyIcon returns E_FAIL. The icon will be registered upon receiving TaskbarCreated.
+                Log.Warning(ex, "System tray icon registration deferred: shell notification area not ready. Will be registered upon TaskbarCreated.");
+            }
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Failed to initialize system tray icon.");
+        }
+    }
+
+    /// <summary>
+    /// Recreates or re-registers the tray icon in the Windows taskbar (e.g., when explorer.exe restarts).
+    /// </summary>
+    public void Recreate()
+    {
+        if (_isDisposed) return;
+
+        try
+        {
+            Log.Information("Recreating system tray icon (TaskbarCreated handled)...");
+            if (_taskbarIcon == null)
+            {
+                Initialize();
+            }
+            else
+            {
+                _taskbarIcon.ForceCreate(true);
+                Log.Information("System tray icon recreated successfully.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to recreate system tray icon after taskbar event.");
         }
     }
 
@@ -191,91 +234,71 @@ public sealed class TrayIconManager : IDisposable
         return menu;
     }
 
-    /// <summary>
-    /// Generates a sharp 32x32 BitmapImage representing the Dynamic Island capsule for the tray icon.
-    /// Encodes via PNG stream to ensure compatibility with H.NotifyIcon.Wpf ImageExtensions.
-    /// </summary>
-    private static ImageSource CreateCapsuleIconSource()
-    {
-        var visual = new DrawingVisual();
-        using (var dc = visual.RenderOpen())
-        {
-            // Dark capsule background (pill shape)
-            var pillRect = new Rect(2, 8, 28, 16);
-            var pillBrush = new SolidColorBrush(Color.FromRgb(20, 20, 24));
-            var borderPen = new Pen(new SolidColorBrush(Color.FromRgb(96, 165, 250)), 1.5);
-            dc.DrawRoundedRectangle(pillBrush, borderPen, pillRect, 8, 8);
-
-            // Center glow dot
-            var dotBrush = new SolidColorBrush(Color.FromRgb(240, 246, 252));
-            dc.DrawEllipse(dotBrush, null, new Point(16, 16), 3, 3);
-        }
-
-        var rtb = new RenderTargetBitmap(32, 32, 96, 96, PixelFormats.Pbgra32);
-        rtb.Render(visual);
-
-        var encoder = new PngBitmapEncoder();
-        encoder.Frames.Add(BitmapFrame.Create(rtb));
-        using var ms = new System.IO.MemoryStream();
-        encoder.Save(ms);
-        ms.Position = 0;
-
-        var bitmapImage = new BitmapImage();
-        bitmapImage.BeginInit();
-        bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
-        bitmapImage.StreamSource = ms;
-        bitmapImage.EndInit();
-        bitmapImage.Freeze();
-
-        return bitmapImage;
-    }
-
     private static System.Drawing.Icon GetOrCreateIcon()
     {
+        try
+        {
+            string diskPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "app.ico");
+            if (File.Exists(diskPath))
+            {
+                var icon = new System.Drawing.Icon(diskPath);
+                Log.Information("Loaded tray icon from disk path: {Path}", diskPath);
+                return icon;
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Debug(ex, "Could not load icon directly from disk path.");
+        }
+
         try
         {
             var iconUri = new Uri("pack://application:,,,/OpenDynamic.App;component/Resources/app.ico");
             var resourceStream = Application.GetResourceStream(iconUri)?.Stream;
             if (resourceStream != null)
             {
-                using (resourceStream)
-                {
-                    return new System.Drawing.Icon(resourceStream);
-                }
+                using var ms = new MemoryStream();
+                resourceStream.CopyTo(ms);
+                resourceStream.Dispose();
+                ms.Position = 0;
+                var icon = new System.Drawing.Icon(ms);
+                Log.Information("Loaded tray icon from pack URI resource stream.");
+                return icon;
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            Log.Debug(ex, "Could not load icon from pack URI resource stream.");
+        }
 
+        // Fallback: draw in-memory 32x32 icon with native handle
         try
         {
-            string diskPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "app.ico");
-            if (System.IO.File.Exists(diskPath))
+            using var bmp = new System.Drawing.Bitmap(32, 32);
+            using (var g = System.Drawing.Graphics.FromImage(bmp))
             {
-                using var fs = System.IO.File.OpenRead(diskPath);
-                return new System.Drawing.Icon(fs);
+                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                g.Clear(System.Drawing.Color.Transparent);
+                using var brush = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(255, 20, 24, 33));
+                using var pen = new System.Drawing.Pen(System.Drawing.Color.FromArgb(255, 96, 165, 250), 2);
+                using var path = new System.Drawing.Drawing2D.GraphicsPath();
+                path.AddArc(2, 8, 16, 16, 90, 180);
+                path.AddArc(14, 8, 16, 16, 270, 180);
+                path.CloseFigure();
+                g.FillPath(brush, path);
+                g.DrawPath(pen, path);
+                using var dotBrush = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(255, 240, 246, 252));
+                g.FillEllipse(dotBrush, 14, 14, 4, 4);
             }
-        }
-        catch { }
 
-        // Fallback: draw in-memory 32x32 icon
-        using var bmp = new System.Drawing.Bitmap(32, 32);
-        using (var g = System.Drawing.Graphics.FromImage(bmp))
-        {
-            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-            g.Clear(System.Drawing.Color.Transparent);
-            using var brush = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(255, 20, 24, 33));
-            using var pen = new System.Drawing.Pen(System.Drawing.Color.FromArgb(255, 96, 165, 250), 2);
-            using var path = new System.Drawing.Drawing2D.GraphicsPath();
-            path.AddArc(2, 8, 16, 16, 90, 180);
-            path.AddArc(14, 8, 16, 16, 270, 180);
-            path.CloseFigure();
-            g.FillPath(brush, path);
-            g.DrawPath(pen, path);
-            using var dotBrush = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(255, 240, 246, 252));
-            g.FillEllipse(dotBrush, 14, 14, 4, 4);
+            IntPtr hIcon = bmp.GetHicon();
+            return System.Drawing.Icon.FromHandle(hIcon);
         }
-        IntPtr hIcon = bmp.GetHicon();
-        return System.Drawing.Icon.FromHandle(hIcon);
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to create fallback GDI icon. Using SystemIcons.Application.");
+            return (System.Drawing.Icon)System.Drawing.SystemIcons.Application.Clone();
+        }
     }
 
     /// <inheritdoc />
@@ -290,6 +313,12 @@ public sealed class TrayIconManager : IDisposable
             {
                 _taskbarIcon.TrayLeftMouseDown -= OnTrayLeftMouseDown;
                 _taskbarIcon.Visibility = Visibility.Collapsed;
+
+                if (Application.Current?.Resources != null && Application.Current.Resources.Contains("OpenDynamicTaskbarIcon"))
+                {
+                    Application.Current.Resources.Remove("OpenDynamicTaskbarIcon");
+                }
+
                 _taskbarIcon.Dispose();
             }
             catch (Exception ex)

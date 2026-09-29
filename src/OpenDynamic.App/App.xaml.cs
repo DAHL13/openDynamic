@@ -11,6 +11,8 @@ namespace OpenDynamic.App;
 public partial class App : Application
 {
     private SingleInstanceManager? _singleInstance;
+    private TrayIconManager? _trayIconManager;
+    private Services.IHotkeyService? _hotkeyService;
 
     public static new App Current => (App)Application.Current;
 
@@ -69,23 +71,34 @@ public partial class App : Application
         var timerWidget = Services.GetRequiredService<Widgets.Timer.TimerWidget>();
         orchestrator.RegisterWidget(timerWidget);
 
-        // Initialize System Tray Icon Manager (H.NotifyIcon.Wpf)
-        var trayIconManager = Services.GetRequiredService<TrayIconManager>();
-        trayIconManager.Initialize();
+        // Initialize System Tray Icon Manager (H.NotifyIcon.Wpf) stored in class field to prevent GC collection
+        _trayIconManager = Services.GetRequiredService<TrayIconManager>();
+        _trayIconManager.Initialize();
 
         // Initialize Global Hotkey Service using native Win32 RegisterHotKey
-        var hotkeyService = Services.GetRequiredService<Services.IHotkeyService>();
+        _hotkeyService = Services.GetRequiredService<Services.IHotkeyService>();
         var hwndSource = System.Windows.Interop.HwndSource.FromHwnd(islandWindow.Hwnd);
         if (hwndSource != null)
         {
-            hotkeyService.Initialize(islandWindow.Hwnd, hwndSource);
+            uint taskbarCreatedMsg = Native.NativeMethods.RegisterWindowMessage("TaskbarCreated");
+            hwndSource.AddHook((IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled) =>
+            {
+                if (msg != 0 && (uint)msg == taskbarCreatedMsg)
+                {
+                    Log.Information("TaskbarCreated broadcast received from Windows Shell. Recreating tray icon...");
+                    _trayIconManager?.Recreate();
+                }
+                return IntPtr.Zero;
+            });
+
+            _hotkeyService.Initialize(islandWindow.Hwnd, hwndSource);
             var settings = Services.GetRequiredService<Core.Settings.AppSettings>();
             if (settings.EnableGlobalHotkeys && !string.IsNullOrWhiteSpace(settings.ToggleIslandHotkey))
             {
-                hotkeyService.UpdateHotkey(settings.ToggleIslandHotkey);
+                _hotkeyService.UpdateHotkey(settings.ToggleIslandHotkey);
             }
 
-            hotkeyService.HotkeyTriggered += (s, ev) =>
+            _hotkeyService.HotkeyTriggered += (s, ev) =>
             {
                 if (orchestrator.StateMachine.CurrentState == Core.State.IslandState.Hidden)
                 {
@@ -180,11 +193,11 @@ public partial class App : Application
     {
         try
         {
-            var trayIconManager = Services?.GetService<TrayIconManager>();
-            trayIconManager?.Dispose();
+            _trayIconManager?.Dispose();
+            _trayIconManager = null;
 
-            var hotkeyService = Services?.GetService<Services.IHotkeyService>();
-            hotkeyService?.Dispose();
+            _hotkeyService?.Dispose();
+            _hotkeyService = null;
 
             var settingsService = Services?.GetService<Core.Settings.ISettingsService>();
             settingsService?.SaveImmediate();

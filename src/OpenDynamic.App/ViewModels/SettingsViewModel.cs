@@ -401,6 +401,26 @@ public partial class SettingsViewModel : ObservableObject
         HotkeyConflictMessage = _hotkeyService.ConflictMessage;
     }
 
+    /// <summary>
+    /// Refreshes the list of available display monitors and adjusts the selected index if needed.
+    /// </summary>
+    [RelayCommand]
+    public void RefreshMonitors()
+    {
+        var monitorNames = WindowPositioner.GetAvailableMonitorNames();
+        AvailableMonitors.Clear();
+        foreach (var name in monitorNames)
+        {
+            AvailableMonitors.Add(name);
+        }
+
+        int clampedIndex = Math.Clamp(_settings.TargetMonitorIndex, 0, Math.Max(0, monitorNames.Count - 1));
+        if (TargetMonitorIndex != clampedIndex)
+        {
+            TargetMonitorIndex = clampedIndex;
+        }
+    }
+
     [RelayCommand]
     public void ResetPosition()
     {
