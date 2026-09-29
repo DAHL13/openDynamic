@@ -25,11 +25,12 @@
                 ClipToBounds="True"
                 Background="#22FFFFFF"
                 Margin="0,0,7,0"
-                VerticalAlignment="Center">
+                VerticalAlignment="Center"
+                AutomationProperties.Name="Carátula del álbum">
             <Grid>
                 <!-- Fallback Note Icon when no thumbnail is provided -->
                 <Path Data="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"
-                      Fill="#B3FFFFFF"
+                      Fill="{DynamicResource AppTextPrimaryBrush}"
                       Stretch="Uniform"
                       Width="11"
                       Height="11"
@@ -47,16 +48,18 @@
         <!-- Track Info with Ellipsis and Proper Breathing Room -->
         <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,6,0">
             <TextBlock Text="{Binding TrackTitle}"
-                       Foreground="#FFFFFFFF"
+                       Foreground="{DynamicResource AppTextPrimaryBrush}"
                        FontSize="10.5"
                        FontWeight="SemiBold"
                        TextTrimming="CharacterEllipsis"
-                       TextWrapping="NoWrap" />
+                       TextWrapping="NoWrap"
+                       AutomationProperties.Name="{Binding TrackTitle}" />
             <TextBlock Text="{Binding TrackArtist}"
-                       Foreground="#FFAAAAAA"
+                       Foreground="{DynamicResource AppTextSecondaryBrush}"
                        FontSize="9"
                        TextTrimming="CharacterEllipsis"
-                       TextWrapping="NoWrap" />
+                       TextWrapping="NoWrap"
+                       AutomationProperties.Name="{Binding TrackArtist}" />
         </StackPanel>
 
         <!-- Audio Equalizer Wave Bars (hidden in reduced motion mode) -->
@@ -66,10 +69,10 @@
                     Height="12"
                     Width="14"
                     Visibility="{Binding EqualizerVisibility}">
-            <Border Width="2" Height="6" CornerRadius="1" Background="#FF1ED760" Margin="0,0,1.2,0" VerticalAlignment="Center" />
-            <Border Width="2" Height="12" CornerRadius="1" Background="#FF1ED760" Margin="0,0,1.2,0" VerticalAlignment="Center" />
-            <Border Width="2" Height="8" CornerRadius="1" Background="#FF1ED760" Margin="0,0,1.2,0" VerticalAlignment="Center" />
-            <Border Width="2" Height="5" CornerRadius="1" Background="#FF1ED760" VerticalAlignment="Center" />
+            <Border Width="2" Height="6" CornerRadius="1" Background="{DynamicResource AppAccentBrush}" Margin="0,0,1.2,0" VerticalAlignment="Center" />
+            <Border Width="2" Height="12" CornerRadius="1" Background="{DynamicResource AppAccentBrush}" Margin="0,0,1.2,0" VerticalAlignment="Center" />
+            <Border Width="2" Height="8" CornerRadius="1" Background="{DynamicResource AppAccentBrush}" Margin="0,0,1.2,0" VerticalAlignment="Center" />
+            <Border Width="2" Height="5" CornerRadius="1" Background="{DynamicResource AppAccentBrush}" VerticalAlignment="Center" />
         </StackPanel>
     </Grid>
 </UserControl>

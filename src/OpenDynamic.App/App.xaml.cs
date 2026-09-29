@@ -27,6 +27,7 @@ public partial class App : Application
 
         LoggingConfiguration.ConfigureLogging();
         RegisterGlobalExceptionHandlers();
+        AccessibilityThemeManager.Initialize();
 
         // Configure dependency injection
         var serviceCollection = new ServiceCollection();

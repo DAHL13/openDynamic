@@ -97,7 +97,8 @@
                      Maximum="100"
                      Value="{Binding Percentage, Mode=OneWay}"
                      Margin="0,0,8,0"
-                     VerticalAlignment="Center">
+                     VerticalAlignment="Center"
+                     AutomationProperties.Name="Nivel de volumen maestro">
             <ProgressBar.Template>
                 <ControlTemplate TargetType="ProgressBar">
                     <Grid>
@@ -126,14 +127,16 @@
             </ProgressBar.Template>
         </ProgressBar>
 
-        <!-- Percentage / Muted Indicator -->
+        <!-- Percentage / Muted Indicator (Polite live announcement) -->
         <TextBlock Grid.Column="2"
                    Text="{Binding StatusText}"
-                   Foreground="#FFFFFFFF"
+                   Foreground="{DynamicResource AppTextPrimaryBrush}"
                    FontSize="11"
                    FontWeight="SemiBold"
                    VerticalAlignment="Center"
                    TextAlignment="Right"
-                   MinWidth="28" />
+                   MinWidth="28"
+                   AutomationProperties.LiveSetting="Polite"
+                   AutomationProperties.Name="Nivel de volumen" />
     </Grid>
 </UserControl>

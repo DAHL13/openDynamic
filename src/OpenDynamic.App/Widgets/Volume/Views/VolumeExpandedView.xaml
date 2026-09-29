@@ -28,22 +28,25 @@
 
             <StackPanel Grid.Column="0">
                 <TextBlock Text="Control de Volumen"
-                           Foreground="#88FFFFFF"
+                           Foreground="{DynamicResource AppTextMutedBrush}"
                            FontSize="10"
                            FontWeight="Medium" />
                 <TextBlock Text="{Binding DeviceName}"
-                           Foreground="#FFFFFFFF"
+                           Foreground="{DynamicResource AppTextPrimaryBrush}"
                            FontSize="14"
                            FontWeight="SemiBold"
-                           TextTrimming="CharacterEllipsis" />
+                           TextTrimming="CharacterEllipsis"
+                           AutomationProperties.Name="{Binding DeviceName}" />
             </StackPanel>
 
             <TextBlock Grid.Column="1"
                        Text="{Binding StatusText}"
-                       Foreground="#FFFFFFFF"
+                       Foreground="{DynamicResource AppTextPrimaryBrush}"
                        FontSize="20"
                        FontWeight="Bold"
-                       VerticalAlignment="Center" />
+                       VerticalAlignment="Center"
+                       AutomationProperties.LiveSetting="Polite"
+                       AutomationProperties.Name="Porcentaje de volumen" />
         </Grid>
 
         <!-- Center: Interactive Slider / Bar -->
@@ -54,7 +57,9 @@
                     ValueChanged="OnSliderValueChanged"
                     IsMoveToPointEnabled="True"
                     Focusable="False"
-                    Cursor="Hand" />
+                    Cursor="Hand"
+                    AutomationProperties.Name="Nivel de volumen maestro"
+                    AutomationProperties.HelpText="Desliza para ajustar el volumen del sistema" />
         </Grid>
 
         <!-- Footer: Action Buttons -->
@@ -68,12 +73,14 @@
             <!-- Mute Toggle Button -->
             <Button Grid.Column="0"
                     Command="{Binding ToggleMuteCommand}"
-                    Background="#22FFFFFF"
-                    Foreground="#FFFFFFFF"
+                    Background="{DynamicResource AppControlBackgroundBrush}"
+                    Foreground="{DynamicResource AppTextPrimaryBrush}"
                     BorderThickness="0"
                     Padding="14,6"
                     Cursor="Hand"
-                    Focusable="False">
+                    Focusable="False"
+                    AutomationProperties.Name="Silenciar o reactivar sonido"
+                    AutomationProperties.HelpText="Alterna el silencio del audio del sistema">
                 <Button.Resources>
                     <Style TargetType="Border">
                         <Setter Property="CornerRadius" Value="14" />

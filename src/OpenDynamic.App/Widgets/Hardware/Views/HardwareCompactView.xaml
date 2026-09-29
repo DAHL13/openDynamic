@@ -7,7 +7,7 @@
              Height="36"
              Background="Transparent">
     <!-- 12 DIP horizontal margins protect content from the R:18 semicircular capsule edges (identical to MediaCompactView) -->
-    <Grid VerticalAlignment="Center" Margin="12,0,12,0">
+    <Grid VerticalAlignment="Center" Margin="12,0,12,0" AutomationProperties.Name="Monitor de hardware">
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center">
             <!-- CPU Indicator -->
             <Path Data="M 2,2 H 14 V 14 H 2 Z M 5,0 V 2 M 8,0 V 2 M 11,0 V 2 M 5,14 V 16 M 8,14 V 16 M 11,14 V 16 M 0,5 H 2 M 0,8 H 2 M 0,11 H 2 M 14,5 H 16 M 14,8 H 16 M 14,11 H 16 M 5,5 H 11 V 11 H 5 Z"
@@ -23,18 +23,20 @@
             <TextBlock Text="CPU"
                        FontSize="9.5"
                        FontWeight="SemiBold"
-                       Foreground="#8E8E93"
+                       Foreground="{DynamicResource AppTextMutedBrush}"
                        VerticalAlignment="Center"
                        Margin="0,0,2,0" />
 
             <TextBlock Text="{Binding CpuSummaryText}"
                        FontSize="10.5"
                        FontWeight="SemiBold"
-                       Foreground="#FFFFFF"
-                       VerticalAlignment="Center" />
+                       Foreground="{DynamicResource AppTextPrimaryBrush}"
+                       VerticalAlignment="Center"
+                       AutomationProperties.LiveSetting="Polite"
+                       AutomationProperties.Name="Uso de CPU" />
 
             <!-- Symmetrical Subtle Separator -->
-            <Rectangle Width="1" Height="12" Fill="#38383A" Margin="6,0,6,0" VerticalAlignment="Center" />
+            <Rectangle Width="1" Height="12" Fill="{DynamicResource AppBorderBrush}" Margin="6,0,6,0" VerticalAlignment="Center" />
 
             <!-- RAM Indicator -->
             <Path Data="M 1,4 H 15 V 12 H 1 Z M 4,4 V 7 M 7,4 V 7 M 10,4 V 7 M 13,4 V 7 M 3,12 V 14 M 5,12 V 14 M 7,12 V 14 M 9,12 V 14 M 11,12 V 14 M 13,12 V 14"
@@ -50,15 +52,17 @@
             <TextBlock Text="RAM"
                        FontSize="9.5"
                        FontWeight="SemiBold"
-                       Foreground="#8E8E93"
+                       Foreground="{DynamicResource AppTextMutedBrush}"
                        VerticalAlignment="Center"
                        Margin="0,0,2,0" />
 
             <TextBlock Text="{Binding RamSummaryText}"
                        FontSize="10.5"
                        FontWeight="SemiBold"
-                       Foreground="#FFFFFF"
-                       VerticalAlignment="Center" />
+                       Foreground="{DynamicResource AppTextPrimaryBrush}"
+                       VerticalAlignment="Center"
+                       AutomationProperties.LiveSetting="Polite"
+                       AutomationProperties.Name="Uso de memoria RAM" />
         </StackPanel>
     </Grid>
 </UserControl>

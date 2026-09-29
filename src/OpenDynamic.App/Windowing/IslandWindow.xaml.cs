@@ -238,7 +238,8 @@ public partial class IslandWindow : Window
     public void UpdateHighContrastThemeLive()
     {
         bool isHighContrast = SystemParameters.HighContrast;
-        Log.Information("System HighContrast status evaluated: {IsHighContrast}", isHighContrast);
+        Infrastructure.AccessibilityThemeManager.ApplyTheme(isHighContrast);
+        Log.Information("System HighContrast status evaluated and theme applied: {IsHighContrast}", isHighContrast);
     }
 
     private void OnSystemParametersStaticPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
