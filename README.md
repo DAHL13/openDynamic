@@ -63,6 +63,7 @@ openDynamic adopta una estética de **muesca rectangular superior (Notch)** pega
 | **Notch UI** | **Rediseño geométrico a muesca rectangular superior con esquinas asimétricas (ADR-017)** | **Completada** |
 | **Fase 9** | **Empaquetado Inno Setup, decisión de runtime (ADR-016), CI/CD y documentación técnica (M6)** | **Completada** |
 | **Fase 10** | **Accesibilidad integral, perfiles de movimiento, alto contraste y UI Automation (v1.1)** | **Completada** |
+| **Fase 11** | **Red (Wi-Fi/Ethernet) y dispositivos periféricos USB/Bluetooth reactivos (v1.1)** | **Completada** |
 
 ---
 
@@ -137,8 +138,8 @@ En estricto cumplimiento de la **Regla de Oro 1** (0% CPU en reposo y consumo m�
 ## Documentación Técnica
 
 - **[Arquitectura y Guía para Desarrolladores (`docs/arquitectura.md`)](./docs/arquitectura.md):** Diagramas conceptuales de capas (Core vs. App), flujo del `IslandOrchestrator`, ciclo de vida de la FSM y la **Guía de 10 pasos** para crear e integrar nuevos widgets desde cero.
-- **[Registro de Decisiones de Arquitectura (`DECISIONS.md`)](./DECISIONS.md):** Registro histórico y justificación de las 18 decisiones técnicas (ADR-001 a ADR-018).
-- **[Matriz de Validación y Pruebas (`docs/pruebas.md`)](./docs/pruebas.md):** 213 pruebas unitarias automatizadas y casos de prueba manual de sistema (DPI, multimonitor, suspensión, pantalla completa, accesibilidad).
+- **[Registro de Decisiones de Arquitectura (`DECISIONS.md`)](./DECISIONS.md):** Registro histórico y justificación de las 19 decisiones técnicas (ADR-001 a ADR-019).
+- **[Matriz de Validación y Pruebas (`docs/pruebas.md`)](./docs/pruebas.md):** 248 pruebas unitarias automatizadas y casos de prueba manual de sistema (DPI, multimonitor, suspensión, pantalla completa, accesibilidad).
 
 ---
 

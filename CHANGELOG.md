@@ -3,6 +3,44 @@
 Todas las modificaciones notables en este proyecto serán documentadas en este archivo.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y cumple con [SemVer](https://semver.org/).
 
+## [1.1.0-dev] - 2026-09-29 (Fase 11: Red y Dispositivos Periféricos)
+
+### Añadido
+- **Alertas de Conectividad de Red en Core (`OpenDynamic.Core.Network`):**
+  - Modelos puros `NetworkState`, `NetworkType` y `NetworkSnapshot` sin dependencias de Windows ni WPF (Regla de Oro 5).
+  - Política pura `NetworkAlertPolicy` con `TimeProvider` inyectable:
+    * Debounce de 1.0 s ante cambios rápidos e inestabilidad transitoria de interfaces de red.
+    * Cooldown de 5.0 s entre alertas consecutivas del mismo estado/red para evitar spam de reconexión.
+    * Supresión total del estado inicial como línea base en el arranque del sistema.
+    * Ventana de supresión de 10.0 s tras reanudación de suspensión/hibernación (`OnPowerResumed`).
+- **Alertas de Dispositivos USB y Bluetooth en Core (`OpenDynamic.Core.Devices`):**
+  - Modelos puros `DeviceEventType`, `DeviceCategory`, `DeviceEvent` y clasificador heurístico `DeviceCategoryClassifier`.
+  - Política pura `DeviceAlertPolicy` con `TimeProvider` inyectable:
+    * Coalescencia / agrupación de 800 ms para inserciones multifunción o ráfagas de periféricos compuestos.
+    * Cooldown de 3.0 s entre eventos similares.
+    * Supresión de toda la enumeración previa a `EnumerationCompleted` para evitar ruido al arrancar.
+    * Supresión de 10.0 s tras reanudación de energía.
+    * Filtrado dinámico insensible a mayúsculas/minúsculas mediante lista de dispositivos ignorados.
+- **Servicios de Plataforma Reactivos sin Polling (`OpenDynamic.App.Services`):**
+  - `NetworkService`: Suscripción al evento WinRT `NetworkInformation.NetworkStatusChanged`. Detección de nombre de perfil (`ProfileName`) sin requerir permisos invasivos de ubicación de Windows.
+  - `DeviceService`: Notificaciones Win32 `WM_DEVICECHANGE` (`RegisterDeviceNotification`) para almacenamiento USB y WinRT `DeviceWatcher` (`AssociationEndpoint`) para periféricos Bluetooth en tiempo real.
+  - Lectura de nivel de batería Bluetooth a través de `System.Devices.BatteryLevel` (0-100) cuando el controlador lo soporta.
+  - Captura y reenvío de eventos `WM_POWERBROADCAST` (`PBT_APMSUSPEND`, `PBT_APMRESUME*`) en `IslandWindow.WndProc`.
+  - **Regla de Oro 11 & Budget:** Desactivación y liberación completa de watchers y suscripciones nativas (`DeviceWatcher.Stop()`, `UnregisterDeviceNotification`, desuscripción de eventos) al desmarcar toggles en ajustes o al apagar la aplicación.
+  - **Privacidad Estricta:** Registro exclusivo de categorías sanitizadas, tipos de evento y conteos en Serilog, sin nombres legibles de dispositivos.
+- **Widgets Notificadores en Muesca Superior (`OpenDynamic.App.Widgets`):**
+  - `NetworkWidget`: Prioridad 65 (`ActivityPriority.Network`), duración transitoria 3.0 s configurable. Vistas XAML `NetworkCompactView`, `NetworkExpandedView` y `NetworkSplitView`.
+  - `DeviceWidget`: Prioridad 60 (`ActivityPriority.Device`), duración transitoria 3.0 s configurable. Vistas XAML `DeviceCompactView`, `DeviceExpandedView` y `DeviceSplitView` con iconos contextuales y porcentaje de batería.
+- **Jerarquía Global de Prioridades y Resolución Determinista:**
+  - `TimerAlert (100) > Battery (90) > Volume (80) > Network (65) > Device (60) > Timer (50) > Media (30) > Hardware (10)`.
+- **Configuración, UI y Migración de Esquema (Schema v4):**
+  - Incremento a `CurrentSchemaVersion = 4` en `AppSettings.cs` con propiedades `EnableNetworkAlerts`, `DefaultNetworkPriority`, `NetworkTransientDurationSeconds`, `EnableDeviceAlerts`, `DefaultDevicePriority`, `DeviceTransientDurationSeconds` y `IgnoredDeviceNames`.
+  - Migración transparente en `SettingsService.Load()` para versiones `< 4`.
+  - Tarjetas dedicadas de configuración en la pestaña "Widgets y Prioridades" de `SettingsWindow.xaml`, incluyendo gestión de dispositivos ignorados y atributos de accesibilidad `AutomationProperties.Name`.
+- **Pruebas Automatizadas:**
+  - Nuevas suites de pruebas unitarias completas: `NetworkAlertPolicyTests`, `DeviceAlertPolicyTests`, `SettingsServiceTests` (migración v4) y `PriorityResolverPhase11Tests`.
+  - Suite completa de 248 pruebas unitarias en verde.
+
 ## [1.1.0-dev] - 2026-09-29 (Fase 10: Accesibilidad y Preferencias de Animación)
 
 ### Añadido
