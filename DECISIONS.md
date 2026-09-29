@@ -179,3 +179,46 @@
   - **Suspensión de Orchestrator y Resortes:** Al entrar en pantalla completa, `IslandOrchestrator.SuspendForFullscreen()` detiene de inmediato el temporizador transitorio activo, cancela cualquier solicitud pendiente y congela el animador (`IslandAnimator.SnapTo(IslandState.Hidden)`), desuscribiéndose de `CompositionTarget.Rendering` (0% CPU).
   - **Restauración al salir:** Al recuperar el escritorio o cambiar a una ventana normal, `ResumeFromFullscreen()` evalúa nuevamente las fuentes de actividad y restaura la cápsula con su estado previo de forma suave. Configurable mediante `AppSettings.HideOnFullscreen` (por defecto activo).
 
+---
+
+## ADR-013: Monitorización Nativa de Hardware (Win32 GetSystemTimes / GlobalMemoryStatusEx) y Condición Estricta de Visibilidad (0% CPU en Reposo)
+
+- **Estado:** Aceptado
+- **Fecha:** 2026-09-28
+- **Contexto:** La Fase 6 (Hito M4) requiere monitorizar CPU y memoria RAM (con soporte opcional de GPU) garantizando el cumplimiento estricto de la Regla de Oro 1 (0% CPU en reposo) y la Regla de Oro 4 (arquitectura nativa aislada sin dependencias pesadas de terceros como LibreHardwareMonitor completo).
+- **Decisiones:**
+  - **P/Invoke Win32 exclusivo:**
+    - CPU: Consulta directa a `GetSystemTimes` en `kernel32.dll`. Cálculo del delta entre muestras consecutivas: $\text{TotalDelta} = (\Delta\text{Kernel} + \Delta\text{User})$, $\text{IdleDelta} = \Delta\text{Idle}$. Dado que en Windows NT el tiempo de kernel incluye el tiempo de inactividad, $\text{CPU\%} = (1.0 - \frac{\text{IdleDelta}}{\text{TotalDelta}}) \times 100$.
+    - RAM: Consulta a `GlobalMemoryStatusEx` obteniendo `dwMemoryLoad` y convirtiendo `ullTotalPhys` / `ullAvailPhys` a Gigabytes.
+    - GPU: Opcional y estrictamente desactivada por defecto (`AppSettings.EnableGpuMonitoring = false`). Si se habilita, inicializa contadores de rendimiento de la categoría `"GPU Engine"` fuera del hilo de UI en `Task.Run` con try/catch.
+  - **Aislamiento en Core (Regla de oro 5):** `HardwareSnapshot`, `IHardwareMonitor` y `HardwareCalculator` residen en `OpenDynamic.Core.Hardware` con cálculo puro y sin dependencias de UI, testeados unitariamente con 100% de reproducibilidad.
+  - **Condición Estricta de Visibilidad (Regla de oro 1: 0% CPU en reposo):**
+    - El temporizador de muestreo a 2.0 segundos (`_sampleTimer`) se activa ÚNICAMENTE si `HardwareWidget` está activamente visible en pantalla (`IsVisibleOnIsland == true` y `DisplayMode == Compact || Expanded || Split`).
+    - Si la isla está en `Hidden`, o si el widget no es primario ni secundario activo, el timer se detiene por completo de inmediato.
+    - Al volver a ser visible, se invoca `ResetCpuBaseline()` para descartar deltas acumulados durante el período inactivo y recalibrar el cálculo sin picos anómalos.
+  - **Prioridad 10:** Se sitúa como actividad continua base del sistema (`AppSettings.DefaultHardwarePriority = 10`), permitiendo convivencia en Split con música (30) o temporizador (50).
+
+---
+
+## ADR-014: Temporizador por Marca de Tiempo Objetivo (TargetEndTimeUtc / TimeProvider) y Modo Split Multitasking con Intercambio Interactivo de Satélite (Hito M4)
+
+- **Estado:** Aceptado
+- **Fecha:** 2026-09-28
+- **Contexto:** Se requiere un widget de temporizador con soporte Pomodoro (25 min trabajo / 5 min descanso) que nunca derive por acumulación de ticks, soporte pruebas unitarias deterministas sin `Thread.Sleep`, emita una alerta transitoria crítica de prioridad 100 al finalizar, y permita convivencia en modo Split real con intercambio interactivo al hacer clic en el satélite circular.
+- **Decisiones:**
+  - **Temporizador por marca de tiempo objetivo (Regla de oro 5):**
+    - Prohibido acumular o decrementar "ticks". El temporizador se basa en un timestamp objetivo absoluto en UTC: `TargetEndTimeUtc = now + TotalDuration`.
+    - El tiempo restante se calcula en todo momento como `RemainingTime = TargetEndTimeUtc - now`.
+    - Al pausar: se preserva `RemainingTime = TargetEndTimeUtc - now`.
+    - Al reanudar: se recalcula `TargetEndTimeUtc = now + RemainingTime`, garantizando cero deriva temporal.
+  - **Inyección de TimeProvider para pruebas deterministas:** `TimerController` en `OpenDynamic.Core.Timer` consume `System.TimeProvider`, permitiendo avanzar el tiempo en `FakeTimeProvider` sin pausas reales en los tests unitarios.
+  - **Jerarquía de prioridades:**
+    - Temporizador en curso: Prioridad 50 (`ActivityPriority.Timer`).
+    - Temporizador finalizado: Alerta crítica transitoria de Prioridad 100 (`ActivityPriority.TimerAlert`) durante 5.0 segundos (`TimerAlertTransientDurationSeconds`), tomando el control exclusivo de la cápsula con parpadeo y sonido de sistema (`SystemSounds.Asterisk`).
+  - **Modo Split Multitasking con Intercambio Interactivo (Hito M4):**
+    - Convivencia: Cuando conviven dos actividades continuas (ej. Temporizador P=50 y Música P=30, o Música P=30 y Hardware P=10), `PriorityResolver` comanda `IslandState.Split`. La actividad primaria se presenta en la cápsula principal y la secundaria en el satélite circular (36x36).
+    - Clic en Satélite: Un clic izquierdo sobre la burbuja satélite invoca `SwapSplitActivities()` en `IslandOrchestrator`, alternando `_isSplitSwapped`: la secundaria pasa a la cápsula principal y la primaria pasa al satélite con cross-fade suave (80ms).
+    - Clic en Cápsula Principal: Si la cápsula está en Split, el clic sobre la cápsula principal expande la actividad primaria actualmente activa (`RequestExpand()`).
+    - Al expirar actividades o ingresar alertas transitorias (batería P=90 o volumen P=80), la alerta toma la cápsula y al expirar se restaura el estado Split continuo de forma automática.
+
+

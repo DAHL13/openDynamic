@@ -17,9 +17,10 @@ Repositorio oficial: [https://github.com/DAHL13/openDynamic](https://github.com/
 | **Fase 3** | **Arquitectura de widgets, resolución de prioridades y Orchestrator (M4 Base)** | **Completada** |
 | **Fase 4** | **Widget multimedia GSMTC (Windows.Media.Control, 0% CPU, Freeze thumbnails, 10s Grace)** | **Completada** |
 | **Fase 5** | **Volumen (NAudio/CoreAudio), batería sin polling (WM_POWERBROADCAST) y pantalla completa (M3)** | **Completada** |
-| Fase 6 | Configuración, persistencia y bandeja del sistema (*System Tray*) | Pendiente |
-| Fase 7 | Optimización de rendimiento (CPU ~0% en reposo, consumo de RAM) | Pendiente |
+| **Fase 6** | **Hardware (GetSystemTimes/GlobalMemoryStatusEx), Temporizador/Pomodoro y Modo Split con intercambio (M4)** | **Completada** |
+| Fase 7 | Configuración, persistencia y bandeja del sistema (*System Tray*) | Pendiente |
 | Fase 8 | Empaquetado y distribución (Inno Setup, publicación Release) | Pendiente |
+
 
 ---
 
@@ -96,6 +97,16 @@ openDynamic/
 │  │   │   ├─ BatteryAlertKind.cs
 │  │   │   ├─ BatteryAlertEventArgs.cs
 │  │   │   └─ BatteryThresholdTracker.cs
+│  │   ├─ Hardware/                # Rendimiento de hardware puro, deltas Win32 y snapshots
+│  │   │   ├─ IHardwareMonitor.cs
+│  │   │   ├─ HardwareSnapshot.cs
+│  │   │   └─ HardwareCalculator.cs
+│  │   ├─ Timer/                   # Temporizador por marca de tiempo objetivo y Pomodoro sin deriva
+│  │   │   ├─ ITimerController.cs
+│  │   │   ├─ TimerController.cs
+│  │   │   ├─ TimerSnapshot.cs
+│  │   │   ├─ TimerMode.cs
+│  │   │   └─ TimerState.cs
 │  │   ├─ Windowing/               # Detección geométrica y de estado de pantalla completa pura
 │  │   │   └─ FullscreenDetector.cs
 │  │   ├─ Settings/                # Configuración de aplicación (Grace periods, umbrales y prioridades)
@@ -109,7 +120,7 @@ openDynamic/
 │  └─ OpenDynamic.App/              # WPF, net10.0-windows10.0.19041.0
 │      ├─ app.manifest              # PerMonitorV2 DPI awareness
 │      ├─ App.xaml / App.xaml.cs    # Ciclo de vida, DI, manejadores de excepción globales
-│      ├─ Native/                   # P/Invoke a Win32 (estilos, DPI, energía, pantalla completa)
+│      ├─ Native/                   # P/Invoke a Win32 (estilos, DPI, energía, hardware, pantalla completa)
 │      │   └─ NativeMethods.cs
 │      ├─ Animation/                # Coordinador de animación y suscripción a CompositionTarget.Rendering
 │      │   └─ IslandAnimator.cs
@@ -120,15 +131,16 @@ openDynamic/
 │      │   ├─ WindowPositioner.cs
 │      │   ├─ ForegroundWatcher.cs
 │      │   └─ FullscreenWatcher.cs
-│      ├─ Services/                 # Servicios nativos: GSMTC, NAudio CoreAudio y Windows Power
+│      ├─ Services/                 # Servicios nativos: GSMTC, NAudio CoreAudio, Windows Power y Hardware
 │      │   ├─ MediaService.cs
 │      │   ├─ WinRtMediaSession.cs
 │      │   ├─ VolumeService.cs
-│      │   └─ PowerService.cs
+│      │   ├─ PowerService.cs
+│      │   └─ HardwareService.cs
 │      ├─ Views/                    # Renderizado elástico y soporte visual Split (satélite circular)
 │      │   ├─ IslandView.xaml
 │      │   └─ IslandView.xaml.cs
-│      ├─ Widgets/                  # Contrato base, mensajería, widgets multimedia, volumen y batería
+│      ├─ Widgets/                  # Contrato base, mensajería, widgets multimedia, volumen, batería, hardware y temporizador
 │      │   ├─ IIslandWidget.cs
 │      │   ├─ IslandWidgetBase.cs
 │      │   ├─ Messages/ActivityMessages.cs
@@ -141,10 +153,16 @@ openDynamic/
 │      │   ├─ Battery/              # Widget Batería: vistas Compact, Expanded y Split satélite
 │      │   │   ├─ BatteryWidget.cs
 │      │   │   └─ Views/
+│      │   ├─ Hardware/             # Widget Hardware: vistas Compact, Expanded y Split satélite (0% CPU reposo)
+│      │   │   ├─ HardwareWidget.cs
+│      │   │   └─ Views/
+│      │   ├─ Timer/                # Widget Temporizador/Pomodoro: vistas Compact, Expanded y Split satélite
+│      │   │   ├─ TimerWidget.cs
+│      │   │   └─ Views/
 │      │   └─ Demo/DemoWidgets.cs   # Condicionado a #if DEBUG
 │      └─ Infrastructure/           # DI, SingleInstance, Logging
 └─ tests/
-   └─ OpenDynamic.Tests/            # xUnit probando Core (resortes, FSM, prioridades, posicionamiento)
+   └─ OpenDynamic.Tests/            # xUnit probando Core (resortes, FSM, prioridades, posicionamiento, temporizador, hardware)
        ├─ InfrastructureTests.cs
        ├─ Animation/
        │   └─ SpringTests.cs
@@ -152,7 +170,14 @@ openDynamic/
        │   ├─ IslandStateMachineTests.cs
        │   └─ IslandLayoutTests.cs
        ├─ Widgets/
-       │   └─ PriorityResolverTests.cs
+       │   ├─ PriorityResolverTests.cs
+       │   ├─ PriorityResolverPhase5Tests.cs
+       │   └─ PriorityResolverPhase6Tests.cs
+       ├─ Hardware/
+       │   └─ HardwareCalculatorTests.cs
+       ├─ Timer/
+       │   ├─ FakeTimeProvider.cs
+       │   └─ TimerControllerTests.cs
        └─ Positioning/
            └─ IslandPositionCalculatorTests.cs
 ```
