@@ -14,7 +14,7 @@ Repositorio oficial: [https://github.com/DAHL13/openDynamic](https://github.com/
 | **Fase 0** | **Andamiaje del proyecto, CI, DI, Logging y Pruebas iniciales** | **Completada** |
 | **Fase 1** | **Ventana de la isla, posicionamiento y renderizado básico (M1)** | **Completada** |
 | **Fase 2** | **Motor de física de animación de resorte (*Spring physics*) y máquina de estados (M2)** | **Completada** |
-| Fase 3 | Máquina de estados de la isla y resolución de prioridades | Pendiente |
+| **Fase 3** | **Arquitectura de widgets, resolución de prioridades y Orchestrator (M4 Base)** | **Completada** |
 | Fase 4 | Integración de widgets del sistema (Audio, Medios GSMTC, Hardware, Batería, Temporizador) | Pendiente |
 | Fase 5 | Interacciones avanzadas y expansión de cápsula (Hover, Gestos, Menú contextual) | Pendiente |
 | Fase 6 | Configuración, persistencia y bandeja del sistema (*System Tray*) | Pendiente |
@@ -67,6 +67,13 @@ openDynamic/
 │  │   │   ├─ IslandStateMachine.cs
 │  │   │   ├─ IslandStateChangedEventArgs.cs
 │  │   │   └─ IslandLayout.cs
+│  │   ├─ Widgets/                 # Modelos de actividad y resolución pura de prioridades
+│  │   │   ├─ IActivitySource.cs
+│  │   │   ├─ IslandActivity.cs
+│  │   │   ├─ ActivityPriority.cs
+│  │   │   ├─ WidgetDisplayMode.cs
+│  │   │   ├─ PriorityResult.cs
+│  │   │   └─ PriorityResolver.cs
 │  │   └─ Positioning/             # Cálculo puro de posicionamiento geométrico y DPI
 │  │       ├─ IslandPositionCalculator.cs
 │  │       ├─ MonitorArea.cs
@@ -80,6 +87,16 @@ openDynamic/
 │      │   └─ NativeMethods.cs
 │      ├─ Animation/                # Coordinador de animación y suscripción a CompositionTarget.Rendering
 │      │   └─ IslandAnimator.cs
+│      ├─ Orchestration/            # Autoridad exclusiva de transiciones y entrega de vistas
+│      │   └─ IslandOrchestrator.cs
+│      ├─ Views/                    # Renderizado elástico y soporte visual Split (satélite circular)
+│      │   ├─ IslandView.xaml
+│      │   └─ IslandView.xaml.cs
+│      ├─ Widgets/                  # Contrato base, mensajería y widgets demostrativos DEBUG
+│      │   ├─ IIslandWidget.cs
+│      │   ├─ IslandWidgetBase.cs
+│      │   ├─ Messages/ActivityMessages.cs
+│      │   └─ Demo/DemoWidgets.cs   # Condicionado a #if DEBUG
 │      ├─ Windowing/                # IslandWindow overlay, ForegroundWatcher, WindowPositioner, Debug
 │      │   ├─ IslandWindow.xaml
 │      │   ├─ IslandWindow.xaml.cs
@@ -89,13 +106,15 @@ openDynamic/
 │      │   └─ TargetMonitorMode.cs
 │      └─ Infrastructure/           # DI, SingleInstance, Logging
 └─ tests/
-   └─ OpenDynamic.Tests/            # xUnit probando Core (resortes, FSM, aislamiento y posicionamiento)
+   └─ OpenDynamic.Tests/            # xUnit probando Core (resortes, FSM, prioridades, posicionamiento)
        ├─ InfrastructureTests.cs
        ├─ Animation/
        │   └─ SpringTests.cs
        ├─ State/
        │   ├─ IslandStateMachineTests.cs
        │   └─ IslandLayoutTests.cs
+       ├─ Widgets/
+       │   └─ PriorityResolverTests.cs
        └─ Positioning/
            └─ IslandPositionCalculatorTests.cs
 ```

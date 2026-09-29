@@ -1,6 +1,7 @@
 <Window x:Class="OpenDynamic.App.Windowing.IslandWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="clr-namespace:OpenDynamic.App.Views"
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
@@ -13,18 +14,8 @@
         Height="240"
         Title="openDynamic Island">
     <Grid Background="{x:Null}">
-        <!-- Dynamic Island Capsule: Margin="0" ensures offset is determined solely by IslandPositionCalculator -->
-        <Border x:Name="CapsuleBorder"
-                Width="160"
-                Height="36"
-                Background="#FF000000"
-                CornerRadius="18"
-                ClipToBounds="True"
-                HorizontalAlignment="Center"
-                VerticalAlignment="Top"
-                Margin="0"
-                Cursor="Hand">
-            <Grid x:Name="CapsuleContentGrid" ClipToBounds="True" />
-        </Border>
+        <views:IslandView x:Name="IslandHostView"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Top" />
     </Grid>
 </Window>

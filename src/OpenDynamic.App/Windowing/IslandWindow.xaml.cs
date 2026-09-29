@@ -2,10 +2,10 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
-using System.Windows.Media;
 using System.Windows.Threading;
 using OpenDynamic.App.Animation;
 using OpenDynamic.App.Native;
+using OpenDynamic.App.Orchestration;
 using OpenDynamic.Core.State;
 using Serilog;
 
@@ -13,13 +13,14 @@ namespace OpenDynamic.App.Windowing;
 
 /// <summary>
 /// Interaction logic for IslandWindow.xaml.
-/// Implements a borderless, layered transparent overlay with Win32 styles, reactive topmost z-order,
-/// spring physics animation, and state machine mouse interactions.
+/// Hosts <see cref="Views.IslandView"/> within a transparent, click-through overlay window,
+/// delegating all state transitions and widget rendering to <see cref="IslandOrchestrator"/>.
 /// </summary>
 public partial class IslandWindow : Window
 {
     private readonly WindowPositioner _windowPositioner;
     private readonly ForegroundWatcher _foregroundWatcher;
+    private readonly IslandOrchestrator _orchestrator;
     private readonly IslandAnimator _animator;
 
     private readonly DispatcherTimer _hoverEnterTimer;
@@ -32,11 +33,12 @@ public partial class IslandWindow : Window
     private IslandDebugWindow? _debugWindow;
 #endif
 
-    public IslandWindow(WindowPositioner windowPositioner, ForegroundWatcher foregroundWatcher, IslandAnimator animator)
+    public IslandWindow(WindowPositioner windowPositioner, ForegroundWatcher foregroundWatcher, IslandOrchestrator orchestrator)
     {
         _windowPositioner = windowPositioner ?? throw new ArgumentNullException(nameof(windowPositioner));
         _foregroundWatcher = foregroundWatcher ?? throw new ArgumentNullException(nameof(foregroundWatcher));
-        _animator = animator ?? throw new ArgumentNullException(nameof(animator));
+        _orchestrator = orchestrator ?? throw new ArgumentNullException(nameof(orchestrator));
+        _animator = orchestrator.Animator;
 
         InitializeComponent();
 
@@ -53,16 +55,21 @@ public partial class IslandWindow : Window
         _hoverLeaveTimer.Tick += OnHoverLeaveTimerTick;
 
         _animator.FrameUpdated += OnAnimatorFrameUpdated;
-        _animator.Settled += OnAnimatorSettled;
+
+        // Attach IslandView to Orchestrator for view delivery
+        _orchestrator.AttachView(IslandHostView);
 
         SetupContextMenu();
         SetupMouseInteractions();
 
         // Apply initial layout dimensions
-        ApplyDimensions(_animator.CurrentDimensions);
+        IslandHostView.ApplyDimensions(_animator.CurrentDimensions, _animator.StateMachine.CurrentState);
     }
 
-    public IslandWindow() : this(new WindowPositioner(), new ForegroundWatcher(), new IslandAnimator())
+    public IslandWindow() : this(
+        new WindowPositioner(),
+        new ForegroundWatcher(),
+        new IslandOrchestrator(new IslandStateMachine(), new IslandAnimator()))
     {
     }
 
@@ -147,12 +154,12 @@ public partial class IslandWindow : Window
 
     private void SetupContextMenu()
     {
-        CapsuleBorder.MouseRightButtonUp += (s, e) =>
+        IslandHostView.CapsuleBorder.MouseRightButtonUp += (s, e) =>
         {
             var menu = new ContextMenu();
 
 #if DEBUG
-            var debugItem = new MenuItem { Header = "🛠 Panel de Depuración (DEBUG)" };
+            var debugItem = new MenuItem { Header = "🛠 Panel de Depuración y Widgets (DEBUG)" };
             debugItem.Click += (_, _) => ShowDebugWindow();
             menu.Items.Add(debugItem);
             menu.Items.Add(new Separator());
@@ -166,7 +173,7 @@ public partial class IslandWindow : Window
             };
             menu.Items.Add(closeItem);
 
-            menu.PlacementTarget = CapsuleBorder;
+            menu.PlacementTarget = IslandHostView.CapsuleBorder;
             menu.IsOpen = true;
             e.Handled = true;
         };
@@ -174,7 +181,9 @@ public partial class IslandWindow : Window
 
     private void SetupMouseInteractions()
     {
-        CapsuleBorder.MouseEnter += (s, e) =>
+        var mainCapsule = IslandHostView.CapsuleBorder;
+
+        mainCapsule.MouseEnter += (s, e) =>
         {
             _hoverLeaveTimer.Stop();
 
@@ -185,12 +194,12 @@ public partial class IslandWindow : Window
             }
             else if (_animator.StateMachine.CurrentState == IslandState.Hidden)
             {
-                Log.Information("MouseEnter detected on Hidden sensor notch. Restoring Compact.");
-                _animator.AnimateTo(IslandState.Compact);
+                Log.Information("MouseEnter detected on Hidden sensor notch. Restoring capsule.");
+                _orchestrator.RequestRestore();
             }
         };
 
-        CapsuleBorder.MouseLeave += (s, e) =>
+        mainCapsule.MouseLeave += (s, e) =>
         {
             _hoverEnterTimer.Stop();
 
@@ -201,35 +210,16 @@ public partial class IslandWindow : Window
             }
         };
 
-        CapsuleBorder.MouseLeftButtonUp += (s, e) =>
+        mainCapsule.MouseLeftButtonUp += (s, e) =>
         {
             _hoverEnterTimer.Stop();
             _hoverLeaveTimer.Stop();
 
-            switch (_animator.StateMachine.CurrentState)
-            {
-                case IslandState.Compact:
-                    Log.Information("Capsule clicked. Expanding to Expanded state.");
-                    _animator.AnimateTo(IslandState.Expanded);
-                    break;
-
-                case IslandState.Expanded:
-                    Log.Information("Capsule clicked. Collapsing to Compact state.");
-                    _animator.AnimateTo(IslandState.Compact);
-                    break;
-
-                case IslandState.Split:
-                    Log.Information("Capsule clicked while Split. Returning to Compact.");
-                    _animator.AnimateTo(IslandState.Compact);
-                    break;
-
-                case IslandState.Hidden:
-                    _animator.AnimateTo(IslandState.Compact);
-                    break;
-            }
+            Log.Information("Capsule clicked. Delegating toggle expand to Orchestrator.");
+            _orchestrator.RequestToggleExpand();
         };
 
-        CapsuleBorder.MouseWheel += (s, e) =>
+        mainCapsule.MouseWheel += (s, e) =>
         {
             _hoverEnterTimer.Stop();
             _hoverLeaveTimer.Stop();
@@ -239,35 +229,38 @@ public partial class IslandWindow : Window
                 // Scroll Up: Collapse / Hide
                 if (_animator.StateMachine.CurrentState == IslandState.Expanded)
                 {
-                    Log.Information("MouseWheel Up detected on Expanded capsule. Collapsing to Compact.");
-                    _animator.AnimateTo(IslandState.Compact);
+                    Log.Information("MouseWheel Up detected on Expanded capsule. Collapsing.");
+                    _orchestrator.RequestCollapse();
                 }
-                else if (_animator.StateMachine.CurrentState == IslandState.Compact)
+                else if (_animator.StateMachine.CurrentState is IslandState.Compact or IslandState.Split)
                 {
-                    Log.Information("MouseWheel Up detected on Compact capsule. Hiding island.");
-                    _animator.AnimateTo(IslandState.Hidden);
-                }
-                else if (_animator.StateMachine.CurrentState == IslandState.Split)
-                {
-                    Log.Information("MouseWheel Up detected on Split capsule. Returning to Compact.");
-                    _animator.AnimateTo(IslandState.Compact);
+                    Log.Information("MouseWheel Up detected. Hiding island.");
+                    _orchestrator.RequestHide();
                 }
             }
             else if (e.Delta < 0)
             {
                 // Scroll Down: Expand / Reveal
-                if (_animator.StateMachine.CurrentState == IslandState.Compact)
+                if (_animator.StateMachine.CurrentState is IslandState.Compact or IslandState.Split)
                 {
-                    Log.Information("MouseWheel Down detected on Compact capsule. Expanding to Expanded.");
-                    _animator.AnimateTo(IslandState.Expanded);
+                    Log.Information("MouseWheel Down detected. Expanding capsule.");
+                    _orchestrator.RequestExpand();
                 }
                 else if (_animator.StateMachine.CurrentState == IslandState.Hidden)
                 {
-                    Log.Information("MouseWheel Down detected on Hidden capsule. Restoring Compact.");
-                    _animator.AnimateTo(IslandState.Compact);
+                    Log.Information("MouseWheel Down detected on Hidden capsule. Restoring.");
+                    _orchestrator.RequestRestore();
                 }
             }
 
+            e.Handled = true;
+        };
+
+        // Satellite bubble click in Split mode
+        IslandHostView.SatelliteBubble.MouseLeftButtonUp += (s, e) =>
+        {
+            Log.Information("Satellite bubble clicked in Split mode. Expanding secondary view.");
+            _orchestrator.RequestToggleExpand();
             e.Handled = true;
         };
     }
@@ -275,56 +268,26 @@ public partial class IslandWindow : Window
     private void OnHoverEnterTimerTick(object? sender, EventArgs e)
     {
         _hoverEnterTimer.Stop();
-        if (CapsuleBorder.IsMouseOver && _animator.StateMachine.CurrentState == IslandState.Compact)
+        if (IslandHostView.CapsuleBorder.IsMouseOver && _animator.StateMachine.CurrentState == IslandState.Compact)
         {
             Log.Debug("Hover enter delay elapsed (150ms). Expanding capsule.");
-            _animator.AnimateTo(IslandState.Expanded);
+            _orchestrator.RequestExpand();
         }
     }
 
     private void OnHoverLeaveTimerTick(object? sender, EventArgs e)
     {
         _hoverLeaveTimer.Stop();
-        if (!CapsuleBorder.IsMouseOver && _animator.StateMachine.CurrentState == IslandState.Expanded)
+        if (!IslandHostView.CapsuleBorder.IsMouseOver && _animator.StateMachine.CurrentState == IslandState.Expanded)
         {
-            Log.Debug("Hover leave delay elapsed (400ms). Collapsing capsule to Compact.");
-            _animator.AnimateTo(IslandState.Compact);
+            Log.Debug("Hover leave delay elapsed (400ms). Collapsing capsule.");
+            _orchestrator.RequestCollapse();
         }
     }
 
     private void OnAnimatorFrameUpdated(object? sender, EventArgs e)
     {
-        ApplyDimensions(_animator.CurrentDimensions);
-    }
-
-    private void OnAnimatorSettled(object? sender, EventArgs e)
-    {
-        // Capsule remains Visibility.Visible at all times to maintain hit-testing on the Hidden sensor notch
-    }
-
-    private void ApplyDimensions(CapsuleDimensions dimensions)
-    {
-        double width = Math.Max(0.0, dimensions.Width);
-        double height = Math.Max(0.0, dimensions.Height);
-        double cornerRadius = Math.Max(0.0, dimensions.CornerRadius);
-        double opacity = Math.Clamp(dimensions.Opacity, 0.0, 1.0);
-
-        CapsuleBorder.Width = width;
-        CapsuleBorder.Height = height;
-        CapsuleBorder.CornerRadius = new CornerRadius(cornerRadius);
-        CapsuleBorder.Opacity = opacity;
-
-        if (width > 0.0 && height > 0.0)
-        {
-            CapsuleBorder.Clip = new RectangleGeometry(
-                new Rect(0, 0, width, height),
-                cornerRadius,
-                cornerRadius);
-        }
-        else
-        {
-            CapsuleBorder.Clip = null;
-        }
+        IslandHostView.ApplyDimensions(_animator.CurrentDimensions, _animator.StateMachine.CurrentState);
     }
 
 #if DEBUG
@@ -332,7 +295,7 @@ public partial class IslandWindow : Window
     {
         if (_debugWindow == null || !_debugWindow.IsLoaded)
         {
-            _debugWindow = new IslandDebugWindow(_animator);
+            _debugWindow = new IslandDebugWindow(_orchestrator);
             _debugWindow.Closed += (_, _) => _debugWindow = null;
             _debugWindow.Show();
         }
@@ -349,8 +312,6 @@ public partial class IslandWindow : Window
         _hoverLeaveTimer.Stop();
 
         _animator.FrameUpdated -= OnAnimatorFrameUpdated;
-        _animator.Settled -= OnAnimatorSettled;
-        _animator.Dispose();
 
 #if DEBUG
         _debugWindow?.Close();

@@ -4,32 +4,41 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using OpenDynamic.App.Animation;
+using OpenDynamic.App.Orchestration;
+using OpenDynamic.App.Widgets.Demo;
 using OpenDynamic.Core.State;
 
 namespace OpenDynamic.App.Windowing;
 
 /// <summary>
-/// Debugging window for testing spring physics, state transitions, and rendering lifecycle.
+/// Debugging window for testing spring physics, state transitions, widget priority resolution,
+/// and transient auto-expiration lifespans.
 /// STRICTLY conditioned to DEBUG builds (#if DEBUG). Zero presence in Release builds.
 /// </summary>
 public sealed class IslandDebugWindow : Window
 {
+    private readonly IslandOrchestrator _orchestrator;
     private readonly IslandAnimator _animator;
+
     private readonly TextBlock _statusBlock;
+    private readonly TextBlock _widgetsBlock;
     private readonly TextBlock _dimensionsBlock;
     private readonly TextBlock _subscriptionBlock;
+    private readonly TextBlock _quarantineBlock;
+
     private readonly Slider _stiffnessSlider;
     private readonly Slider _dampingSlider;
     private readonly TextBlock _stiffnessValueLabel;
     private readonly TextBlock _dampingValueLabel;
 
-    public IslandDebugWindow(IslandAnimator animator)
+    public IslandDebugWindow(IslandOrchestrator orchestrator)
     {
-        _animator = animator ?? throw new ArgumentNullException(nameof(animator));
+        _orchestrator = orchestrator ?? throw new ArgumentNullException(nameof(orchestrator));
+        _animator = orchestrator.Animator;
 
-        Title = "openDynamic - Panel de Depuración (DEBUG)";
-        Width = 460;
-        Height = 560;
+        Title = "openDynamic - Panel de Depuración y Widgets (DEBUG)";
+        Width = 520;
+        Height = 720;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         ResizeMode = ResizeMode.CanResizeWithGrip;
         Background = new SolidColorBrush(Color.FromRgb(24, 24, 27));
@@ -40,7 +49,7 @@ public sealed class IslandDebugWindow : Window
         // Header
         mainPanel.Children.Add(new TextBlock
         {
-            Text = "🛠 Monitor de Resortes y Estados (Fase 2)",
+            Text = "🛠 Monitor de Orquestación y Widgets (Fase 3)",
             FontSize = 16,
             FontWeight = FontWeights.Bold,
             Foreground = Brushes.White,
@@ -67,6 +76,15 @@ public sealed class IslandDebugWindow : Window
         };
         telemetryStack.Children.Add(_statusBlock);
 
+        _widgetsBlock = new TextBlock
+        {
+            Text = "Actividad: Primario: - | Secundario: -",
+            FontSize = 12,
+            Foreground = Brushes.White,
+            Margin = new Thickness(0, 0, 0, 4)
+        };
+        telemetryStack.Children.Add(_widgetsBlock);
+
         _subscriptionBlock = new TextBlock
         {
             Text = "Render Loop: ○ EN REPOSO (0% CPU - Desuscrito)",
@@ -81,42 +99,89 @@ public sealed class IslandDebugWindow : Window
             Text = $"Dimensiones: W:{_animator.CurrentDimensions.Width:F1} | H:{_animator.CurrentDimensions.Height:F1} | R:{_animator.CurrentDimensions.CornerRadius:F1} | Op:{_animator.CurrentDimensions.Opacity:F2}",
             FontFamily = new FontFamily("Consolas"),
             FontSize = 12,
-            Foreground = Brushes.DarkGray
+            Foreground = Brushes.DarkGray,
+            Margin = new Thickness(0, 0, 0, 4)
         };
         telemetryStack.Children.Add(_dimensionsBlock);
+
+        _quarantineBlock = new TextBlock
+        {
+            Text = "Aislamiento: Ningún widget con fallo",
+            FontSize = 11,
+            Foreground = Brushes.LightSeaGreen
+        };
+        telemetryStack.Children.Add(_quarantineBlock);
+
         telemetryBorder.Child = telemetryStack;
         mainPanel.Children.Add(telemetryBorder);
+
+        // Demo Widgets Controls Group
+        mainPanel.Children.Add(new TextBlock
+        {
+            Text = "Control de Widgets de Demostración:",
+            FontWeight = FontWeights.SemiBold,
+            Margin = new Thickness(0, 0, 0, 8)
+        });
+
+        var demoGrid = new UniformGrid { Columns = 2, Margin = new Thickness(0, 0, 0, 16) };
+
+        demoGrid.Children.Add(CreateButton("Conmutar Demo A (Música)", () =>
+        {
+            var demoA = _orchestrator.RegisteredWidgets.OfType<DemoWidgetA>().FirstOrDefault();
+            demoA?.ToggleActive();
+            UpdateTelemetry();
+        }));
+
+        demoGrid.Children.Add(CreateButton("Conmutar Demo B (Timer)", () =>
+        {
+            var demoB = _orchestrator.RegisteredWidgets.OfType<DemoWidgetB>().FirstOrDefault();
+            demoB?.ToggleActive();
+            UpdateTelemetry();
+        }));
+
+        demoGrid.Children.Add(CreateButton("⚡ Aviso Transitorio A (3s, P=200)", () =>
+        {
+            var demoA = _orchestrator.RegisteredWidgets.OfType<DemoWidgetA>().FirstOrDefault();
+            demoA?.TriggerTransientNotice(TimeSpan.FromSeconds(3));
+            UpdateTelemetry();
+        }));
+
+        demoGrid.Children.Add(CreateButton("⚡ Aviso Transitorio B (3s, P=250)", () =>
+        {
+            var demoB = _orchestrator.RegisteredWidgets.OfType<DemoWidgetB>().FirstOrDefault();
+            demoB?.TriggerTransientNotice(TimeSpan.FromSeconds(3));
+            UpdateTelemetry();
+        }));
+
+        demoGrid.Children.Add(CreateButton("💥 Forzar Fallo en Demo A", () =>
+        {
+            var demoA = _orchestrator.RegisteredWidgets.OfType<DemoWidgetA>().FirstOrDefault();
+            demoA?.ArmFaultSimulation();
+            UpdateTelemetry();
+        }));
+
+        demoGrid.Children.Add(CreateButton("💥 Forzar Fallo en Demo B", () =>
+        {
+            var demoB = _orchestrator.RegisteredWidgets.OfType<DemoWidgetB>().FirstOrDefault();
+            demoB?.ArmFaultSimulation();
+            UpdateTelemetry();
+        }));
+
+        mainPanel.Children.Add(demoGrid);
 
         // State Transition Buttons Group
         mainPanel.Children.Add(new TextBlock
         {
-            Text = "Forzar Transición de Estado:",
+            Text = "Forzar Transición Manual de Estado:",
             FontWeight = FontWeights.SemiBold,
             Margin = new Thickness(0, 0, 0, 8)
         });
 
         var statesGrid = new UniformGrid { Columns = 2, Margin = new Thickness(0, 0, 0, 16) };
-
-        statesGrid.Children.Add(CreateButton("Compact (160x36)", () => _animator.AnimateTo(IslandState.Compact)));
-        statesGrid.Children.Add(CreateButton("Expanded (400x160)", () =>
-        {
-            // If hidden, transition through compact first as per FSM rules
-            if (_animator.StateMachine.CurrentState == IslandState.Hidden)
-            {
-                _animator.StateMachine.TryTransitionTo(IslandState.Compact);
-            }
-            _animator.AnimateTo(IslandState.Expanded);
-        }));
-        statesGrid.Children.Add(CreateButton("Split (260x36)", () =>
-        {
-            if (_animator.StateMachine.CurrentState == IslandState.Hidden)
-            {
-                _animator.StateMachine.TryTransitionTo(IslandState.Compact);
-            }
-            _animator.AnimateTo(IslandState.Split);
-        }));
-        statesGrid.Children.Add(CreateButton("Hidden (80x4)", () => _animator.AnimateTo(IslandState.Hidden)));
-
+        statesGrid.Children.Add(CreateButton("Compact (160x36)", () => _orchestrator.TransitionTo(IslandState.Compact)));
+        statesGrid.Children.Add(CreateButton("Expanded (400x160)", () => _orchestrator.RequestExpand()));
+        statesGrid.Children.Add(CreateButton("Split (260x36)", () => _orchestrator.TransitionTo(IslandState.Split)));
+        statesGrid.Children.Add(CreateButton("Hidden (80x4)", () => _orchestrator.RequestHide()));
         mainPanel.Children.Add(statesGrid);
 
         // Spring Controls Group
@@ -127,7 +192,6 @@ public sealed class IslandDebugWindow : Window
             Margin = new Thickness(0, 0, 0, 8)
         });
 
-        // Initialize sliders and labels before wiring event handlers
         _stiffnessValueLabel = new TextBlock
         {
             Text = $"{_animator.WidthSpring.Stiffness:F0}",
@@ -158,7 +222,6 @@ public sealed class IslandDebugWindow : Window
             Margin = new Thickness(0, 0, 0, 16)
         };
 
-        // Wire handlers now that both sliders are allocated
         _stiffnessSlider.ValueChanged += (s, e) =>
         {
             _stiffnessValueLabel.Text = $"{e.NewValue:F0}";
@@ -171,50 +234,28 @@ public sealed class IslandDebugWindow : Window
             _animator.SetSpringParameters(_stiffnessSlider.Value, e.NewValue);
         };
 
-        // Stiffness UI layout
         var stiffnessHeader = new Grid { Margin = new Thickness(0, 0, 0, 4) };
         stiffnessHeader.Children.Add(new TextBlock { Text = "Rigidez (Stiffness / k):", HorizontalAlignment = HorizontalAlignment.Left });
         stiffnessHeader.Children.Add(_stiffnessValueLabel);
         mainPanel.Children.Add(stiffnessHeader);
         mainPanel.Children.Add(_stiffnessSlider);
 
-        // Damping UI layout
         var dampingHeader = new Grid { Margin = new Thickness(0, 0, 0, 4) };
         dampingHeader.Children.Add(new TextBlock { Text = "Amortiguamiento (Damping / c):", HorizontalAlignment = HorizontalAlignment.Left });
         dampingHeader.Children.Add(_dampingValueLabel);
         mainPanel.Children.Add(dampingHeader);
         mainPanel.Children.Add(_dampingSlider);
 
-        // Presets
-        mainPanel.Children.Add(new TextBlock
-        {
-            Text = "Perfiles Preconfigurados:",
-            FontWeight = FontWeights.SemiBold,
-            Margin = new Thickness(0, 0, 0, 8)
-        });
-
-        var presetsGrid = new UniformGrid { Columns = 3, Margin = new Thickness(0, 0, 0, 16) };
-        presetsGrid.Children.Add(CreateButton("iOS Fluido", () => ApplyPreset(320, 26)));
-        presetsGrid.Children.Add(CreateButton("Rebote Vivo", () => ApplyPreset(420, 20)));
-        presetsGrid.Children.Add(CreateButton("Amortiguado", () => ApplyPreset(300, 36)));
-        mainPanel.Children.Add(presetsGrid);
-
         Content = new ScrollViewer { Content = mainPanel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
 
-        // Hook animator events to update live telemetry
         _animator.FrameUpdated += OnAnimatorUpdated;
         _animator.Settled += OnAnimatorUpdated;
         _animator.Started += OnAnimatorUpdated;
+
+        UpdateTelemetry();
     }
 
-    private void ApplyPreset(double stiffness, double damping)
-    {
-        _stiffnessSlider.Value = stiffness;
-        _dampingSlider.Value = damping;
-        _animator.SetSpringParameters(stiffness, damping);
-    }
-
-    private void OnAnimatorUpdated(object? sender, EventArgs e)
+    private void UpdateTelemetry()
     {
         Dispatcher.InvokeAsync(() =>
         {
@@ -228,7 +269,27 @@ public sealed class IslandDebugWindow : Window
 
             var d = _animator.CurrentDimensions;
             _dimensionsBlock.Text = $"Dimensiones: W:{d.Width:F1} | H:{d.Height:F1} | R:{d.CornerRadius:F1} | Op:{d.Opacity:F2}";
+
+            var primary = _orchestrator.ActivePrimaryWidget?.Id ?? "Ninguno";
+            var secondary = _orchestrator.ActiveSecondaryWidget?.Id ?? "Ninguno";
+            _widgetsBlock.Text = $"Actividad: Primario: [{primary}] | Secundario: [{secondary}]";
+
+            if (_orchestrator.QuarantinedWidgetIds.Count > 0)
+            {
+                _quarantineBlock.Text = $"Aislamiento: ⚠️ Widgets en cuarentena: {string.Join(", ", _orchestrator.QuarantinedWidgetIds)}";
+                _quarantineBlock.Foreground = Brushes.Tomato;
+            }
+            else
+            {
+                _quarantineBlock.Text = "Aislamiento: ✔ Ningún widget con fallo";
+                _quarantineBlock.Foreground = Brushes.LightSeaGreen;
+            }
         });
+    }
+
+    private void OnAnimatorUpdated(object? sender, EventArgs e)
+    {
+        UpdateTelemetry();
     }
 
     private Button CreateButton(string label, Action action)

@@ -1,7 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
 using OpenDynamic.App.Animation;
+using OpenDynamic.App.Orchestration;
 using OpenDynamic.App.Windowing;
 using OpenDynamic.Core.State;
+using OpenDynamic.Core.Widgets;
 
 namespace OpenDynamic.App.Infrastructure;
 
@@ -18,8 +20,9 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IslandStateMachine>();
         services.AddSingleton<IslandLayout>();
         services.AddSingleton<IslandAnimator>();
+        services.AddSingleton<PriorityResolver>();
+        services.AddSingleton<IslandOrchestrator>();
         services.AddSingleton<IslandWindow>();
         return services;
     }
 }
-
