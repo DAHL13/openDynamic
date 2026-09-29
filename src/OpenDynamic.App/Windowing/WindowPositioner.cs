@@ -15,7 +15,59 @@ public class WindowPositioner
 
     public double TopMarginDip { get; set; } = IslandPositionCalculator.DefaultTopMarginDip;
 
+    public double OffsetXDip { get; set; } = 0.0;
+
+    public int TargetMonitorIndex { get; set; } = 0;
+
     public WindowDimensions Dimensions { get; set; } = WindowDimensions.DefaultIsland;
+
+    /// <summary>
+    /// Enumerates all connected display monitors using Win32 EnumDisplayMonitors without WinForms.
+    /// </summary>
+    public static List<IntPtr> GetAllMonitorHandles()
+    {
+        var monitors = new List<IntPtr>();
+        try
+        {
+            NativeMethods.EnumDisplayMonitors(
+                IntPtr.Zero,
+                IntPtr.Zero,
+                (IntPtr hMon, IntPtr _, ref NativeMethods.RECT _, IntPtr _) =>
+                {
+                    monitors.Add(hMon);
+                    return true;
+                },
+                IntPtr.Zero);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to enumerate display monitors.");
+        }
+
+        return monitors;
+    }
+
+    /// <summary>
+    /// Gets human-readable monitor information for available displays.
+    /// </summary>
+    public static List<string> GetAvailableMonitorNames()
+    {
+        var handles = GetAllMonitorHandles();
+        var names = new List<string>();
+
+        for (int i = 0; i < handles.Count; i++)
+        {
+            var area = QueryMonitorArea(handles[i]);
+            names.Add($"Monitor {i + 1} ({area.Width}x{area.Height})");
+        }
+
+        if (names.Count == 0)
+        {
+            names.Add("Monitor Principal");
+        }
+
+        return names;
+    }
 
     /// <summary>
     /// Positions and sizes the HWND on the target monitor according to current DPI and margins.
@@ -37,13 +89,14 @@ public class WindowPositioner
             monitorArea,
             dpi,
             Dimensions,
-            TopMarginDip);
+            TopMarginDip,
+            OffsetXDip);
 
         Log.Information(
-            "Positioning IslandWindow: X={X}, Y={Y}, Width={Width}, Height={Height} (Monitor: {MonLeft},{MonTop},{MonW}x{MonH}, DPI: {DpiX}x{DpiY}, Scale: {Scale:P0})",
+            "Positioning IslandWindow: X={X}, Y={Y}, Width={Width}, Height={Height} (Monitor: {MonLeft},{MonTop},{MonW}x{MonH}, DPI: {DpiX}x{DpiY}, Scale: {Scale:P0}, OffsetX: {OffsetX})",
             placement.X, placement.Y, placement.Width, placement.Height,
             monitorArea.Left, monitorArea.Top, monitorArea.Width, monitorArea.Height,
-            dpi.DpiX, dpi.DpiY, dpi.ScaleX);
+            dpi.DpiX, dpi.DpiY, dpi.ScaleX, OffsetXDip);
 
         bool success = NativeMethods.SetWindowPos(
             hwnd,
@@ -95,6 +148,15 @@ public class WindowPositioner
                 {
                     return hMon;
                 }
+            }
+        }
+
+        if (TargetMonitorIndex >= 0)
+        {
+            var monitors = GetAllMonitorHandles();
+            if (TargetMonitorIndex < monitors.Count)
+            {
+                return monitors[TargetMonitorIndex];
             }
         }
 

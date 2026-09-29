@@ -69,7 +69,38 @@ public partial class App : Application
         var timerWidget = Services.GetRequiredService<Widgets.Timer.TimerWidget>();
         orchestrator.RegisterWidget(timerWidget);
 
+        // Initialize System Tray Icon Manager (H.NotifyIcon.Wpf)
+        var trayIconManager = Services.GetRequiredService<TrayIconManager>();
+        trayIconManager.Initialize();
 
+        // Initialize Global Hotkey Service using native Win32 RegisterHotKey
+        var hotkeyService = Services.GetRequiredService<Services.IHotkeyService>();
+        var hwndSource = System.Windows.Interop.HwndSource.FromHwnd(islandWindow.Hwnd);
+        if (hwndSource != null)
+        {
+            hotkeyService.Initialize(islandWindow.Hwnd, hwndSource);
+            var settings = Services.GetRequiredService<Core.Settings.AppSettings>();
+            if (settings.EnableGlobalHotkeys && !string.IsNullOrWhiteSpace(settings.ToggleIslandHotkey))
+            {
+                hotkeyService.UpdateHotkey(settings.ToggleIslandHotkey);
+            }
+
+            hotkeyService.HotkeyTriggered += (s, ev) =>
+            {
+                if (orchestrator.StateMachine.CurrentState == Core.State.IslandState.Hidden)
+                {
+                    orchestrator.RequestRestore();
+                }
+                else
+                {
+                    orchestrator.RequestHide();
+                }
+            };
+        }
+
+        // Verify and correct autostart executable path if registered
+        var autostartService = Services.GetRequiredService<Core.Autostart.IAutostartService>();
+        autostartService.VerifyAndCorrectExecutablePath();
 
 #if DEBUG
         // Register demo widgets for manual testing/fault injection from debug window
@@ -79,7 +110,7 @@ public partial class App : Application
         orchestrator.RegisterWidget(demoB);
 #endif
 
-        SetupTemporaryShutdownMechanisms(e.Args);
+        ProcessCommandLineArgs(e.Args);
     }
 
     private void RegisterGlobalExceptionHandlers()
@@ -87,7 +118,6 @@ public partial class App : Application
         DispatcherUnhandledException += (s, e) =>
         {
             Log.Error(e.Exception, "Unhandled exception intercepted on WPF Dispatcher. Preserving application state.");
-            // Do not close app for widget/UI failures
             e.Handled = true;
         };
 
@@ -106,53 +136,12 @@ public partial class App : Application
         TaskScheduler.UnobservedTaskException += (s, e) =>
         {
             Log.Error(e.Exception, "Unobserved Task exception intercepted. Preserving application state.");
-            // Do not crash on background task exceptions
             e.SetObserved();
         };
     }
 
-    private void SetupTemporaryShutdownMechanisms(string[] args)
+    private void ProcessCommandLineArgs(string[] args)
     {
-        // 1. Console Ctrl+C hook (when attached or running in terminal)
-        try
-        {
-            Console.CancelKeyPress += (s, e) =>
-            {
-                Log.Information("Ctrl+C received. Initiating graceful shutdown...");
-                e.Cancel = true;
-                Dispatcher.Invoke(Shutdown);
-            };
-        }
-        catch
-        {
-            // Ignore if console is not available
-        }
-
-        // 2. Interactive console input listener (typing 'exit', 'quit' or 'q')
-        Task.Run(() =>
-        {
-            try
-            {
-                while (Console.ReadLine() is { } line)
-                {
-                    var trimmed = line.Trim();
-                    if (trimmed.Equals("exit", StringComparison.OrdinalIgnoreCase) ||
-                        trimmed.Equals("quit", StringComparison.OrdinalIgnoreCase) ||
-                        trimmed.Equals("q", StringComparison.OrdinalIgnoreCase))
-                    {
-                        Log.Information("Exit command received from console input. Initiating shutdown...");
-                        Dispatcher.Invoke(Shutdown);
-                        break;
-                    }
-                }
-            }
-            catch
-            {
-                // Console input not accessible
-            }
-        });
-
-        // 3. Command line triggers for verification / CI
         for (int i = 0; i < args.Length; i++)
         {
             if (args[i] == "--trigger-test-exception")
@@ -191,11 +180,28 @@ public partial class App : Application
     {
         try
         {
+            var trayIconManager = Services?.GetService<TrayIconManager>();
+            trayIconManager?.Dispose();
+
+            var hotkeyService = Services?.GetService<Services.IHotkeyService>();
+            hotkeyService?.Dispose();
+
+            var settingsService = Services?.GetService<Core.Settings.ISettingsService>();
+            settingsService?.SaveImmediate();
+            settingsService?.Dispose();
+
+            var settingsWindow = Services?.GetService<Views.SettingsWindow>();
+            settingsWindow?.ForceClose();
+
             if (Services is IDisposable disposableServices)
             {
                 disposableServices.Dispose();
             }
             _singleInstance?.Dispose();
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Exception encountered during OnExit cleanup.");
         }
         finally
         {

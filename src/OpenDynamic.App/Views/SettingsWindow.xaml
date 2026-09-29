@@ -1,0 +1,493 @@
+<Window x:Class="OpenDynamic.App.Views.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:viewModels="clr-namespace:OpenDynamic.App.ViewModels"
+        mc:Ignorable="d"
+        Title="openDynamic - Ajustes"
+        Height="680" Width="640"
+        MinHeight="550" MinWidth="520"
+        WindowStartupLocation="CenterScreen"
+        Background="#131418"
+        Foreground="#F0F2F5"
+        FontFamily="Segoe UI Variable, Segoe UI, sans-serif">
+
+    <Window.Resources>
+        <!-- Modern ScrollViewer style -->
+        <Style TargetType="ScrollBar">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Width" Value="8"/>
+        </Style>
+
+        <!-- Card container style -->
+        <Style x:Key="SettingCard" TargetType="Border">
+            <Setter Property="Background" Value="#1C1E24"/>
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="Padding" Value="16"/>
+            <Setter Property="Margin" Value="0,0,0,12"/>
+            <Setter Property="BorderBrush" Value="#2A2D36"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+
+        <!-- Modern Slider style -->
+        <Style TargetType="Slider">
+            <Setter Property="Margin" Value="0,6,0,0"/>
+            <Setter Property="IsSnapToTickEnabled" Value="False"/>
+            <Setter Property="Foreground" Value="#60A5FA"/>
+        </Style>
+
+        <!-- Header Label style -->
+        <Style x:Key="SectionHeader" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="#60A5FA"/>
+            <Setter Property="Margin" Value="0,0,0,12"/>
+        </Style>
+
+        <!-- Setting title style -->
+        <Style x:Key="SettingTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13.5"/>
+            <Setter Property="FontWeight" Value="Medium"/>
+            <Setter Property="Foreground" Value="#F3F4F6"/>
+        </Style>
+
+        <!-- Setting description style -->
+        <Style x:Key="SettingDesc" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11.5"/>
+            <Setter Property="Foreground" Value="#9CA3AF"/>
+            <Setter Property="Margin" Value="0,2,0,0"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+
+        <!-- Value badge style -->
+        <Style x:Key="ValueBadge" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="#38BDF8"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Top Header Banner -->
+        <Border Grid.Row="0" Background="#181920" BorderBrush="#252730" BorderThickness="0,0,0,1" Padding="20,16">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Orientation="Vertical">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- Capsule Icon Glyph -->
+                        <Border Background="#2563EB" CornerRadius="8" Width="28" Height="16" Margin="0,0,10,0">
+                            <Ellipse Fill="#FFFFFF" Width="4" Height="4" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <TextBlock Text="openDynamic" FontSize="18" FontWeight="Bold" Foreground="#FFFFFF"/>
+                        <Border Background="#2D3748" CornerRadius="4" Padding="6,2" Margin="10,0,0,0">
+                            <TextBlock Text="Ajustes" FontSize="11" FontWeight="SemiBold" Foreground="#94A3B8"/>
+                        </Border>
+                    </StackPanel>
+                    <TextBlock Text="Configuración en vivo de la Dynamic Island para Windows" FontSize="12" Foreground="#9CA3AF" Margin="38,2,0,0"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Main Content with Tabs -->
+        <TabControl Grid.Row="1" Background="Transparent" BorderThickness="0" Margin="16,12,16,0">
+            <TabControl.Resources>
+                <Style TargetType="TabItem">
+                    <Setter Property="FontSize" Value="13"/>
+                    <Setter Property="FontWeight" Value="Medium"/>
+                    <Setter Property="Foreground" Value="#9CA3AF"/>
+                    <Setter Property="Padding" Value="14,8"/>
+                    <Setter Property="Margin" Value="0,0,6,0"/>
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="TabItem">
+                                <Border x:Name="TabBorder" Background="Transparent" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                                    <ContentPresenter ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter TargetName="TabBorder" Property="Background" Value="#252834"/>
+                                        <Setter Property="Foreground" Value="#38BDF8"/>
+                                        <Setter Property="FontWeight" Value="SemiBold"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </TabControl.Resources>
+
+            <!-- TAB 1: Posición y Tamaño -->
+            <TabItem Header="📐 Posición y Tamaño">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="4,12,12,12">
+                    <StackPanel>
+                        <!-- Monitor Selector -->
+                        <Border Style="{StaticResource SettingCard}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="180"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="Monitor de Destino" Style="{StaticResource SettingTitle}"/>
+                                    <TextBlock Text="Pantalla en la que se ancla y visualiza la cápsula flotante." Style="{StaticResource SettingDesc}"/>
+                                </StackPanel>
+                                <ComboBox Grid.Column="1"
+                                          ItemsSource="{Binding AvailableMonitors}"
+                                          SelectedIndex="{Binding TargetMonitorIndex}"
+                                          Height="32" VerticalContentAlignment="Center"
+                                          Background="#282B36" Foreground="#FFFFFF" BorderBrush="#3B4252"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Offset X -->
+                        <Border Style="{StaticResource SettingCard}">
+                            <StackPanel>
+                                <Grid>
+                                    <StackPanel>
+                                        <TextBlock Text="Desplazamiento Horizontal (Offset X)" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Alineación horizontal respecto al centro de la pantalla." Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding OffsetX, StringFormat='{}{0:0} DIP'}" Style="{StaticResource ValueBadge}"/>
+                                </Grid>
+                                <Slider Minimum="-300" Maximum="300" Value="{Binding OffsetX}" SmallChange="1" LargeChange="10"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Offset Y -->
+                        <Border Style="{StaticResource SettingCard}">
+                            <StackPanel>
+                                <Grid>
+                                    <StackPanel>
+                                        <TextBlock Text="Margen Superior (Offset Y)" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Distancia desde el borde superior de la pantalla hasta la cápsula." Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding OffsetY, StringFormat='{}{0:0} DIP'}" Style="{StaticResource ValueBadge}"/>
+                                </Grid>
+                                <Slider Minimum="0" Maximum="80" Value="{Binding OffsetY}" SmallChange="1" LargeChange="5"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Capsule Width -->
+                        <Border Style="{StaticResource SettingCard}">
+                            <StackPanel>
+                                <Grid>
+                                    <StackPanel>
+                                        <TextBlock Text="Ancho Base de la Cápsula (Compacto)" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Ancho en reposo y modo compacto (por defecto 160 DIP)." Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding CapsuleWidth, StringFormat='{}{0:0} DIP'}" Style="{StaticResource ValueBadge}"/>
+                                </Grid>
+                                <Slider Minimum="120" Maximum="240" Value="{Binding CapsuleWidth}" SmallChange="2" LargeChange="10"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Capsule Height -->
+                        <Border Style="{StaticResource SettingCard}">
+                            <StackPanel>
+                                <Grid>
+                                    <StackPanel>
+                                        <TextBlock Text="Alto Base de la Cápsula" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Grosor vertical en modo compacto (por defecto 36 DIP)." Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding CapsuleHeight, StringFormat='{}{0:0} DIP'}" Style="{StaticResource ValueBadge}"/>
+                                </Grid>
+                                <Slider Minimum="28" Maximum="48" Value="{Binding CapsuleHeight}" SmallChange="1" LargeChange="4"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Corner Radius -->
+                        <Border Style="{StaticResource SettingCard}">
+                            <StackPanel>
+                                <Grid>
+                                    <StackPanel>
+                                        <TextBlock Text="Radio de Esquinas" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Curvatura elástica de los bordes (por defecto 18 DIP para cápsula perfecta)." Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding CapsuleCornerRadius, StringFormat='{}{0:0} DIP'}" Style="{StaticResource ValueBadge}"/>
+                                </Grid>
+                                <Slider Minimum="8" Maximum="24" Value="{Binding CapsuleCornerRadius}" SmallChange="1" LargeChange="2"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Reset Position Button -->
+                        <Button Content="🔄 Restablecer Posición y Dimensiones Predeterminadas"
+                                Command="{Binding ResetPositionCommand}"
+                                Height="34" Margin="0,4,0,12"
+                                Background="#252A36" Foreground="#94A3B8" BorderBrush="#374151"
+                                HorizontalAlignment="Left" Padding="14,0"/>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- TAB 2: Widgets y Prioridades -->
+            <TabItem Header="🧩 Widgets y Prioridades">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="4,12,12,12">
+                    <StackPanel>
+                        <!-- Hardware Widget Card -->
+                        <Border Style="{StaticResource SettingCard}">
+                            <StackPanel>
+                                <Grid>
+                                    <StackPanel>
+                                        <TextBlock Text="📊 Monitor de Hardware (CPU y RAM)" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Monitorea en tiempo real el consumo de CPU y memoria física." Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <CheckBox IsChecked="{Binding EnableHardwareMonitoring}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                </Grid>
+
+                                <StackPanel Margin="0,12,0,0">
+                                    <Grid>
+                                        <TextBlock Text="Prioridad de Hardware" Style="{StaticResource SettingDesc}"/>
+                                        <TextBlock Text="{Binding DefaultHardwarePriority}" Style="{StaticResource ValueBadge}"/>
+                                    </Grid>
+                                    <Slider Minimum="5" Maximum="50" Value="{Binding DefaultHardwarePriority}" SmallChange="5"/>
+                                </StackPanel>
+
+                                <StackPanel Margin="0,8,0,0">
+                                    <Grid>
+                                        <TextBlock Text="Intervalo de Muestreo (Segundos)" Style="{StaticResource SettingDesc}"/>
+                                        <TextBlock Text="{Binding HardwareSamplingIntervalSeconds, StringFormat='{}{0:0.0} s'}" Style="{StaticResource ValueBadge}"/>
+                                    </Grid>
+                                    <Slider Minimum="0.5" Maximum="5.0" Value="{Binding HardwareSamplingIntervalSeconds}" SmallChange="0.5"/>
+                                </StackPanel>
+
+                                <Grid Margin="0,10,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="Monitoreo de GPU (Experimental)" FontSize="12" Foreground="#CBD5E1"/>
+                                        <TextBlock Text="Usa contadores de rendimiento de Windows (requiere más recursos)." Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <CheckBox IsChecked="{Binding EnableGpuMonitoring}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Media Widget Card -->
+                        <Border Style="{StaticResource SettingCard}">
+                            <StackPanel>
+                                <Grid>
+                                    <StackPanel>
+                                        <TextBlock Text="🎵 Música y Multimedia (GSMTC)" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Detecta reproductores como Spotify, Edge, Chrome y VLC." Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <CheckBox IsChecked="{Binding EnableMediaWidget}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                </Grid>
+
+                                <StackPanel Margin="0,12,0,0">
+                                    <Grid>
+                                        <TextBlock Text="Prioridad de Música" Style="{StaticResource SettingDesc}"/>
+                                        <TextBlock Text="{Binding DefaultMediaPriority}" Style="{StaticResource ValueBadge}"/>
+                                    </Grid>
+                                    <Slider Minimum="10" Maximum="60" Value="{Binding DefaultMediaPriority}" SmallChange="5"/>
+                                </StackPanel>
+
+                                <StackPanel Margin="0,8,0,0">
+                                    <Grid>
+                                        <TextBlock Text="Tiempo de Gracia tras Pausa (Segundos)" Style="{StaticResource SettingDesc}"/>
+                                        <TextBlock Text="{Binding MediaPauseGracePeriodSeconds, StringFormat='{}{0} s'}" Style="{StaticResource ValueBadge}"/>
+                                    </Grid>
+                                    <Slider Minimum="0" Maximum="30" Value="{Binding MediaPauseGracePeriodSeconds}" SmallChange="1"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Volume Widget Card -->
+                        <Border Style="{StaticResource SettingCard}">
+                            <StackPanel>
+                                <Grid>
+                                    <StackPanel>
+                                        <TextBlock Text="🔊 Control de Volumen del Sistema" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Aviso transitorio al cambiar el volumen con rueda o teclas de audio." Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <CheckBox IsChecked="{Binding EnableVolumeWidget}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                </Grid>
+
+                                <StackPanel Margin="0,12,0,0">
+                                    <Grid>
+                                        <TextBlock Text="Prioridad de Volumen" Style="{StaticResource SettingDesc}"/>
+                                        <TextBlock Text="{Binding DefaultVolumePriority}" Style="{StaticResource ValueBadge}"/>
+                                    </Grid>
+                                    <Slider Minimum="50" Maximum="100" Value="{Binding DefaultVolumePriority}" SmallChange="5"/>
+                                </StackPanel>
+
+                                <StackPanel Margin="0,8,0,0">
+                                    <Grid>
+                                        <TextBlock Text="Duración del Aviso Transitorio" Style="{StaticResource SettingDesc}"/>
+                                        <TextBlock Text="{Binding VolumeTransientDurationSeconds, StringFormat='{}{0:0.0} s'}" Style="{StaticResource ValueBadge}"/>
+                                    </Grid>
+                                    <Slider Minimum="0.5" Maximum="5.0" Value="{Binding VolumeTransientDurationSeconds}" SmallChange="0.5"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Battery Widget Card -->
+                        <Border Style="{StaticResource SettingCard}">
+                            <StackPanel>
+                                <Grid>
+                                    <StackPanel>
+                                        <TextBlock Text="🔋 Alertas de Batería y Cargador" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Avisos instantáneos al conectar el cargador o alcanzar batería baja." Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <CheckBox IsChecked="{Binding EnableBatteryWidget}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                </Grid>
+
+                                <StackPanel Margin="0,12,0,0">
+                                    <Grid>
+                                        <TextBlock Text="Umbral de Batería Baja" Style="{StaticResource SettingDesc}"/>
+                                        <TextBlock Text="{Binding BatteryLowThresholdPercent, StringFormat='{}{0}%'}" Style="{StaticResource ValueBadge}"/>
+                                    </Grid>
+                                    <Slider Minimum="15" Maximum="35" Value="{Binding BatteryLowThresholdPercent}" SmallChange="1"/>
+                                </StackPanel>
+
+                                <StackPanel Margin="0,8,0,0">
+                                    <Grid>
+                                        <TextBlock Text="Umbral de Batería Crítica" Style="{StaticResource SettingDesc}"/>
+                                        <TextBlock Text="{Binding BatteryCriticalThresholdPercent, StringFormat='{}{0}%'}" Style="{StaticResource ValueBadge}"/>
+                                    </Grid>
+                                    <Slider Minimum="5" Maximum="15" Value="{Binding BatteryCriticalThresholdPercent}" SmallChange="1"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Timer Widget Card -->
+                        <Border Style="{StaticResource SettingCard}">
+                            <StackPanel>
+                                <Grid>
+                                    <StackPanel>
+                                        <TextBlock Text="⏱ Temporizador y Pomodoro" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Cuenta regresiva sin deriva temporal y sesiones de concentración." Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <CheckBox IsChecked="{Binding EnableTimerWidget}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                </Grid>
+
+                                <StackPanel Margin="0,12,0,0">
+                                    <Grid>
+                                        <TextBlock Text="Duración de Trabajo Pomodoro" Style="{StaticResource SettingDesc}"/>
+                                        <TextBlock Text="{Binding PomodoroWorkDurationMinutes, StringFormat='{}{0} min'}" Style="{StaticResource ValueBadge}"/>
+                                    </Grid>
+                                    <Slider Minimum="5" Maximum="60" Value="{Binding PomodoroWorkDurationMinutes}" SmallChange="5"/>
+                                </StackPanel>
+
+                                <StackPanel Margin="0,8,0,0">
+                                    <Grid>
+                                        <TextBlock Text="Duración de Descanso Pomodoro" Style="{StaticResource SettingDesc}"/>
+                                        <TextBlock Text="{Binding PomodoroBreakDurationMinutes, StringFormat='{}{0} min'}" Style="{StaticResource ValueBadge}"/>
+                                    </Grid>
+                                    <Slider Minimum="1" Maximum="20" Value="{Binding PomodoroBreakDurationMinutes}" SmallChange="1"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- TAB 3: Atajos y Sistema -->
+            <TabItem Header="⚡ Atajos y Sistema">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="4,12,12,12">
+                    <StackPanel>
+                        <!-- Global Hotkey Card -->
+                        <Border Style="{StaticResource SettingCard}">
+                            <StackPanel>
+                                <TextBlock Text="⌨ Atajo Global de Teclado" Style="{StaticResource SettingTitle}"/>
+                                <TextBlock Text="Combinación global para mostrar u ocultar la isla flotante (Win32 RegisterHotKey, sin hooks de bajo nivel)." Style="{StaticResource SettingDesc}"/>
+
+                                <Grid Margin="0,12,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox Text="{Binding ToggleIslandHotkey, UpdateSourceTrigger=LostFocus}"
+                                             Height="32" VerticalContentAlignment="Center"
+                                             Padding="8,0"
+                                             Background="#242732" Foreground="#FFFFFF" BorderBrush="#3B4252"
+                                             FontSize="13"/>
+                                    <Button Grid.Column="1" Content="Aplicar Atajo"
+                                            Command="{Binding ApplyHotkeyCommand}"
+                                            Height="32" Margin="8,0,0,0" Padding="14,0"
+                                            Background="#2563EB" Foreground="#FFFFFF" BorderThickness="0"/>
+                                </Grid>
+
+                                <!-- Conflict Alert Badge -->
+                                <Border Background="#451A1A" BorderBrush="#EF4444" BorderThickness="1" CornerRadius="6"
+                                        Padding="10,8" Margin="0,10,0,0"
+                                        Visibility="{Binding HasHotkeyConflict, Converter={x:Static viewModels:SettingsConverters.BooleanToVisibility}}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="⚠️ " Foreground="#EF4444" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding HotkeyConflictMessage}" Foreground="#FCA5A5" FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Fullscreen Behavior Card -->
+                        <Border Style="{StaticResource SettingCard}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="🖥 Ocultar en Pantalla Completa" Style="{StaticResource SettingTitle}"/>
+                                    <TextBlock Text="Suspende automáticamente la isla al jugar o ver videos maximizados (0% CPU)." Style="{StaticResource SettingDesc}"/>
+                                </StackPanel>
+                                <CheckBox Grid.Column="1" IsChecked="{Binding HideOnFullscreen}" VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Autostart Card -->
+                        <Border Style="{StaticResource SettingCard}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="🚀 Iniciar con Windows" Style="{StaticResource SettingTitle}"/>
+                                    <TextBlock Text="Arranca openDynamic al iniciar sesión en Windows (sin elevación de permisos UAC)." Style="{StaticResource SettingDesc}"/>
+                                </StackPanel>
+                                <CheckBox Grid.Column="1" IsChecked="{Binding StartWithWindows}" VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Factory Reset Card -->
+                        <Border Style="{StaticResource SettingCard}">
+                            <Grid>
+                                <StackPanel>
+                                    <TextBlock Text="Restablecer Configuración de Fábrica" Style="{StaticResource SettingTitle}"/>
+                                    <TextBlock Text="Vuelve a los valores predeterminados de fábrica para todos los parámetros." Style="{StaticResource SettingDesc}"/>
+                                </StackPanel>
+                                <Button Content="Restablecer Todo"
+                                        Command="{Binding ResetAllDefaultsCommand}"
+                                        Height="32" Padding="14,0"
+                                        Background="#7F1D1D" Foreground="#FCA5A5" BorderBrush="#991B1B"
+                                        HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
+
+        <!-- Bottom Footer -->
+        <Border Grid.Row="2" Background="#181920" BorderBrush="#252730" BorderThickness="0,1,0,0" Padding="20,12">
+            <Grid>
+                <TextBlock Text="openDynamic • Hito M5 (Bandeja, Ajustes y Atajos)" FontSize="11.5" Foreground="#64748B" VerticalAlignment="Center"/>
+                <Button Content="Cerrar" Click="OnCloseClicked"
+                        HorizontalAlignment="Right"
+                        Height="32" Padding="20,0"
+                        Background="#2B303C" Foreground="#E2E8F0" BorderBrush="#3B4252"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

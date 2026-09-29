@@ -25,7 +25,8 @@ public static class IslandPositionCalculator
         MonitorArea monitorArea,
         DisplayDpi dpi,
         WindowDimensions? windowDimensions = null,
-        double topMarginDip = DefaultTopMarginDip)
+        double topMarginDip = DefaultTopMarginDip,
+        double offsetXDip = 0.0)
     {
         var dimensions = windowDimensions ?? WindowDimensions.DefaultIsland;
 
@@ -47,7 +48,7 @@ public static class IslandPositionCalculator
         int physicalWidth = (int)Math.Round(dimensions.WidthDip * dpi.ScaleX, MidpointRounding.AwayFromZero);
         int physicalHeight = (int)Math.Round(dimensions.HeightDip * dpi.ScaleY, MidpointRounding.AwayFromZero);
 
-        int physicalX = monitorArea.Left + (int)Math.Round((monitorArea.Width - physicalWidth) / 2.0, MidpointRounding.AwayFromZero);
+        int physicalX = monitorArea.Left + (int)Math.Round(((monitorArea.Width - physicalWidth) / 2.0) + (offsetXDip * dpi.ScaleX), MidpointRounding.AwayFromZero);
         int physicalY = monitorArea.Top + (int)Math.Round(topMarginDip * dpi.ScaleY, MidpointRounding.AwayFromZero);
 
         return new CalculatedWindowPlacement(physicalX, physicalY, physicalWidth, physicalHeight);

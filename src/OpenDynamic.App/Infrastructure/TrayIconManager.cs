@@ -60,13 +60,12 @@ public sealed class TrayIconManager : IDisposable
             _taskbarIcon = new TaskbarIcon
             {
                 ToolTipText = "openDynamic - Dynamic Island para Windows",
-                IconSource = CreateCapsuleIconSource()
+                Icon = GetOrCreateIcon()
             };
 
             _taskbarIcon.TrayLeftMouseDown += OnTrayLeftMouseDown;
             _taskbarIcon.ContextMenu = BuildContextMenu();
 
-            _taskbarIcon.ForceCreate();
             Log.Information("System tray icon initialized successfully using H.NotifyIcon.Wpf.");
         }
         catch (Exception ex)
@@ -193,7 +192,8 @@ public sealed class TrayIconManager : IDisposable
     }
 
     /// <summary>
-    /// Generates a sharp 32x32 ImageSource representing the Dynamic Island capsule for the tray icon.
+    /// Generates a sharp 32x32 BitmapImage representing the Dynamic Island capsule for the tray icon.
+    /// Encodes via PNG stream to ensure compatibility with H.NotifyIcon.Wpf ImageExtensions.
     /// </summary>
     private static ImageSource CreateCapsuleIconSource()
     {
@@ -213,8 +213,69 @@ public sealed class TrayIconManager : IDisposable
 
         var rtb = new RenderTargetBitmap(32, 32, 96, 96, PixelFormats.Pbgra32);
         rtb.Render(visual);
-        rtb.Freeze();
-        return rtb;
+
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(rtb));
+        using var ms = new System.IO.MemoryStream();
+        encoder.Save(ms);
+        ms.Position = 0;
+
+        var bitmapImage = new BitmapImage();
+        bitmapImage.BeginInit();
+        bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
+        bitmapImage.StreamSource = ms;
+        bitmapImage.EndInit();
+        bitmapImage.Freeze();
+
+        return bitmapImage;
+    }
+
+    private static System.Drawing.Icon GetOrCreateIcon()
+    {
+        try
+        {
+            var iconUri = new Uri("pack://application:,,,/OpenDynamic.App;component/Resources/app.ico");
+            var resourceStream = Application.GetResourceStream(iconUri)?.Stream;
+            if (resourceStream != null)
+            {
+                using (resourceStream)
+                {
+                    return new System.Drawing.Icon(resourceStream);
+                }
+            }
+        }
+        catch { }
+
+        try
+        {
+            string diskPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "app.ico");
+            if (System.IO.File.Exists(diskPath))
+            {
+                using var fs = System.IO.File.OpenRead(diskPath);
+                return new System.Drawing.Icon(fs);
+            }
+        }
+        catch { }
+
+        // Fallback: draw in-memory 32x32 icon
+        using var bmp = new System.Drawing.Bitmap(32, 32);
+        using (var g = System.Drawing.Graphics.FromImage(bmp))
+        {
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            g.Clear(System.Drawing.Color.Transparent);
+            using var brush = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(255, 20, 24, 33));
+            using var pen = new System.Drawing.Pen(System.Drawing.Color.FromArgb(255, 96, 165, 250), 2);
+            using var path = new System.Drawing.Drawing2D.GraphicsPath();
+            path.AddArc(2, 8, 16, 16, 90, 180);
+            path.AddArc(14, 8, 16, 16, 270, 180);
+            path.CloseFigure();
+            g.FillPath(brush, path);
+            g.DrawPath(pen, path);
+            using var dotBrush = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(255, 240, 246, 252));
+            g.FillEllipse(dotBrush, 14, 14, 4, 4);
+        }
+        IntPtr hIcon = bmp.GetHicon();
+        return System.Drawing.Icon.FromHandle(hIcon);
     }
 
     /// <inheritdoc />
