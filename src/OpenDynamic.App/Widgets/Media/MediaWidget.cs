@@ -207,7 +207,7 @@ public sealed class MediaWidget : IslandWidgetBase
         {
             _dispatcher.InvokeAsync(() =>
             {
-                IsDecorativeAllowed = msg.Value.AllowDecorative;
+                IsDecorativeAllowed = msg.Profile.AllowDecorative;
             });
         });
     }

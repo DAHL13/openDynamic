@@ -576,6 +576,37 @@
                             </StackPanel>
                         </Border>
 
+                        <!-- Motion and Animations (Phase 10 Accessibility) -->
+                        <Border Style="{StaticResource SettingCard}">
+                            <StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="220"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="🎬 Animaciones y Movimiento (Accesibilidad)" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Configura el comportamiento elástico o directo de la cápsula según tus preferencias de movimiento." Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <ComboBox Grid.Column="1"
+                                              ItemsSource="{Binding MotionModeOptions}"
+                                              SelectedItem="{Binding SelectedMotionModeOption}"
+                                              DisplayMemberPath="DisplayName"
+                                              Height="32" VerticalContentAlignment="Center"
+                                              Background="#1C1C1E" Foreground="#FFFFFF" BorderBrush="#3B4252"
+                                              AutomationProperties.Name="Modo de animaciones y movimiento"/>
+                                </Grid>
+                                <Border Background="#1E232F" BorderBrush="#374151" BorderThickness="1" CornerRadius="6"
+                                        Padding="10,8" Margin="0,10,0,0">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="ℹ️ " Foreground="#38BDF8" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding SystemAnimationStatusText}" Foreground="#94A3B8" FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center"
+                                                   AutomationProperties.Name="Estado de animaciones del sistema"/>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+
                         <!-- Fullscreen Behavior Card -->
                         <Border Style="{StaticResource SettingCard}">
                             <Grid>

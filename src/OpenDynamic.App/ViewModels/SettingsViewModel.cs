@@ -5,6 +5,7 @@ using OpenDynamic.App.Orchestration;
 using OpenDynamic.App.Services;
 using OpenDynamic.App.Widgets.Hardware;
 using OpenDynamic.App.Windowing;
+using OpenDynamic.Core.Animation;
 using OpenDynamic.Core.Autostart;
 using OpenDynamic.Core.Settings;
 using Serilog;
@@ -126,6 +127,35 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string? _hotkeyConflictMessage;
 
+    // Motion and Animations (Phase 10)
+    [ObservableProperty]
+    private MotionMode _motionMode;
+
+    [ObservableProperty]
+    private string _systemAnimationStatusText = string.Empty;
+
+    public record MotionModeOption(MotionMode Value, string DisplayName);
+
+    public IReadOnlyList<MotionModeOption> MotionModeOptions { get; } = new List<MotionModeOption>
+    {
+        new(MotionMode.Auto, "Automático (Sigue a Windows)"),
+        new(MotionMode.Reduced, "Reducidas (Sin rebote ni efectos)"),
+        new(MotionMode.Full, "Completas (Física elástica de resortes)")
+    };
+
+    public MotionModeOption SelectedMotionModeOption
+    {
+        get => MotionModeOptions.FirstOrDefault(o => o.Value == MotionMode) ?? MotionModeOptions[0];
+        set
+        {
+            if (value != null && MotionMode != value.Value)
+            {
+                MotionMode = value.Value;
+                OnPropertyChanged(nameof(SelectedMotionModeOption));
+            }
+        }
+    }
+
     public SettingsViewModel(
         ISettingsService settingsService,
         IslandOrchestrator orchestrator,
@@ -182,6 +212,10 @@ public partial class SettingsViewModel : ObservableObject
         _hideOnFullscreen = _settings.HideOnFullscreen;
         _startWithWindows = _autostartService.IsEnabled();
         _toggleIslandHotkey = _settings.ToggleIslandHotkey;
+
+        _motionMode = _settings.MotionMode;
+        UpdateSystemAnimationStatus();
+        System.Windows.SystemParameters.StaticPropertyChanged += OnSystemParametersStaticPropertyChanged;
 
         _hasHotkeyConflict = _hotkeyService.HasConflict;
         _hotkeyConflictMessage = _hotkeyService.ConflictMessage;
@@ -385,6 +419,33 @@ public partial class SettingsViewModel : ObservableObject
         ApplyHotkey();
     }
 
+    partial void OnMotionModeChanged(MotionMode value)
+    {
+        _settings.MotionMode = value;
+        _settingsService.SaveDebounced();
+        UpdateSystemAnimationStatus();
+        ApplyPositionLive();
+    }
+
+    private void OnSystemParametersStaticPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(System.Windows.SystemParameters.ClientAreaAnimation))
+        {
+            UpdateSystemAnimationStatus();
+        }
+    }
+
+    public void UpdateSystemAnimationStatus()
+    {
+        bool sysAnim = System.Windows.SystemParameters.ClientAreaAnimation;
+        var resolved = MotionProfileResolver.Resolve(MotionMode, sysAnim);
+        string modeDesc = resolved.AllowDecorative
+            ? "Animaciones activas (Física de resortes completa)"
+            : "Animaciones reducidas (Movimiento directo/amortiguado, sin efectos decorativos)";
+
+        SystemAnimationStatusText = $"Windows: {(sysAnim ? "Efectos activados" : "Efectos desactivados")} | Efectivo: {modeDesc}";
+    }
+
     [RelayCommand]
     public void ApplyHotkey()
     {
@@ -479,6 +540,10 @@ public partial class SettingsViewModel : ObservableObject
         HideOnFullscreen = _settings.HideOnFullscreen;
         StartWithWindows = _settings.StartWithWindows;
         ToggleIslandHotkey = _settings.ToggleIslandHotkey;
+
+        MotionMode = _settings.MotionMode;
+        OnPropertyChanged(nameof(SelectedMotionModeOption));
+        UpdateSystemAnimationStatus();
 
         ApplyPositionLive();
         ApplyHotkey();

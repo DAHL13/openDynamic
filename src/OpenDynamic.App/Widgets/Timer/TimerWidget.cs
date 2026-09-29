@@ -4,6 +4,8 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Messaging;
+using OpenDynamic.App.Widgets.Messages;
 using OpenDynamic.App.Widgets.Timer.Views;
 using OpenDynamic.Core.Settings;
 using OpenDynamic.Core.Timer;
@@ -104,9 +106,9 @@ public sealed class TimerWidget : IslandWidgetBase
         };
         _tickTimer.Tick += OnTickTimerTick;
 
-        CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger.Default.Register<Messages.MotionProfileChangedMessage>(this, (_, msg) =>
+        WeakReferenceMessenger.Default.Register<MotionProfileChangedMessage>(this, (_, msg) =>
         {
-            IsDecorativeAllowed = msg.Value.AllowDecorative;
+            IsDecorativeAllowed = msg.Profile.AllowDecorative;
         });
     }
 
