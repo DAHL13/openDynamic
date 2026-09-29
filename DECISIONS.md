@@ -120,6 +120,22 @@
   - **Representación visual del modo Split:** `IslandView.xaml` presenta una cápsula principal (`Border` con dimensiones elásticas) y una burbuja satélite circular (`36x36` con radio 18) separada por una brecha transparente de 10 DIPs. La ventana de capas permite el paso libre de clics (*click-through*) entre ambas piezas, emulando la Dynamic Island de hardware.
   - **Widgets de demostración (#if DEBUG):** `DemoWidgetA` (música/alta prioridad), `DemoWidgetB` (temporizador/prioridad normal) y los controles de simulación en `IslandDebugWindow` se aíslan bajo directivas `#if DEBUG`. En compilaciones Release no se incluye ninguna línea ni referencia a código de prueba o demostración.
 
+---
+
+## ADR-009: Integración Multimedia WinRT (GSMTC), Extrapolación de Progreso sin Polling, Desuscripción Estricta y Congelación de Miniaturas (Freeze)
+
+- **Estado:** Aceptado
+- **Fecha:** 2026-09-28
+- **Contexto:** La Fase 4 demanda integración con el sistema de transporte multimedia de Windows (`Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager`) para detectar y gobernar reproductores (Spotify, Edge, Chrome, VLC) manteniendo la Regla de Oro 1 (CPU ~0% en reposo), Regla de Oro 4 (aislamiento de fallos WinRT/COM) y Regla de Oro 5 (aislamiento del dominio en Core).
+- **Decisiones:**
+  - **Aislamiento en Core (Regla de oro 5):** Modelos de dominio inmutables (`MediaPlaybackStatus`, `MediaPlaybackCapabilities`, `MediaPlaybackInfo`, `MediaTimelineInfo`, `MediaPropertiesInfo`, `IMediaSession`, `IMediaService`, `MediaActivityController`, `MediaProgressCalculator`) en `OpenDynamic.Core.Media` sin referencias a Windows ni WPF, testeados de forma autónoma en `OpenDynamic.Tests`.
+  - **Extrapolación local de progreso (Regla de oro 1: CPU ~0% en reposo):** Prohibido el sondeo (polling) por GSMTC. La posición se extrapola matemáticamente a partir de `TimelineProperties.Position` + `(DateTime.UtcNow - LastUpdatedTime)`. El temporizador `DispatcherTimer` de 1s para refrescar la barra en UI se activa ÚNICAMENTE en estado `Expanded` y con reproducción activa (`Playing`). En `Compact`, `Split`, `Hidden` o en Pausa, se detiene de inmediato.
+  - **Gestión de Miniaturas y Seguridad de Hilos:** Se lee el flujo de carátula (`IRandomAccessStreamReference`) a memoria local y se ejecuta obligatoriamente `BitmapImage.Freeze()` antes de suministrarlo a la UI, previniendo excepciones de acceso de hilo cruzado y fugas de memoria. Las vistas aplican `RenderOptions.BitmapScalingMode="HighQuality"`.
+  - **Desuscripción meticulosa:** Toda sesión WinRT anterior desuscribe explícitamente sus eventos (`MediaPropertiesChanged`, `PlaybackInfoChanged`, `TimelinePropertiesChanged`, `SessionClosed`) antes de disponerse, previniendo fugas y callbacks zombies sobre procesos cerrados.
+  - **Tiempo de gracia tras pausa (10 segundos):** Al pausar la reproducción, la actividad se mantiene visible durante 10 segundos antes de desactivarse (`IsActive = false`), cancelándose el temporizador si se reanuda la música antes de los 10 segundos. Si el reproductor se cierra (`SessionClosed`), la actividad se retira inmediatamente sin esperar. Configurable mediante `AppSettings.MediaPauseGracePeriodSeconds`.
+  - **Activación de App emisora (PrimaryAction):** Búsqueda de ventanas y activación a primer plano (`SetForegroundWindow`, `ShowWindow`) a partir del `SourceAppUserModelId` o nombre de proceso de forma pacífica en `try/catch`.
+
+
 
 
 

@@ -3,6 +3,34 @@
 Todas las modificaciones notables en este proyecto serán documentadas en este archivo.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y cumple con [SemVer](https://semver.org/).
 
+## [0.5.0] - 2026-09-28 (Fase 4: Widget Multimedia - GSMTC)
+
+### Añadido
+- Modelos de dominio y contratos multimedia puros en `OpenDynamic.Core.Media` (Regla de oro 5):
+  - `MediaPlaybackStatus`: Estados de reproducción (`Closed`, `Opened`, `Changing`, `Stopped`, `Playing`, `Paused`).
+  - `MediaPlaybackCapabilities`: Capacidades interactivas de la sesión (`CanPlay`, `CanPause`, `CanTogglePlayPause`, `CanSkipNext`, `CanSkipPrevious`, `CanSeek`).
+  - `MediaPlaybackInfo`, `MediaTimelineInfo` y `MediaPropertiesInfo`: Snapshots inmutables de reproducción, límites de tiempo y metadatos libres de tipos de UI.
+  - `IMediaSession` e `IMediaService`: Contratos de abstracción para sesiones y servicios de transporte multimedia de Windows.
+  - `MediaProgressCalculator`: Lógica pura de cálculo de progreso extrapolado localmente, cálculo de ratio normalizado `[0.0, 1.0]` y formateo de tiempo (`mm:ss`, `h:mm:ss`).
+  - `MediaActivityController`: Coordinador de ciclo de vida de sesión que gestiona la regla de tiempo de gracia de 10 segundos tras pausa, reanudación y terminación inmediata al cerrar el reproductor.
+  - `AppSettings` en `OpenDynamic.Core.Settings`: Configuración con `MediaPauseGracePeriodSeconds = 10` y `DefaultMediaPriority = 30`.
+- Servicio de transporte multimedia nativo `MediaService` y sesión `WinRtMediaSession` en `OpenDynamic.App.Services`:
+  - Conexión a `GlobalSystemMediaTransportControlsSessionManager` (WinRT `Windows.Media.Control`).
+  - Todas las invocaciones a WinRT/COM encapsuladas en `try/catch` con registro estructurado en Serilog (Regla de oro 4).
+  - Desuscripción meticulosa (`-=`) de eventos al cambiar de sesión o cerrar reproductores para evitar fugas de memoria y callbacks sobre sesiones muertas.
+  - Extracción de miniatura (`Thumbnail`) con lectura asíncrona a memoria local y ejecución de `BitmapImage.Freeze()` antes de su entrega al hilo de UI.
+  - Activación de aplicación emisora (`TryActivateApp`) mediante `SourceAppUserModelId` o nombre de ejecutable (`SetForegroundWindow`, `ShowWindow`).
+- Widget multimedia `MediaWidget` en `OpenDynamic.App.Widgets.Media`:
+  - Vista `Compact`: carátula miniatura (24x24) con esquinas redondeadas y escalado de alta calidad, título y artista con recorte elíptico, y mini barras de onda de audio.
+  - Vista `Expanded`: carátula grande (52x52), título, artista, álbum, barra de progreso interactiva (seek en vivo por clic o arrastre), tiempos `mm:ss / mm:ss` y controles de transporte (Anterior, Play/Pausa central destacado y Siguiente).
+  - Vista `Split`: carátula circular (26x26) adaptada al satélite multitasking de 36x36 con insignia verde activa en reproducción.
+  - Regla de oro 1 (CPU ~0% en reposo): Prohibición total de sondeo (polling). El temporizador `DispatcherTimer` de 1s de extrapolación de progreso se activa ÚNICAMENTE cuando la cápsula está en estado `Expanded` Y la sesión está en reproducción (`Playing`). En `Compact`, `Split`, `Hidden` o en Pausa, el timer se detiene de inmediato.
+  - Tiempo de gracia de 10 segundos tras pausa: al pausar, la actividad se mantiene visible 10s antes de pasar a `IsActive = false`. Si se reanuda antes de los 10s, se cancela el temporizador y continúa activa; si el reproductor se cierra, la actividad se retira de inmediato.
+- Batería de 26 nuevas pruebas unitarias en `OpenDynamic.Tests` (total 88 en verde):
+  - Extrapolación de posición en reproducción, pausa, desbordamiento de límites y formato de tiempo en `MediaProgressCalculatorTests`.
+  - Simulación de transiciones Play -> Pause con timeout de 10s, reanudación y cierre inmediato en `MediaActivityControllerTests`.
+  - Resolución de prioridades con el nuevo widget Media en `PriorityResolverMediaTests`.
+
 ## [0.4.0] - 2026-09-28 (Fase 3: Arquitectura de Widgets y Orchestrator - Base M4)
 
 ### Añadido
