@@ -3,6 +3,40 @@
 Todas las modificaciones notables en este proyecto serán documentadas en este archivo.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y cumple con [SemVer](https://semver.org/).
 
+## [0.4.0] - 2026-09-28 (Fase 3: Arquitectura de Widgets y Orchestrator - Base M4)
+
+### Añadido
+- Modelos de dominio y contratos de actividad puros en `OpenDynamic.Core.Widgets` (Regla de oro 5):
+  - `IActivitySource`: Contrato para emisores de actividades (`Id`, `Priority`, `IsActive`, `IsTransient`, `LastActivatedUtc`, `TransientDuration`, `Changed`).
+  - `ActivityPriority`: Niveles estándar de prioridad (`Idle = 0`, `Low = 10`, `Normal = 50`, `High = 100`, `TransientNotice = 200`, `Critical = 500`).
+  - `IslandActivity`: Modelo inmutable de snapshot de actividad.
+  - `WidgetDisplayMode`: Enumeración de modos de renderizado (`Compact`, `Split`, `Expanded`).
+  - `PriorityResult`: Resultado inmutable de resolución con fuente primaria, secundaria, estado sugerido y próximo tiempo de expiración.
+- Servicio de resolución de prioridades determinista `PriorityResolver` en `OpenDynamic.Core.Widgets`:
+  - Evaluación por prioridad numérica descendente (mayor valor gana).
+  - Desempate determinista por recencia de activación (`LastActivatedUtc`) y por identificador (`Id`).
+  - Pre-emption de actividades transitorias con tiempo de vida o expiración: toman el control como fuente primaria exclusiva en `Compact`, y al expirar devuelven automáticamente el control a las actividades en segundo plano.
+  - Soporte de lista vacía o fuentes inactivas retornando estado inactivo/reposo (`Hidden`).
+- Interfaz `IIslandWidget` y clase base `IslandWidgetBase` en `OpenDynamic.App.Widgets`:
+  - Integración de `IActivitySource` con `IDisposable` y fábricas de vistas WPF (`CreateCompactView()`, `CreateExpandedView()`, `CreateSplitView()`).
+  - Métodos de ciclo de vida: `Initialize()`, `OnExpand()`, `OnCollapse()`.
+  - Integración MVVM con `CommunityToolkit.Mvvm` (`ObservableObject`).
+- Bus de eventos desacoplado con `WeakReferenceMessenger` de CommunityToolkit.Mvvm:
+  - Mensajes de actividad (`ActivityChangedMessage`, `WidgetRegisteredMessage`, `WidgetUnregisteredMessage`, `ExpandRequestedMessage`, `CollapseRequestedMessage`, `IslandStateChangedMessage`) que evitan fugas de memoria por referencias fuertes.
+- Orquestador central `IslandOrchestrator` en `OpenDynamic.App.Orchestration`:
+  - Autoridad EXCLUSIVA sobre transiciones en `IslandStateMachine`.
+  - Coordinación de prioridades de widgets, entrega de vistas a `IslandView` y gestión de temporizadores de expiración de transitorios de un solo disparo (CPU ~0% en reposo).
+  - Aislamiento estricto de fallos (Regla de oro 4): toda inicialización y creación de vistas de widgets está protegida en bloques `try/catch` con registro en Serilog y puesta en cuarentena de widgets con excepciones sin desestabilizar la cápsula ni la aplicación.
+- Componente de presentación `IslandView.xaml` en `OpenDynamic.App.Views`:
+  - Cápsula principal con animación y recorte elástico.
+  - Soporte visual nativo para modo multitasking `Split`: cápsula principal más burbuja satélite circular (`36x36` con radio 18) adyacente con espacio transparente para clics intermedios.
+  - Transiciones de opacidad suaves (cross-fade) al conmutar contenido entre widgets.
+- Widgets de demostración `DemoWidgetA` y `DemoWidgetB` condicionados estrictamente a compilación `#if DEBUG`:
+  - Simulación de actividad continua (Música y Temporizador) y avisos transitorios de 3 segundos con auto-expiración.
+  - Controles interactivos y telemetría en tiempo real en `IslandDebugWindow`.
+  - Cero código de demostración en compilaciones Release.
+- Suite de 15 pruebas unitarias exhaustivas en `OpenDynamic.Tests.Widgets.PriorityResolverTests`, elevando el total de pruebas a 62 en verde.
+
 ## [0.3.0] - 2026-09-28 (Fase 2: Animación y Estados - M2)
 
 ### Añadido

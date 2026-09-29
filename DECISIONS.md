@@ -99,5 +99,27 @@
   - **Sensor de activación en estado Hidden (Anti-bloqueo de Hit-Testing):** Se prohíbe el uso de `Visibility.Collapsed` en la cápsula, ya que desactiva por completo el árbol de hit-testing de WPF, volviendo la isla irrecuperable. En su lugar, el estado `Hidden` se modela como una micro-muesca de 80x4 DIPs con radio 2 y opacidad al 1% (`0.01`). Esto la mantiene prácticamente invisible al ojo humano mientras retiene capacidad receptora de eventos para `MouseWheel` hacia abajo, `MouseEnter` y clics en el centro superior, dejando intacto el paso de clics (*click-through*) en el resto de la pantalla.
   - **Aislamiento de depuración (#if DEBUG):** La ventana `IslandDebugWindow` y sus puntos de entrada se condicionan estrictamente a `#if DEBUG`, garantizando cero código ni dependencias visuales de depuración en compilaciones Release.
 
+---
+
+## ADR-008: Arquitectura de Widgets, Resolución de Prioridades Determinista y Autoridad Exclusiva del Orchestrator
+
+- **Estado:** Aceptado
+- **Fecha:** 2026-09-28
+- **Contexto:** La Fase 3 (M4 Base) establece la infraestructura para desacoplar fuentes de actividad, resolver qué widgets deben presentarse en la Dynamic Island y comandar las transiciones entre modos `Compact`, `Split` y `Expanded` sin comprometer la estabilidad ni el consumo de CPU.
+- **Decisiones:**
+  - **Aislamiento del modelo en Core (Regla de oro 5):** `IActivitySource`, `IslandActivity`, `ActivityPriority`, `WidgetDisplayMode`, `PriorityResult` y `PriorityResolver` residen en `OpenDynamic.Core.Widgets` con lógica determinista pura y sin dependencias de WPF ni Windows.
+  - **Resolución determinista de prioridades:**
+    - Prioridad numérica descendente: mayor valor toma precedencia (`ActivityPriority`).
+    - Desempate por recencia de activación: si dos fuentes tienen igual prioridad, prevalece la activada más recientemente (`LastActivatedUtc`).
+    - Desempate determinista final: ordenación ordinal por identificador textual (`Id`), garantizando total reproducibilidad sin dependencia de orden de lista o memoria.
+  - **Pre-emption de actividades transitorias y auto-expiración:** Una actividad transitoria (`IsTransient == true`) con prioridad alta toma el control exclusivo como fuente primaria (`Secondary = null`) en modo `Compact`. `PriorityResolver` calcula el próximo instante de expiración (`NextExpirationUtc`). `IslandOrchestrator` programa un único temporizador de un solo disparo (`DispatcherTimer`) que se detiene tras expirar para restablecer la actividad o modo anterior (Regla de oro 1: 0% CPU en reposo).
+  - **Contrato de widgets y ciclo de vida:** Se define `IIslandWidget` en `OpenDynamic.App.Widgets` extendiendo `IActivitySource` e `IDisposable`, con fábricas de vistas WPF (`CreateCompactView()`, `CreateExpandedView()`, `CreateSplitView()`) y eventos de ciclo de vida (`Initialize()`, `OnExpand()`, `OnCollapse()`). La clase base `IslandWidgetBase` implementa `CommunityToolkit.Mvvm` (`ObservableObject`).
+  - **Mensajería desacoplada con referencias débiles:** Los eventos de cambio de actividad, solicitud de expansión y transiciones se emiten a través de `WeakReferenceMessenger.Default`, impidiendo fugas de memoria (*memory leaks*) por suscripciones fuertes entre widgets de ciclo de vida independiente y la UI.
+  - **Autoridad exclusiva del Orchestrator:** Únicamente `IslandOrchestrator` comanda cambios de estado en `IslandStateMachine`. Los widgets declaran su estado (`IsActive`, `Priority`, `IsTransient`) y exponen vistas; nunca tocan la máquina de estados.
+  - **Aislamiento y tolerancia a fallos (Regla de oro 4):** Toda invocación a métodos de widgets (`Initialize`, creación de vistas, `OnExpand`, etc.) está encapsulada en bloques `try/catch` con registro en Serilog. Un fallo o excepción en un widget provoca su puesta en cuarentena (`QuarantinedWidgetIds`) y su aislamiento inmediato, permitiendo a la cápsula continuar operando con normalidad con las fuentes restantes.
+  - **Representación visual del modo Split:** `IslandView.xaml` presenta una cápsula principal (`Border` con dimensiones elásticas) y una burbuja satélite circular (`36x36` con radio 18) separada por una brecha transparente de 10 DIPs. La ventana de capas permite el paso libre de clics (*click-through*) entre ambas piezas, emulando la Dynamic Island de hardware.
+  - **Widgets de demostración (#if DEBUG):** `DemoWidgetA` (música/alta prioridad), `DemoWidgetB` (temporizador/prioridad normal) y los controles de simulación en `IslandDebugWindow` se aíslan bajo directivas `#if DEBUG`. En compilaciones Release no se incluye ninguna línea ni referencia a código de prueba o demostración.
+
+
 
 
