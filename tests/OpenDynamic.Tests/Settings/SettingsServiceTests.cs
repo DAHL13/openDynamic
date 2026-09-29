@@ -153,14 +153,15 @@ public sealed class SettingsServiceTests : IDisposable
         Assert.Equal(AppSettings.CurrentSchemaVersion, service.CurrentSettings.SchemaVersion);
         Assert.Equal(175.0, service.CurrentSettings.CapsuleWidth);
         Assert.Equal(45, service.CurrentSettings.DefaultMediaPriority);
+        Assert.Equal(OpenDynamic.Core.Animation.MotionMode.Auto, service.CurrentSettings.MotionMode);
 
-        // File should now contain SchemaVersion = 2
+        // File should now contain SchemaVersion = 3
         string reloadedJson = File.ReadAllText(filePath);
-        Assert.Contains("\"SchemaVersion\": 2", reloadedJson);
+        Assert.Contains("\"SchemaVersion\": 3", reloadedJson);
     }
 
     [Fact]
-    public void Load_WhenSchemaVersionIs1_MigratesToSchemaVersion2_NormalizesOffsetYAndCapsuleCornerRadius()
+    public void Load_WhenSchemaVersionIs1_MigratesToSchemaVersion3_NormalizesNotchAndSetsMotionMode()
     {
         string filePath = Path.Combine(_testDirectory, "settings_v1.json");
         // Legacy JSON schema with version 1 (Phase 7 floating pill settings)
@@ -178,15 +179,65 @@ public sealed class SettingsServiceTests : IDisposable
         using var service = new SettingsService(filePath, debounceMilliseconds: 100);
         service.Load();
 
-        Assert.Equal(2, service.CurrentSettings.SchemaVersion);
+        Assert.Equal(3, service.CurrentSettings.SchemaVersion);
         Assert.Equal(0.0, service.CurrentSettings.OffsetY);
         Assert.Equal(14.0, service.CurrentSettings.CapsuleCornerRadius);
         Assert.Equal(200.0, service.CurrentSettings.CapsuleWidth);
+        Assert.Equal(OpenDynamic.Core.Animation.MotionMode.Auto, service.CurrentSettings.MotionMode);
 
         string reloadedJson = File.ReadAllText(filePath);
-        Assert.Contains("\"SchemaVersion\": 2", reloadedJson);
+        Assert.Contains("\"SchemaVersion\": 3", reloadedJson);
         Assert.Contains("\"OffsetY\": 0", reloadedJson);
         Assert.Contains("\"CapsuleCornerRadius\": 14", reloadedJson);
+    }
+
+    [Fact]
+    public void Load_WhenSchemaVersionIs2_MigratesToSchemaVersion3_SetsDefaultMotionModeAuto()
+    {
+        string filePath = Path.Combine(_testDirectory, "settings_v2.json");
+        // Legacy JSON schema with version 2 (Phase 9 notch settings without MotionMode)
+        const string v2Json = """
+        {
+            "SchemaVersion": 2,
+            "OffsetY": 0.0,
+            "CapsuleCornerRadius": 14.0,
+            "CapsuleWidth": 200.0,
+            "EnableMediaWidget": true
+        }
+        """;
+
+        File.WriteAllText(filePath, v2Json);
+
+        using var service = new SettingsService(filePath, debounceMilliseconds: 100);
+        service.Load();
+
+        Assert.Equal(3, service.CurrentSettings.SchemaVersion);
+        Assert.Equal(OpenDynamic.Core.Animation.MotionMode.Auto, service.CurrentSettings.MotionMode);
+        Assert.Equal(0.0, service.CurrentSettings.OffsetY);
+        Assert.Equal(14.0, service.CurrentSettings.CapsuleCornerRadius);
+        Assert.True(service.CurrentSettings.EnableMediaWidget);
+
+        string reloadedJson = File.ReadAllText(filePath);
+        Assert.Contains("\"SchemaVersion\": 3", reloadedJson);
+        Assert.Contains("\"MotionMode\": \"Auto\"", reloadedJson);
+    }
+
+    [Fact]
+    public void Load_WhenMotionModeIsConfigured_PersistsAndDeserializesCorrectly()
+    {
+        string filePath = Path.Combine(_testDirectory, "settings_motion.json");
+        var custom = new AppSettings
+        {
+            SchemaVersion = 3,
+            MotionMode = OpenDynamic.Core.Animation.MotionMode.Reduced
+        };
+
+        File.WriteAllText(filePath, JsonSerializer.Serialize(custom));
+
+        using var service = new SettingsService(filePath, debounceMilliseconds: 100);
+        service.Load();
+
+        Assert.Equal(OpenDynamic.Core.Animation.MotionMode.Reduced, service.CurrentSettings.MotionMode);
     }
 
     [Fact]
@@ -286,7 +337,8 @@ public sealed class SettingsServiceTests : IDisposable
             PomodoroBreakDurationMinutes = 10,
             ToggleIslandHotkey = "Win+Alt+O",
             EnableGlobalHotkeys = false,
-            StartWithWindows = true
+            StartWithWindows = true,
+            MotionMode = OpenDynamic.Core.Animation.MotionMode.Reduced
         };
 
         var cloned = original.Clone();
@@ -298,6 +350,7 @@ public sealed class SettingsServiceTests : IDisposable
         Assert.Equal(original.OffsetY, cloned.OffsetY);
         Assert.Equal(original.TargetMonitorIndex, cloned.TargetMonitorIndex);
         Assert.Equal(original.ScaleFactor, cloned.ScaleFactor);
+        Assert.Equal(original.MotionMode, cloned.MotionMode);
         Assert.Equal(original.EnableMediaWidget, cloned.EnableMediaWidget);
         Assert.Equal(original.DefaultMediaPriority, cloned.DefaultMediaPriority);
         Assert.Equal(original.MediaPauseGracePeriodSeconds, cloned.MediaPauseGracePeriodSeconds);
@@ -319,5 +372,6 @@ public sealed class SettingsServiceTests : IDisposable
         Assert.Equal(original.CapsuleWidth, destination.CapsuleWidth);
         Assert.Equal(original.ToggleIslandHotkey, destination.ToggleIslandHotkey);
         Assert.Equal(original.StartWithWindows, destination.StartWithWindows);
+        Assert.Equal(original.MotionMode, destination.MotionMode);
     }
 }

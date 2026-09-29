@@ -118,6 +118,15 @@ public sealed class SettingsService : ISettingsService
                         }
                     }
 
+                    if (loaded.SchemaVersion < 3)
+                    {
+                        // Migration v2 -> v3: Introduce MotionMode setting with Auto as default.
+                        if (!Enum.IsDefined(typeof(Animation.MotionMode), loaded.MotionMode))
+                        {
+                            loaded.MotionMode = Animation.MotionMode.Auto;
+                        }
+                    }
+
                     loaded.SchemaVersion = AppSettings.CurrentSchemaVersion;
                     CurrentSettings = loaded;
                     WriteSettingsToDisk(CurrentSettings);
