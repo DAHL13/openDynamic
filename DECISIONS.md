@@ -258,7 +258,7 @@
 
 ---
 
-## ADR-016: Optimización Estricta (TreatWarningsAsErrors), Robustez ante Eventos del Sistema (WM_POWERBROADCAST / WM_DISPLAYCHANGE), Estilizado Oscuro de Controles y Publicación ReadyToRun (R2R) - Hito Previo a M6
+## ADR-015B: Optimización Estricta (TreatWarningsAsErrors), Robustez ante Eventos del Sistema (WM_POWERBROADCAST / WM_DISPLAYCHANGE), Estilizado Oscuro de Controles y Publicación ReadyToRun (R2R) - Hito Previo a M6
 
 - **Estado:** Aceptado
 - **Fecha:** 2026-09-29
@@ -293,6 +293,36 @@
   - **Optimización de Publicación con ReadyToRun (R2R):**
     - Se habilita `<PublishReadyToRun>true</PublishReadyToRun>` en `OpenDynamic.App.csproj`.
     - Publicación `win-x64` genera binarios precompilados a código nativo Ahead-of-Time para arranque instantáneo en frío, sin aplicar trimming destructivo incompatible con WPF.
+
+---
+
+## ADR-016: Decisión de Distribución del Runtime (.NET 10 Desktop Runtime vs. Self-Contained) y Empaquetado de Instalador (Hito M6)
+
+- **Estado:** Aceptado
+- **Fecha:** 2026-09-29
+- **Contexto:**
+  Para el cierre y entrega final de openDynamic v1.0.0 (Hito M6), es fundamental definir la estrategia de empaquetado y distribución del runtime de .NET 10 para Windows x64. Las opciones evaluadas son:
+  1. **Distribución dependiente de framework (Framework-Dependent):** Requiere que el usuario final cuente con Microsoft .NET 10 Desktop Runtime (x64) instalado en el sistema.
+  2. **Distribución auto-contenida (Self-Contained):** Empaqueta el runtime completo de .NET 10 (CoreCLR, bibliotecas base BCL, subsistema WPF nativo y assemblies) dentro del directorio de instalación de la aplicación.
+  
+- **Análisis Comparativo:**
+
+| Criterio | Dependiente de Framework (.NET 10 Desktop Runtime) | Auto-Contenido (Self-Contained) |
+|---|---|---|
+| **Tamaño de Binarios en Disco** | **~32.0 MB** (26 archivos con `PublishReadyToRun=true`) | **~224.5 MB** (272 archivos con `PublishReadyToRun=true`) |
+| **Tamaño de Descarga del Instalador (.exe)** | **~11 - 12 MB** (compresión LZMA2 en Inno Setup) | **~65 - 75 MB** (compresión LZMA2 en Inno Setup) |
+| **Tamaño de Paquete Portátil (.zip)** | **~12 MB** | **~75 MB** |
+| **Arranque en Frío y Rendimiento** | Excelente con ReadyToRun (R2R nativo compila métodos Ahead-of-Time). | Excelente con ReadyToRun (R2R nativo). |
+| **Consumo de Memoria RAM** | Compartición de assemblies en caché del runtime global; Working Set en reposo **27.9 MB**, Memoria Privada **5.2 MB**. | Asignaciones de BCL y CoreCLR privadas por proceso; ligero incremento de huella de memoria privada. |
+| **Seguridad y Parches de SO** | Las actualizaciones de seguridad de .NET 10 se aplican a nivel de sistema operativo vía Windows Update sin requerir re-empaquetar openDynamic. | Cualquier vulnerabilidad en el runtime requiere que openDynamic publique una nueva release completa. |
+| **Experiencia de Usuario en Máquinas Limpias** | Si la máquina no tiene .NET 10 Desktop Runtime, el instalador detecta la ausencia y guía automáticamente al usuario con enlace directo oficial de descarga (`https://aka.ms/dotnet/10.0/windowsdesktop-runtime-win-x64.exe`). | Funciona de inmediato sin prerrequisitos previos. |
+
+- **Decisión Adoptada:**
+  Se elige la **Distribución Dependiente de Framework (Framework-Dependent)** con `PublishReadyToRun=true` para x64 como estándar de producción oficial de openDynamic v1.0.0 por las siguientes razones clave:
+  1. **Alineación con la Filosofía de Cero Bloatware:** openDynamic se diseñó desde el primer día para ser un overlay ultra-liviano con consumo < 30 MB de RAM y CPU 0.0% en reposo. Un instalador de apenas ~11 MB y una carpeta de instalación de ~32 MB respetan la filosofía de ligereza, a diferencia de los ~225 MB de un paquete auto-contenido.
+  2. **Detección Automatizada en Instalador:** El instalador de Inno Setup (`installer/setup.iss`) comprueba la presencia de .NET 10 Desktop Runtime en el registro de Windows (`HKLM\SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedfx\Microsoft.WindowsDesktop.App` o ejecución rápida de `dotnet --list-runtimes`). Si no se encuentra, abre el instalador web oficial o guía al usuario en un solo clic.
+  3. **Seguridad y Mantenimiento:** La delegación del runtime a Windows Update garantiza que parches de seguridad críticos de Microsoft no dependan de ciclos de despliegue de openDynamic.
+  4. **Publicación Dual en GitHub Releases:** El workflow de CI/CD generará el instalador oficial optimizado y el archivo portátil comprimido en el release de GitHub, documentando claramente el enlace directo al runtime oficial.
 
 ---
 
