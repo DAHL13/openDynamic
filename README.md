@@ -12,7 +12,7 @@ Repositorio oficial: [https://github.com/DAHL13/openDynamic](https://github.com/
 | Fase | Descripción | Estado |
 |---|---|:---:|
 | **Fase 0** | **Andamiaje del proyecto, CI, DI, Logging y Pruebas iniciales** | **Completada** |
-| Fase 1 | Ventana de la isla, posicionamiento y renderizado básico | Pendiente |
+| **Fase 1** | **Ventana de la isla, posicionamiento y renderizado básico (M1)** | **Completada** |
 | Fase 2 | Motor de física de animación de resorte (*Spring physics*) | Pendiente |
 | Fase 3 | Máquina de estados de la isla y resolución de prioridades | Pendiente |
 | Fase 4 | Integración de widgets del sistema (Audio, Medios GSMTC, Hardware, Batería, Temporizador) | Pendiente |
@@ -59,13 +59,30 @@ openDynamic/
 │      └─ ci.yml                   # CI en windows-latest (restore, build, test)
 ├─ src/
 │  ├─ OpenDynamic.Core/             # net10.0 — Lógica pura sin dependencias de Windows ni WPF
-│  │   └─ CoreInfo.cs
+│  │   ├─ CoreInfo.cs
+│  │   └─ Positioning/             # Cálculo puro de posicionamiento geométrico y DPI
+│  │       ├─ IslandPositionCalculator.cs
+│  │       ├─ MonitorArea.cs
+│  │       ├─ DisplayDpi.cs
+│  │       ├─ WindowDimensions.cs
+│  │       └─ CalculatedWindowPlacement.cs
 │  └─ OpenDynamic.App/              # WPF, net10.0-windows10.0.19041.0
 │      ├─ app.manifest              # PerMonitorV2 DPI awareness
 │      ├─ App.xaml / App.xaml.cs    # Ciclo de vida, DI, manejadores de excepción globales
+│      ├─ Native/                   # P/Invoke a Win32 (estilos, DPI, monitores, hooks)
+│      │   └─ NativeMethods.cs
+│      ├─ Windowing/                # IslandWindow overlay, ForegroundWatcher, WindowPositioner
+│      │   ├─ IslandWindow.xaml
+│      │   ├─ IslandWindow.xaml.cs
+│      │   ├─ ForegroundWatcher.cs
+│      │   ├─ WindowPositioner.cs
+│      │   └─ TargetMonitorMode.cs
 │      └─ Infrastructure/           # DI, SingleInstance, Logging
 └─ tests/
-   └─ OpenDynamic.Tests/            # xUnit probando la infraestructura y aislamiento de Core
+   └─ OpenDynamic.Tests/            # xUnit probando infraestructura, aislamiento y posicionamiento
+       ├─ InfrastructureTests.cs
+       └─ Positioning/
+           └─ IslandPositionCalculatorTests.cs
 ```
 
 ---
