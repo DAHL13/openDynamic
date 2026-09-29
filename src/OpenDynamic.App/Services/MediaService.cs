@@ -53,51 +53,71 @@ public sealed class MediaService : IMediaService
     }
 
     /// <summary>
-    /// Initializes the GSMTC session manager and registers for system session changes.
-    /// Safely handles failures without crashing the application.
+    /// Initializes the GSMTC session manager and registers for system session changes with default retries.
+    /// Implements <see cref="IMediaService.InitializeAsync"/>.
     /// </summary>
-    public async Task<bool> InitializeAsync()
+    public Task<bool> InitializeAsync() => InitializeAsync(maxRetries: 3, retryDelayMs: 1500);
+
+    /// <summary>
+    /// Initializes the GSMTC session manager and registers for system session changes.
+    /// Safely handles failures with automatic retries if GSMTC is delayed at system startup.
+    /// </summary>
+    public async Task<bool> InitializeAsync(int maxRetries, int retryDelayMs)
     {
-        lock (_lock)
-        {
-            if (_isDisposed || _isInitializing) return false;
-            _isInitializing = true;
-        }
-
-        try
-        {
-            Log.Information("Initializing WinRT GSMTC session manager...");
-            var manager = await GlobalSystemMediaTransportControlsSessionManager.RequestAsync();
-
-            if (manager == null)
-            {
-                Log.Warning("GSMTC session manager returned null. Media integration degraded peacefully.");
-                return false;
-            }
-
-            lock (_lock)
-            {
-                _sessionManager = manager;
-                _sessionManager.CurrentSessionChanged += OnSessionManagerCurrentSessionChanged;
-                _sessionManager.SessionsChanged += OnSessionManagerSessionsChanged;
-            }
-
-            Log.Information("WinRT GSMTC session manager hooked successfully.");
-            await UpdateCurrentSessionAsync();
-            return true;
-        }
-        catch (Exception ex)
-        {
-            Log.Warning(ex, "Failed to initialize GlobalSystemMediaTransportControlsSessionManager. Media integration degraded gracefully.");
-            return false;
-        }
-        finally
+        for (int attempt = 1; attempt <= maxRetries; attempt++)
         {
             lock (_lock)
             {
-                _isInitializing = false;
+                if (_isDisposed) return false;
+                if (_isInitializing) return false;
+                _isInitializing = true;
+            }
+
+            try
+            {
+                Log.Information("Initializing WinRT GSMTC session manager (attempt {Attempt}/{MaxRetries})...", attempt, maxRetries);
+                var manager = await GlobalSystemMediaTransportControlsSessionManager.RequestAsync();
+
+                if (manager != null)
+                {
+                    lock (_lock)
+                    {
+                        _sessionManager = manager;
+                        _sessionManager.CurrentSessionChanged += OnSessionManagerCurrentSessionChanged;
+                        _sessionManager.SessionsChanged += OnSessionManagerSessionsChanged;
+                    }
+
+                    Log.Information("WinRT GSMTC session manager hooked successfully.");
+                    await UpdateCurrentSessionAsync();
+                    return true;
+                }
+
+                Log.Warning("GSMTC session manager returned null on attempt {Attempt}/{MaxRetries}.", attempt, maxRetries);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Failed to initialize GlobalSystemMediaTransportControlsSessionManager on attempt {Attempt}/{MaxRetries}.", attempt, maxRetries);
+            }
+            finally
+            {
+                lock (_lock)
+                {
+                    _isInitializing = false;
+                }
+            }
+
+            if (attempt < maxRetries)
+            {
+                lock (_lock)
+                {
+                    if (_isDisposed) return false;
+                }
+                await Task.Delay(retryDelayMs * attempt);
             }
         }
+
+        Log.Warning("GSMTC session manager could not be initialized after {MaxRetries} attempts. Media integration degraded gracefully.", maxRetries);
+        return false;
     }
 
     private async void OnSessionManagerCurrentSessionChanged(

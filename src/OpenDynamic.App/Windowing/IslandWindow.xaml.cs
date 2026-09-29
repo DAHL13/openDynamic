@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Threading;
+using Microsoft.Win32;
 using OpenDynamic.App.Animation;
 using OpenDynamic.App.Native;
 using OpenDynamic.App.Orchestration;
@@ -101,6 +102,7 @@ public partial class IslandWindow : Window
         _foregroundWatcher.Start();
 
         _powerService?.RegisterWindowNotifications(_hwnd);
+        SystemEvents.PowerModeChanged += OnPowerModeChanged;
 
         if (_fullscreenWatcher != null)
         {
@@ -130,6 +132,7 @@ public partial class IslandWindow : Window
         if (_hwnd != IntPtr.Zero)
         {
             _windowPositioner.PositionWindow(_hwnd);
+            _windowPositioner.ReassertTopmost(_hwnd);
         }
     }
 
@@ -163,25 +166,91 @@ public partial class IslandWindow : Window
                 handled = true;
                 return new IntPtr(NativeMethods.MA_NOACTIVATE);
 
-            // React to display and resolution changes
+            // React to display, resolution, and monitor connection/disconnection changes
             case NativeMethods.WM_DISPLAYCHANGE:
-                Log.Information("WM_DISPLAYCHANGE received. Repositioning IslandWindow...");
+                int width = (int)(lParam.ToInt64() & 0xFFFF);
+                int height = (int)((lParam.ToInt64() >> 16) & 0xFFFF);
+                int depth = wParam.ToInt32();
+                Log.Information("WM_DISPLAYCHANGE received ({Width}x{Height} @ {Depth}bpp). Re-evaluating display monitors and repositioning IslandWindow...", width, height, depth);
                 _windowPositioner.PositionWindow(_hwnd);
+                _windowPositioner.ReassertTopmost(_hwnd);
                 break;
 
             // React to PerMonitor DPI changes
             case NativeMethods.WM_DPICHANGED:
                 Log.Information("WM_DPICHANGED received. Repositioning IslandWindow...");
                 _windowPositioner.PositionWindow(_hwnd);
+                _windowPositioner.ReassertTopmost(_hwnd);
                 break;
 
             // React to system power and battery broadcasts (0% CPU polling)
             case NativeMethods.WM_POWERBROADCAST:
-                _powerService?.HandlePowerBroadcast(wParam, lParam);
+                HandlePowerBroadcast(wParam, lParam);
                 break;
         }
 
         return IntPtr.Zero;
+    }
+
+    private void HandlePowerBroadcast(IntPtr wParam, IntPtr lParam)
+    {
+        int eventCode = wParam.ToInt32();
+        Log.Information("WM_POWERBROADCAST received (wParam: 0x{EventCode:X4})", eventCode);
+
+        switch (eventCode)
+        {
+            case NativeMethods.PBT_APMSUSPEND:
+                Log.Information("System suspending (PBT_APMSUSPEND). Halting timers and rendering loops.");
+                _hoverEnterTimer.Stop();
+                _hoverLeaveTimer.Stop();
+                _orchestrator.SuspendForPower();
+                break;
+
+            case NativeMethods.PBT_APMRESUMEAUTOMATIC:
+            case NativeMethods.PBT_APMRESUMESUSPEND:
+                Log.Information("System resuming from sleep (0x{EventCode:X4}). Repositioning and restoring state...", eventCode);
+                _orchestrator.ResumeFromPower();
+                if (_hwnd != IntPtr.Zero)
+                {
+                    _windowPositioner.PositionWindow(_hwnd);
+                    _windowPositioner.ReassertTopmost(_hwnd);
+                }
+                _powerService?.RefreshPowerStatus(isInitial: false);
+                break;
+
+            default:
+                _powerService?.HandlePowerBroadcast(wParam, lParam);
+                break;
+        }
+    }
+
+    private void OnPowerModeChanged(object sender, PowerModeChangedEventArgs e)
+    {
+        Log.Information("SystemEvents.PowerModeChanged received: {Mode}", e.Mode);
+        switch (e.Mode)
+        {
+            case PowerModes.Suspend:
+                Dispatcher.InvokeAsync(() =>
+                {
+                    _hoverEnterTimer.Stop();
+                    _hoverLeaveTimer.Stop();
+                    _orchestrator.SuspendForPower();
+                });
+                break;
+
+            case PowerModes.Resume:
+                Dispatcher.InvokeAsync(() =>
+                {
+                    _orchestrator.ResumeFromPower();
+                    if (_hwnd != IntPtr.Zero)
+                    {
+                        _windowPositioner.PositionWindow(_hwnd);
+                        _windowPositioner.ReassertTopmost(_hwnd);
+                    }
+                    _powerService?.RefreshPowerStatus(isInitial: false);
+                });
+                break;
+        }
     }
 
     private void OnForegroundWindowChanged(object? sender, IntPtr foregroundHwnd)
@@ -423,8 +492,13 @@ public partial class IslandWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        SystemEvents.PowerModeChanged -= OnPowerModeChanged;
+
         _hoverEnterTimer.Stop();
+        _hoverEnterTimer.Tick -= OnHoverEnterTimerTick;
+
         _hoverLeaveTimer.Stop();
+        _hoverLeaveTimer.Tick -= OnHoverLeaveTimerTick;
 
         _animator.FrameUpdated -= OnAnimatorFrameUpdated;
 

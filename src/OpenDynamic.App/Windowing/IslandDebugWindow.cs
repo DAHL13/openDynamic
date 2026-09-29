@@ -26,7 +26,10 @@ public sealed class IslandDebugWindow : Window
     private readonly TextBlock _widgetsBlock;
     private readonly TextBlock _dimensionsBlock;
     private readonly TextBlock _subscriptionBlock;
+    private readonly TextBlock _timersBlock;
+    private readonly TextBlock _memoryBlock;
     private readonly TextBlock _quarantineBlock;
+    private readonly System.Windows.Threading.DispatcherTimer _telemetryTimer;
 
     private readonly Slider _stiffnessSlider;
     private readonly Slider _dampingSlider;
@@ -95,6 +98,24 @@ public sealed class IslandDebugWindow : Window
             Margin = new Thickness(0, 0, 0, 4)
         };
         telemetryStack.Children.Add(_subscriptionBlock);
+
+        _timersBlock = new TextBlock
+        {
+            Text = "Timers Activos: Ninguno (0% CPU)",
+            FontSize = 12,
+            Foreground = Brushes.LightGray,
+            Margin = new Thickness(0, 0, 0, 4)
+        };
+        telemetryStack.Children.Add(_timersBlock);
+
+        _memoryBlock = new TextBlock
+        {
+            Text = "Memoria: Working Set: 0 MB | GC: 0 MB",
+            FontSize = 12,
+            Foreground = Brushes.Aqua,
+            Margin = new Thickness(0, 0, 0, 4)
+        };
+        telemetryStack.Children.Add(_memoryBlock);
 
         _dimensionsBlock = new TextBlock
         {
@@ -268,6 +289,13 @@ public sealed class IslandDebugWindow : Window
         _animator.Settled += OnAnimatorUpdated;
         _animator.Started += OnAnimatorUpdated;
 
+        _telemetryTimer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(1)
+        };
+        _telemetryTimer.Tick += (s, e) => UpdateTelemetry();
+        _telemetryTimer.Start();
+
         UpdateTelemetry();
     }
 
@@ -282,6 +310,15 @@ public sealed class IslandDebugWindow : Window
             _subscriptionBlock.Foreground = _animator.IsSubscribed
                 ? Brushes.Gold
                 : Brushes.LightGreen;
+
+            bool hasTransientTimer = _orchestrator.HasActiveTransientTimer;
+            _timersBlock.Text = $"Timers / Render: TransientTimer={(hasTransientTimer ? "ACTIVO" : "Inactivo")} | RenderLoop={(_animator.IsSubscribed ? "ACTIVO" : "Desuscrito")}";
+            _timersBlock.Foreground = (hasTransientTimer || _animator.IsSubscribed) ? Brushes.LightSkyBlue : Brushes.LightGray;
+
+            double workingSetMb = System.Diagnostics.Process.GetCurrentProcess().WorkingSet64 / (1024.0 * 1024.0);
+            double gcTotalMb = GC.GetTotalMemory(false) / (1024.0 * 1024.0);
+            _memoryBlock.Text = $"Memoria: Working Set: {workingSetMb:F1} MB (Meta: < 100 MB) | Heap GC: {gcTotalMb:F1} MB";
+            _memoryBlock.Foreground = workingSetMb < 100.0 ? Brushes.LightGreen : Brushes.Orange;
 
             var d = _animator.CurrentDimensions;
             _dimensionsBlock.Text = $"Dimensiones: W:{d.Width:F1} | H:{d.Height:F1} | R:{d.CornerRadius:F1} | Op:{d.Opacity:F2}";
@@ -326,6 +363,7 @@ public sealed class IslandDebugWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        _telemetryTimer.Stop();
         _animator.FrameUpdated -= OnAnimatorUpdated;
         _animator.Settled -= OnAnimatorUpdated;
         _animator.Started -= OnAnimatorUpdated;

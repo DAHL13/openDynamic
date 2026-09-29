@@ -213,7 +213,19 @@ public class WindowPositioner
             return monitors[TargetMonitorIndex].Handle;
         }
 
-        // Safe fallback to Primary monitor
+        // Safe fallback to Primary monitor if target monitor was disconnected or index out of bounds
+        if (TargetMonitorIndex >= monitors.Count)
+        {
+            Log.Warning("Target monitor index {Index} is out of range ({Count} connected). Falling back to Primary monitor.", TargetMonitorIndex, monitors.Count);
+            TargetMonitorIndex = 0;
+        }
+
+        var fallbackPrimary = monitors.FirstOrDefault(m => m.IsPrimary);
+        if (fallbackPrimary != null && fallbackPrimary.Handle != IntPtr.Zero)
+        {
+            return fallbackPrimary.Handle;
+        }
+
         return NativeMethods.MonitorFromWindow(
             NativeMethods.GetDesktopWindow(),
             NativeMethods.MONITOR_DEFAULTTOPRIMARY);
