@@ -81,3 +81,21 @@
   - **Cero dependencias de WinForms:** Todo el cálculo de monitores, resolución y DPI se efectúa mediante P/Invoke a Win32 (`MonitorFromWindow`, `MonitorFromPoint`, `GetMonitorInfo`, `GetDpiForMonitor`, `GetDpiForWindow`) en `NativeMethods`.
   - **Aislamiento del cálculo en Core:** El cálculo geométrico y la compensación de escala DPI se aíslan en la clase estática pura `IslandPositionCalculator` dentro de `OpenDynamic.Core.Positioning`, permitiendo pruebas unitarias sin dependencias de plataforma al 100%, 125%, 150% y 200% de escala.
 
+---
+
+## ADR-007: Motor de Física de Resortes con Sub-Stepping, Máquina de Estados Finita y Ciclo de Render Reactivo
+
+- **Estado:** Aceptado
+- **Fecha:** 2026-09-28
+- **Contexto:** La Fase 2 (M2) demanda animaciones elásticas orgánicas (rebote leve, conservación de inercia), reglas formales de transición entre estados visuales (`Hidden`, `Compact`, `Split`, `Expanded`) y el cumplimiento estricto de la Regla de Oro 1 (consumo de CPU ~0% en reposo absoluto).
+- **Decisiones:**
+  - **Física desacoplada en Core (Regla de oro 5):** Se implementa `Spring` en `OpenDynamic.Core.Animation` con integración semi-implícita de Euler (Euler simpléctico) y sub-pasos temporales (*sub-stepping* a $h = 1/240\text{ s}$) para evitar divergencia numérica ante variaciones o picos de $\Delta t$.
+  - **Conservación de inercia:** Al cambiar dinámicamente de destino (`Target`), se preserva la velocidad acumulada (`Velocity`), evitando saltos visuales o interrupciones abruptas de trayectoria.
+  - **Parámetros elásticos base:** Rigidez $k = 320$, amortiguamiento $c = 26$, masa $m = 1.0$, logrando una razón de amortiguamiento $\zeta \approx 0.73$ que genera un rebote natural y sutil. Al asentarse (`IsSettled`), se fija `Value = Target` y `Velocity = 0.0`.
+  - **Máquina de Estados Finita (FSM):** Se formaliza `IslandStateMachine` en `OpenDynamic.Core.State` con los estados `Hidden`, `Compact`, `Split` y `Expanded`. Se prohíbe taxativamente la transición directa `Hidden -> Expanded` (debe pasar por `Compact`).
+  - **Suscripción estricta a render (Regla de oro 1):** `IslandAnimator` en `OpenDynamic.App.Animation` coordina los resortes (`Width`, `Height`, `CornerRadius`, `Opacity`) y se suscribe a `CompositionTarget.Rendering` ÚNICAMENTE mientras haya resortes en movimiento (`!IsSettled`). Al alcanzar reposo, se desuscribe de inmediato. $\Delta t$ real entre fotogramas se acota a un máximo de 50 ms.
+  - **Alineación geométrica y recorte:** Se elimina el margen estático (`Margin="0"` en `CapsuleBorder`), delegando toda la distancia al cálculo de 8 DIPs de `IslandPositionCalculator`. Se aplica `ClipToBounds="True"` y `RectangleGeometry` en la cápsula para recortar el contenido durante los rebotes.
+  - **Interacciones reactivas:** Temporizadores de hover de un único disparo (150 ms para expandir, 400 ms de margen al salir) que se detienen tras dispararse, clic para conmutar `Compact`/`Expanded` y rueda del ratón (`MouseWheel`) para contraer/ocultar.
+  - **Aislamiento de depuración (#if DEBUG):** La ventana `IslandDebugWindow` y sus puntos de entrada se condicionan estrictamente a `#if DEBUG`, garantizando cero código ni dependencias visuales de depuración en compilaciones Release.
+
+

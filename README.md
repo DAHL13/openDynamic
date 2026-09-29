@@ -13,7 +13,7 @@ Repositorio oficial: [https://github.com/DAHL13/openDynamic](https://github.com/
 |---|---|:---:|
 | **Fase 0** | **Andamiaje del proyecto, CI, DI, Logging y Pruebas iniciales** | **Completada** |
 | **Fase 1** | **Ventana de la isla, posicionamiento y renderizado básico (M1)** | **Completada** |
-| Fase 2 | Motor de física de animación de resorte (*Spring physics*) | Pendiente |
+| **Fase 2** | **Motor de física de animación de resorte (*Spring physics*) y máquina de estados (M2)** | **Completada** |
 | Fase 3 | Máquina de estados de la isla y resolución de prioridades | Pendiente |
 | Fase 4 | Integración de widgets del sistema (Audio, Medios GSMTC, Hardware, Batería, Temporizador) | Pendiente |
 | Fase 5 | Interacciones avanzadas y expansión de cápsula (Hover, Gestos, Menú contextual) | Pendiente |
@@ -60,6 +60,13 @@ openDynamic/
 ├─ src/
 │  ├─ OpenDynamic.Core/             # net10.0 — Lógica pura sin dependencias de Windows ni WPF
 │  │   ├─ CoreInfo.cs
+│  │   ├─ Animation/               # Física de resortes con sub-stepping y conservación de inercia
+│  │   │   └─ Spring.cs
+│  │   ├─ State/                   # Máquina de estados finita y layout de dimensiones de cápsula
+│  │   │   ├─ IslandState.cs
+│  │   │   ├─ IslandStateMachine.cs
+│  │   │   ├─ IslandStateChangedEventArgs.cs
+│  │   │   └─ IslandLayout.cs
 │  │   └─ Positioning/             # Cálculo puro de posicionamiento geométrico y DPI
 │  │       ├─ IslandPositionCalculator.cs
 │  │       ├─ MonitorArea.cs
@@ -71,16 +78,24 @@ openDynamic/
 │      ├─ App.xaml / App.xaml.cs    # Ciclo de vida, DI, manejadores de excepción globales
 │      ├─ Native/                   # P/Invoke a Win32 (estilos, DPI, monitores, hooks)
 │      │   └─ NativeMethods.cs
-│      ├─ Windowing/                # IslandWindow overlay, ForegroundWatcher, WindowPositioner
+│      ├─ Animation/                # Coordinador de animación y suscripción a CompositionTarget.Rendering
+│      │   └─ IslandAnimator.cs
+│      ├─ Windowing/                # IslandWindow overlay, ForegroundWatcher, WindowPositioner, Debug
 │      │   ├─ IslandWindow.xaml
 │      │   ├─ IslandWindow.xaml.cs
+│      │   ├─ IslandDebugWindow.cs  # Panel de depuración condicionado estrictamente a #if DEBUG
 │      │   ├─ ForegroundWatcher.cs
 │      │   ├─ WindowPositioner.cs
 │      │   └─ TargetMonitorMode.cs
 │      └─ Infrastructure/           # DI, SingleInstance, Logging
 └─ tests/
-   └─ OpenDynamic.Tests/            # xUnit probando infraestructura, aislamiento y posicionamiento
+   └─ OpenDynamic.Tests/            # xUnit probando Core (resortes, FSM, aislamiento y posicionamiento)
        ├─ InfrastructureTests.cs
+       ├─ Animation/
+       │   └─ SpringTests.cs
+       ├─ State/
+       │   ├─ IslandStateMachineTests.cs
+       │   └─ IslandLayoutTests.cs
        └─ Positioning/
            └─ IslandPositionCalculatorTests.cs
 ```
