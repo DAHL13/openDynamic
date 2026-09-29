@@ -3,7 +3,49 @@
 Todas las modificaciones notables en este proyecto serán documentadas en este archivo.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y cumple con [SemVer](https://semver.org/).
 
+## [0.7.0] - 2026-09-28 (Fase 6: Hardware, Temporizador y Modo Split Multitasking - Hito M4)
+
+### Añadido
+- Modelos de dominio y controlador de temporizador por marca de tiempo en `OpenDynamic.Core.Timer` (Regla de oro 5):
+  - `TimerMode`: Modos operativo estándar, Pomodoro trabajo (`PomodoroWork`, 25 min) y descanso (`PomodoroBreak`, 5 min).
+  - `TimerState`: Ciclo de vida determinista (`Stopped`, `Running`, `Paused`, `Completed`).
+  - `TimerSnapshot`: Snapshot inmutable con `RemainingTime`, `TotalDuration`, `TargetEndTimeUtc`, `FormattedTime` (`mm:ss` / `hh:mm:ss`), `ProgressRatio` y `RemainingRatio`.
+  - `ITimerController` y `TimerController`: Controlador sin deriva temporal sustentado en marca de tiempo objetivo (`TargetEndTimeUtc`), con soporte de reloj inyectable `System.TimeProvider` para pruebas unitarias deterministas sin esperas reales (`Thread.Sleep`).
+- Modelos y cálculo puro de rendimiento de hardware en `OpenDynamic.Core.Hardware` (Regla de oro 5):
+  - `HardwareSnapshot`: Snapshot inmutable de utilización de CPU, RAM (porcentaje y GB usados/totales) y GPU opcional.
+  - `IHardwareMonitor`: Contrato para muestreo de recursos de hardware.
+  - `HardwareCalculator`: Lógica pura de cálculo de deltas de Win32 `GetSystemTimes` ($\text{CPU\%} = (1.0 - \frac{\text{Idle}}{\text{Total}}) \times 100$), porcentaje de memoria y conversión a GB.
+- P/Invoke nativo a Win32 en `NativeMethods` (Regla de oro 4):
+  - `GetSystemTimes`: Lectura directa de tiempos de CPU (Idle, Kernel, User) de `kernel32.dll` sin librerías pesadas externas.
+  - `GlobalMemoryStatusEx`: Lectura de estado de memoria física mediante estructura `MEMORYSTATUSEX`.
+- Configuración extendida en `AppSettings`:
+  - `DefaultHardwarePriority = 10`, `HardwareSamplingIntervalSeconds = 2.0`, `EnableHardwareMonitoring = true`.
+  - `EnableGpuMonitoring = false` (estrictamente desactivado por defecto).
+  - `DefaultTimerPriority = 50`, `DefaultTimerAlertPriority = 100`, `TimerAlertTransientDurationSeconds = 5.0`.
+  - `PomodoroWorkDurationMinutes = 25`, `PomodoroBreakDurationMinutes = 5`.
+- Servicio nativo de hardware `HardwareService` en `OpenDynamic.App.Services`:
+  - Muestreo periódico aislado con `try/catch` y log en Serilog.
+  - Método `ResetCpuBaseline()` para eliminar picos de delta tras períodos inactivos.
+- Widget de monitorización de hardware `HardwareWidget` en `OpenDynamic.App.Widgets.Hardware`:
+  - Condición estricta de visibilidad (Regla de oro 1: 0% CPU en reposo): el timer de 2.0s se activa ÚNICAMENTE si el widget está activamente visible en pantalla (`DisplayMode == Compact || Expanded || Split` e `IsVisibleOnIsland == true`). Al colapsar a `Hidden` o no estar visible, se detiene por completo.
+  - Vistas `Compact` (CPU/RAM con colores dinámicos), `Expanded` (tarjetas métricas con barras de progreso) y `Split` (satélite circular 36x36).
+- Widget de temporizador `TimerWidget` en `OpenDynamic.App.Widgets.Timer`:
+  - Funciona con marca de tiempo continua aun si la isla está oculta (`Hidden`).
+  - Prioridad 50 en ejecución continua; al finalizar, emite una actividad transitoria con Prioridad 100 durante 5.0 segundos con aviso visual crítico y sonido del sistema (`SystemSounds.Asterisk`).
+  - Controles interactivos: Play/Pausa, Reinicio, +1m, +5m, alternancia rápida entre Temporizador, Pomodoro (25m) y Descanso (5m).
+  - Vistas `Compact` (reloj y badge de Pomodoro), `Expanded` (display gigante, selectores segmentados, controles de transporte) y `Split` (satélite circular 36x36 con tiempo compacto).
+- Modo Split Multitasking con Intercambio Interactivo en `IslandOrchestrator` e `IslandWindow` (Hito M4):
+  - Convivencia de actividades continuas (ej. Temporizador P=50 en cápsula principal y Música P=30 en satélite circular).
+  - Clic en burbuja satélite: Invoca `SwapSplitActivities()`, intercambiando de inmediato la actividad primaria y secundaria con cross-fade suave (80ms).
+  - Clic en cápsula principal en Split: Expande la actividad primaria actualmente seleccionada (`RequestExpand()`).
+  - Pre-emption de alertas transitorias (ej. Temporizador finalizado P=100, Batería P=90, Volumen P=80) que toman la cápsula y al expirar restauran el modo Split original.
+- Batería de 27 nuevas pruebas unitarias en `OpenDynamic.Tests` (total 160 en verde):
+  - `TimerControllerTests`: Expiración exacta, pausa/reanudación sin deriva, Pomodoro Trabajo/Descanso, adición de tiempo y formateo `mm:ss` / `hh:mm:ss`.
+  - `HardwareCalculatorTests`: Deltas de CPU normales, carga completa, desbordamiento de inactividad, porcentaje de RAM y conversión a GB.
+  - `PriorityResolverPhase6Tests`: Convivencia Timer + Media en Split, Media + Hardware en Split, Hardware solo en Compact, pre-emption de Timer Alert (100) sobre Batería (90) y Volumen (80), y restauración automática tras expirar alerta transitoria.
+
 ## [0.6.0] - 2026-09-28 (Fase 5: Volumen, Batería y Pantalla Completa)
+
 
 ### Añadido
 - Modelos de dominio y contratos puros de audio en `OpenDynamic.Core.Audio` (Regla de oro 5):

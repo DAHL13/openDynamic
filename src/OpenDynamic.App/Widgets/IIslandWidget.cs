@@ -37,6 +37,12 @@ public interface IIslandWidget : IActivitySource, IDisposable
     void Initialize();
 
     /// <summary>
+    /// Notifies the widget of its current visibility on screen and active display mode.
+    /// Used by widgets to pause sampling timers when hidden (Golden Rule 1).
+    /// </summary>
+    void SetDisplayState(WidgetDisplayMode mode, bool isVisible);
+
+    /// <summary>
     /// Notifies the widget that its expanded view is now actively displayed.
     /// </summary>
     void OnExpand();
@@ -46,3 +52,4 @@ public interface IIslandWidget : IActivitySource, IDisposable
     /// </summary>
     void OnCollapse();
 }
+

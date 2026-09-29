@@ -314,14 +314,15 @@ public partial class IslandWindow : Window
             e.Handled = true;
         };
 
-        // Satellite bubble click in Split mode
+        // Satellite bubble click in Split mode: interactive multitasking swap (Hito M4)
         IslandHostView.SatelliteBubble.MouseLeftButtonUp += (s, e) =>
         {
-            Log.Information("Satellite bubble clicked in Split mode. Expanding secondary view.");
-            _orchestrator.RequestToggleExpand();
+            Log.Information("Satellite bubble clicked in Split mode. Swapping primary and secondary activities.");
+            _orchestrator.SwapSplitActivities();
             e.Handled = true;
         };
     }
+
 
     private void OnHoverEnterTimerTick(object? sender, EventArgs e)
     {
