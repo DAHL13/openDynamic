@@ -30,6 +30,8 @@ public partial class SettingsWindow : Window
     /// </summary>
     public void ShowSettings()
     {
+        ViewModel.RefreshMonitors();
+
         if (WindowState == WindowState.Minimized)
         {
             WindowState = WindowState.Normal;
