@@ -128,4 +128,26 @@ public class IslandPositionCalculatorTests
         Assert.Throws<ArgumentOutOfRangeException>(() =>
             IslandPositionCalculator.CalculatePlacement(monitor, new DisplayDpi(96, -10)));
     }
+
+    [Fact]
+    public void DisplayDpi_FromScale_ComputesAccurateDpiAndScaleProperties()
+    {
+        var dpi = DisplayDpi.FromScale(1.25);
+        Assert.Equal(120.0, dpi.DpiX);
+        Assert.Equal(120.0, dpi.DpiY);
+        Assert.Equal(1.25, dpi.ScaleX);
+        Assert.Equal(1.25, dpi.ScaleY);
+    }
+
+    [Fact]
+    public void MonitorArea_FromEdges_InitializesCorrectWidthAndHeight()
+    {
+        var area = MonitorArea.FromEdges(100, 50, 1920, 1080);
+        Assert.Equal(100, area.Left);
+        Assert.Equal(50, area.Top);
+        Assert.Equal(1820, area.Width);
+        Assert.Equal(1030, area.Height);
+        Assert.Equal(1920, area.Right);
+        Assert.Equal(1080, area.Bottom);
+    }
 }
