@@ -4,23 +4,29 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              mc:Ignorable="d" 
-             Width="320"
+             Width="330"
+             Height="165"
              Background="Transparent">
-    <Grid Margin="18,12,18,16">
+    <!-- Balanced vertical margins with 14 DIP bottom clearance from the R:24 capsule curvature (similar to MediaExpandedView) -->
+    <Grid Margin="18,10,18,14">
         <Grid.RowDefinitions>
+            <!-- Mode Selector Segmented Bar -->
             <RowDefinition Height="Auto" />
+            <!-- Big Countdown Clock -->
             <RowDefinition Height="Auto" />
+            <!-- Progress Bar -->
             <RowDefinition Height="Auto" />
+            <!-- Controls Row -->
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <!-- Mode Selector Segmented Bar -->
-        <Border Grid.Row="0" Background="#1C1C1E" CornerRadius="8" Padding="2" HorizontalAlignment="Center" Margin="0,0,0,12">
+        <Border Grid.Row="0" Background="#1C1C1E" CornerRadius="8" Padding="2" HorizontalAlignment="Center" Margin="0,0,0,6">
             <StackPanel Orientation="Horizontal">
                 <Button Content="Normal"
                         Command="{Binding SwitchToStandardCommand}"
-                        Padding="10,4"
-                        FontSize="10"
+                        Padding="8,3"
+                        FontSize="9.5"
                         FontWeight="SemiBold"
                         Foreground="#FFFFFF"
                         Background="#2C2C2E"
@@ -28,8 +34,8 @@
                         Cursor="Hand" />
                 <Button Content="Pomodoro (25m)"
                         Command="{Binding SwitchToPomodoroWorkCommand}"
-                        Padding="10,4"
-                        FontSize="10"
+                        Padding="8,3"
+                        FontSize="9.5"
                         FontWeight="SemiBold"
                         Foreground="#FFFFFF"
                         Background="Transparent"
@@ -37,8 +43,8 @@
                         Cursor="Hand" />
                 <Button Content="Descanso (5m)"
                         Command="{Binding SwitchToPomodoroBreakCommand}"
-                        Padding="10,4"
-                        FontSize="10"
+                        Padding="8,3"
+                        FontSize="9.5"
                         FontWeight="SemiBold"
                         Foreground="#FFFFFF"
                         Background="Transparent"
@@ -48,21 +54,21 @@
         </Border>
 
         <!-- Big Countdown Clock -->
-        <StackPanel Grid.Row="1" HorizontalAlignment="Center" Margin="0,0,0,8">
+        <StackPanel Grid.Row="1" HorizontalAlignment="Center" Margin="0,0,0,4">
             <TextBlock Text="{Binding FormattedTime}"
-                       FontSize="32"
+                       FontSize="34"
                        FontWeight="Bold"
                        Foreground="#FFFFFF"
                        HorizontalAlignment="Center" />
             <TextBlock Text="{Binding ModeDescription}"
-                       FontSize="11"
+                       FontSize="10.5"
                        Foreground="#8E8E93"
                        HorizontalAlignment="Center"
-                       Margin="0,2,0,0" />
+                       Margin="0,1,0,0" />
         </StackPanel>
 
         <!-- Progress Bar -->
-        <Border Grid.Row="2" Height="4" Background="#2C2C2E" CornerRadius="2" Margin="10,0,10,14">
+        <Border Grid.Row="2" Height="4" Background="#2C2C2E" CornerRadius="2" Margin="10,0,10,8">
             <ProgressBar Value="{Binding ProgressPercent}"
                          Minimum="0"
                          Maximum="100"
@@ -73,7 +79,7 @@
         </Border>
 
         <!-- Controls Row -->
-        <Grid Grid.Row="3" Margin="10,0,10,0">
+        <Grid Grid.Row="3" Margin="10,0,10,0" VerticalAlignment="Center">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
@@ -84,8 +90,8 @@
             <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                 <Button Content="+1m"
                         Command="{Binding AddOneMinuteCommand}"
-                        Padding="8,4"
-                        FontSize="10"
+                        Padding="7,3"
+                        FontSize="9.5"
                         FontWeight="SemiBold"
                         Foreground="#FFFFFF"
                         Background="#2C2C2E"
@@ -94,8 +100,8 @@
                         Margin="0,0,4,0" />
                 <Button Content="+5m"
                         Command="{Binding AddFiveMinutesCommand}"
-                        Padding="8,4"
-                        FontSize="10"
+                        Padding="7,3"
+                        FontSize="9.5"
                         FontWeight="SemiBold"
                         Foreground="#FFFFFF"
                         Background="#2C2C2E"
@@ -103,7 +109,7 @@
                         Cursor="Hand" />
             </StackPanel>
 
-            <!-- Play / Pause Action Button -->
+            <!-- Play / Pause Action Button (100% visible, fully circular with safe clearance) -->
             <Button Grid.Column="1"
                     Command="{Binding TogglePlayPauseCommand}"
                     Width="36"
