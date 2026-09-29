@@ -17,6 +17,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<SingleInstanceManager>();
         services.AddSingleton<WindowPositioner>();
         services.AddSingleton<ForegroundWatcher>();
+        services.AddSingleton<FullscreenWatcher>();
         services.AddSingleton<IslandStateMachine>();
         services.AddSingleton<IslandLayout>();
         services.AddSingleton<IslandAnimator>();

@@ -170,6 +170,40 @@ public sealed class IslandOrchestrator : IDisposable
         DispatchToUIThread(UpdateOrchestration);
     }
 
+    public bool IsFullscreenSuppressed => _isFullscreenSuppressed;
+    private bool _isFullscreenSuppressed;
+
+    /// <summary>
+    /// Immediately hides the island, suspends all transient timers and halts animations
+    /// when an application enters fullscreen mode.
+    /// </summary>
+    public void SuspendForFullscreen()
+    {
+        _isFullscreenSuppressed = true;
+        _userExpanded = false;
+
+        // Cancel transient expiration timer
+        _transientTimer?.Stop();
+        _transientTimer = null;
+
+        // Halt any animation and snap immediately to Hidden (Golden Rule 1: 0% CPU)
+        _animator.SnapTo(IslandState.Hidden);
+
+        Log.Information("IslandOrchestrator: Suspended for fullscreen. Animations halted and island hidden.");
+    }
+
+    /// <summary>
+    /// Resumes normal orchestration and restores previous active presentation upon exiting fullscreen mode.
+    /// </summary>
+    public void ResumeFromFullscreen()
+    {
+        if (!_isFullscreenSuppressed) return;
+
+        _isFullscreenSuppressed = false;
+        Log.Information("IslandOrchestrator: Resumed from fullscreen mode. Re-evaluating active widgets.");
+        DispatchToUIThread(UpdateOrchestration);
+    }
+
     /// <summary>
     /// Evaluates active widget priorities, commands appropriate state transitions,
     /// schedules expiration for transient activities, and delivers views to <see cref="IslandView"/>.
@@ -177,7 +211,7 @@ public sealed class IslandOrchestrator : IDisposable
     /// </summary>
     public void UpdateOrchestration()
     {
-        if (_disposed) return;
+        if (_disposed || _isFullscreenSuppressed) return;
 
         // Cancel previous expiration timer
         _transientTimer?.Stop();
