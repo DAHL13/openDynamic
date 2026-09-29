@@ -94,7 +94,9 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<WindowPositioner>(),
             sp.GetRequiredService<IHotkeyService>(),
             sp.GetRequiredService<IAutostartService>(),
-            () => sp.GetRequiredService<IslandWindow>()));
+            () => sp.GetRequiredService<IslandWindow>(),
+            sp.GetRequiredService<NetworkService>(),
+            sp.GetRequiredService<DeviceService>()));
         services.AddSingleton<SettingsWindow>();
 
         // System Tray Icon Manager
