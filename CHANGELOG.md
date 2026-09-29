@@ -9,14 +9,16 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 - Motor de física de oscilador armónico amortiguado `Spring` en `OpenDynamic.Core.Animation` con integración semi-implícita de Euler y sub-pasos temporales (*sub-stepping* a $h = 1/240\text{ s}$), garantizando estabilidad numérica incondicional ante picos de $\Delta t$ o tirones de fotogramas sin divergencia.
 - Conservación de inercia y velocidad continua (`Velocity`) al reorientar el destino dinámicamente (`Target`), posibilitando transiciones fluidas en vuelo sin tirones visuales.
 - Máquina de estados finita `IslandStateMachine` en `OpenDynamic.Core.State` con estados formales `Hidden`, `Compact`, `Split` y `Expanded`, y reglas estrictas de transición (prohibición taxativa de `Hidden -> Expanded` directo, requiriendo paso por `Compact`).
-- Definición y resolución de geometrías de cápsula con `IslandLayout` (Compact 160x36 R:18, Expanded 400x160 R:24, Split 260x36 R:18, Hidden 0x0 Op:0).
+- Definición y resolución de geometrías de cápsula con `IslandLayout` (Compact 160x36 R:18, Expanded 400x160 R:24, Split 260x36 R:18, Hidden 80x4 R:2 Op:0.01).
+- Eliminación de `Visibility.Collapsed` en la cápsula para mantener activa la capacidad de hit-testing en WPF, permitiendo que la micro-muesca de reposo en `Hidden` (80x4 DIPs a 1% de opacidad) detecte `MouseWheel` (scroll down), `MouseEnter` o clic izquierdo para restaurar la cápsula a `Compact` de forma inmediata.
 - Coordinador de animación `IslandAnimator` en `OpenDynamic.App.Animation` con gestión estricta del ciclo de vida de `CompositionTarget.Rendering`: suscripción exclusiva durante el vuelo de resortes y desuscripción inmediata al reposo (`IsSettled`), garantizando 0% de uso de CPU en reposo (Regla de oro 1). Acotación de $\Delta t$ a 50 ms.
 - Eliminación del margen superior estático en `IslandWindow.xaml` (`Margin="0"` en `CapsuleBorder`), delegando toda la distancia al cálculo exacto de 8 DIPs de `IslandPositionCalculator`.
 - Recorte de contenido interno mediante `ClipToBounds="True"` y `RectangleGeometry` adaptativa en `CapsuleBorder` para prevenir artefactos o fugas gráficas durante los rebotes elásticos.
 - Interacciones directas de ratón sobre la cápsula:
   - Detección de hover sin sobrecoste de CPU: temporizador reactivo de 150 ms para expandir y 400 ms de margen al retirar el puntero antes de contraer a `Compact`.
-  - Clic primario para alternar de forma bidireccional entre `Compact` y `Expanded`.
-  - Rueda de ratón (`MouseWheel`) hacia arriba para contraer/ocultar (`Expanded -> Compact -> Hidden`) y hacia abajo para revelar/expandir.
+  - Detección de `MouseEnter` en la micro-muesca de `Hidden` para despertar automáticamente la isla a `Compact`.
+  - Clic primario para alternar de forma bidireccional entre `Compact` y `Expanded` (o restaurar desde `Hidden`).
+  - Rueda de ratón (`MouseWheel`) hacia arriba para contraer/ocultar (`Expanded -> Compact -> Hidden`) y hacia abajo para revelar/expandir (`Hidden -> Compact -> Expanded`).
 - Panel visual interactivo `IslandDebugWindow` condicionado estrictamente a compilación `#if DEBUG` con telemetría en vivo del render loop, conmutadores manuales de estado y controles deslizantes de rigidez, amortiguamiento y perfiles.
 - Batería de 33 nuevas pruebas unitarias en `OpenDynamic.Tests` (convergencia, inercia, estabilidad ante $\Delta t$ extremos, sub-stepping, transiciones FSM válidas e inválidas, y layout), elevando la cobertura a 47 pruebas automáticas.
 

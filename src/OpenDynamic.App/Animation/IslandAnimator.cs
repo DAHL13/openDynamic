@@ -67,7 +67,7 @@ public sealed class IslandAnimator : IDisposable
         WidthSpring = new Spring(initialDimensions.Width);
         HeightSpring = new Spring(initialDimensions.Height);
         CornerRadiusSpring = new Spring(initialDimensions.CornerRadius);
-        OpacitySpring = new Spring(initialDimensions.Opacity);
+        OpacitySpring = new Spring(initialDimensions.Opacity) { SettledThreshold = 0.005 };
     }
 
     /// <summary>

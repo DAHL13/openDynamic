@@ -183,6 +183,11 @@ public partial class IslandWindow : Window
                 _hoverEnterTimer.Stop();
                 _hoverEnterTimer.Start();
             }
+            else if (_animator.StateMachine.CurrentState == IslandState.Hidden)
+            {
+                Log.Information("MouseEnter detected on Hidden sensor notch. Restoring Compact.");
+                _animator.AnimateTo(IslandState.Compact);
+            }
         };
 
         CapsuleBorder.MouseLeave += (s, e) =>
@@ -294,10 +299,7 @@ public partial class IslandWindow : Window
 
     private void OnAnimatorSettled(object? sender, EventArgs e)
     {
-        if (_animator.StateMachine.CurrentState == IslandState.Hidden)
-        {
-            CapsuleBorder.Visibility = Visibility.Collapsed;
-        }
+        // Capsule remains Visibility.Visible at all times to maintain hit-testing on the Hidden sensor notch
     }
 
     private void ApplyDimensions(CapsuleDimensions dimensions)
@@ -312,17 +314,12 @@ public partial class IslandWindow : Window
         CapsuleBorder.CornerRadius = new CornerRadius(cornerRadius);
         CapsuleBorder.Opacity = opacity;
 
-        if (width > 0.0 && height > 0.0 && opacity > 0.0)
+        if (width > 0.0 && height > 0.0)
         {
             CapsuleBorder.Clip = new RectangleGeometry(
                 new Rect(0, 0, width, height),
                 cornerRadius,
                 cornerRadius);
-
-            if (CapsuleBorder.Visibility != Visibility.Visible)
-            {
-                CapsuleBorder.Visibility = Visibility.Visible;
-            }
         }
         else
         {
