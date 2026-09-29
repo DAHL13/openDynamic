@@ -215,9 +215,9 @@ public sealed class IslandDebugWindow : Window
         });
 
         var statesGrid = new UniformGrid { Columns = 2, Margin = new Thickness(0, 0, 0, 16) };
-        statesGrid.Children.Add(CreateButton("Compact (160x36)", () => _orchestrator.TransitionTo(IslandState.Compact)));
+        statesGrid.Children.Add(CreateButton("Compact (200x36)", () => _orchestrator.TransitionTo(IslandState.Compact)));
         statesGrid.Children.Add(CreateButton("Expanded (400x160)", () => _orchestrator.RequestExpand()));
-        statesGrid.Children.Add(CreateButton("Split (260x36)", () => _orchestrator.TransitionTo(IslandState.Split)));
+        statesGrid.Children.Add(CreateButton("Split (280x36)", () => _orchestrator.TransitionTo(IslandState.Split)));
         statesGrid.Children.Add(CreateButton("Hidden (80x4)", () => _orchestrator.RequestHide()));
         mainPanel.Children.Add(statesGrid);
 

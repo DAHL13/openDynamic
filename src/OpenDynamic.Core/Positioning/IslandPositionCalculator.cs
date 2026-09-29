@@ -8,8 +8,9 @@ public static class IslandPositionCalculator
 {
     /// <summary>
     /// Default top margin from the top edge of the monitor in Device Independent Pixels (DIP).
+    /// Default is 0.0 DIP to anchor the notch flush against the top display bezel.
     /// </summary>
-    public const double DefaultTopMarginDip = 8.0;
+    public const double DefaultTopMarginDip = 0.0;
 
     /// <summary>
     /// Calculates the physical placement (X, Y, Width, Height) of the overlay window,

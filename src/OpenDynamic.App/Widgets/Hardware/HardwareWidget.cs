@@ -49,9 +49,28 @@ public sealed class HardwareWidget : IslandWidgetBase
             if (SetProperty(ref _ramUsagePercent, value))
             {
                 OnPropertyChanged(nameof(RamSummaryText));
+                OnPropertyChanged(nameof(MemorySummaryText));
+                OnPropertyChanged(nameof(RamPercentage));
+                OnPropertyChanged(nameof(MemoryUsage));
+                OnPropertyChanged(nameof(MemoryPercentage));
             }
         }
     }
+
+    /// <summary>
+    /// Semantic alias for <see cref="RamUsagePercent"/> (0.0 to 100.0).
+    /// </summary>
+    public double RamPercentage => RamUsagePercent;
+
+    /// <summary>
+    /// Semantic alias for <see cref="RamUsagePercent"/> (0.0 to 100.0).
+    /// </summary>
+    public double MemoryUsage => RamUsagePercent;
+
+    /// <summary>
+    /// Semantic alias for <see cref="RamUsagePercent"/> (0.0 to 100.0).
+    /// </summary>
+    public double MemoryPercentage => RamUsagePercent;
 
     public double UsedRamGb
     {
@@ -61,6 +80,8 @@ public sealed class HardwareWidget : IslandWidgetBase
             if (SetProperty(ref _usedRamGb, value))
             {
                 OnPropertyChanged(nameof(RamDetailText));
+                OnPropertyChanged(nameof(RamUsageText));
+                OnPropertyChanged(nameof(MemoryUsageText));
             }
         }
     }
@@ -73,6 +94,8 @@ public sealed class HardwareWidget : IslandWidgetBase
             if (SetProperty(ref _totalRamGb, value))
             {
                 OnPropertyChanged(nameof(RamDetailText));
+                OnPropertyChanged(nameof(RamUsageText));
+                OnPropertyChanged(nameof(MemoryUsageText));
             }
         }
     }
@@ -91,7 +114,10 @@ public sealed class HardwareWidget : IslandWidgetBase
 
     public string CpuSummaryText => $"{CpuUsagePercent:0}%";
     public string RamSummaryText => $"{RamUsagePercent:0}%";
-    public string RamDetailText => $"{UsedRamGb:0.1} / {TotalRamGb:0.1} GB";
+    public string MemorySummaryText => RamSummaryText;
+    public string MemoryUsageText => $"{UsedRamGb:0.0} / {TotalRamGb:0.0} GB";
+    public string RamUsageText => MemoryUsageText;
+    public string RamDetailText => MemoryUsageText;
     public string GpuSummaryText => GpuUsagePercent.HasValue ? $"{GpuUsagePercent.Value:0}%" : "N/A";
 
     public HardwareWidget(HardwareService hardwareService, AppSettings settings)
@@ -133,6 +159,7 @@ public sealed class HardwareWidget : IslandWidgetBase
             Duration: null);
         IsActive = true;
 
+        SampleNow();
         UpdateSamplingTimerState();
         Log.Information("HardwareWidget: Telemetry monitoring enabled (Priority: {Priority}).", Priority);
     }
@@ -247,6 +274,7 @@ public sealed class HardwareWidget : IslandWidgetBase
 
     public override UserControl CreateExpandedView()
     {
+        SampleNow();
         return new HardwareExpandedView { DataContext = this };
     }
 

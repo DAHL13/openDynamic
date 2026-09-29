@@ -19,9 +19,9 @@ public sealed class IslandLayout
     /// preserving hit-testing for mouse wheel and hover wake-up while remaining visually invisible.
     /// </summary>
     public CapsuleDimensions Hidden { get; set; } = new(Width: 80.0, Height: 4.0, CornerRadius: 2.0, Opacity: 0.01);
-    public CapsuleDimensions Compact { get; set; } = new(Width: 160.0, Height: 36.0, CornerRadius: 18.0, Opacity: 1.0);
-    public CapsuleDimensions Split { get; set; } = new(Width: 260.0, Height: 36.0, CornerRadius: 18.0, Opacity: 1.0);
-    public CapsuleDimensions Expanded { get; set; } = new(Width: 400.0, Height: 175.0, CornerRadius: 24.0, Opacity: 1.0);
+    public CapsuleDimensions Compact { get; set; } = new(Width: 200.0, Height: 36.0, CornerRadius: 14.0, Opacity: 1.0);
+    public CapsuleDimensions Split { get; set; } = new(Width: 280.0, Height: 36.0, CornerRadius: 14.0, Opacity: 1.0);
+    public CapsuleDimensions Expanded { get; set; } = new(Width: 400.0, Height: 160.0, CornerRadius: 16.0, Opacity: 1.0);
 
     public CapsuleDimensions GetDimensions(IslandState state) => state switch
     {

@@ -10,21 +10,21 @@ public class IslandLayoutTests
         var layout = new IslandLayout();
 
         var compact = layout.GetDimensions(IslandState.Compact);
-        Assert.Equal(160.0, compact.Width);
+        Assert.Equal(200.0, compact.Width);
         Assert.Equal(36.0, compact.Height);
-        Assert.Equal(18.0, compact.CornerRadius);
+        Assert.Equal(14.0, compact.CornerRadius);
         Assert.Equal(1.0, compact.Opacity);
 
         var expanded = layout.GetDimensions(IslandState.Expanded);
         Assert.Equal(400.0, expanded.Width);
-        Assert.Equal(175.0, expanded.Height);
-        Assert.Equal(24.0, expanded.CornerRadius);
+        Assert.Equal(160.0, expanded.Height);
+        Assert.Equal(16.0, expanded.CornerRadius);
         Assert.Equal(1.0, expanded.Opacity);
 
         var split = layout.GetDimensions(IslandState.Split);
-        Assert.Equal(260.0, split.Width);
+        Assert.Equal(280.0, split.Width);
         Assert.Equal(36.0, split.Height);
-        Assert.Equal(18.0, split.CornerRadius);
+        Assert.Equal(14.0, split.CornerRadius);
         Assert.Equal(1.0, split.Opacity);
 
         var hidden = layout.GetDimensions(IslandState.Hidden);

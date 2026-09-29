@@ -42,8 +42,9 @@ public sealed class SettingsServiceTests : IDisposable
         Assert.True(File.Exists(filePath));
         Assert.NotNull(service.CurrentSettings);
         Assert.Equal(AppSettings.CurrentSchemaVersion, service.CurrentSettings.SchemaVersion);
-        Assert.Equal(160.0, service.CurrentSettings.CapsuleWidth);
+        Assert.Equal(200.0, service.CurrentSettings.CapsuleWidth);
         Assert.Equal(36.0, service.CurrentSettings.CapsuleHeight);
+        Assert.Equal(0.0, service.CurrentSettings.OffsetY);
         Assert.Equal("Win+Ctrl+I", service.CurrentSettings.ToggleIslandHotkey);
     }
 
@@ -53,7 +54,7 @@ public sealed class SettingsServiceTests : IDisposable
         string filePath = Path.Combine(_testDirectory, "settings.json");
         var custom = new AppSettings
         {
-            SchemaVersion = 1,
+            SchemaVersion = 2,
             CapsuleWidth = 190.0,
             CapsuleHeight = 42.0,
             OffsetX = 15.0,
@@ -120,7 +121,8 @@ public sealed class SettingsServiceTests : IDisposable
         Assert.True(File.Exists(filePath));
         Assert.NotNull(service.CurrentSettings);
         Assert.Equal(AppSettings.CurrentSchemaVersion, service.CurrentSettings.SchemaVersion);
-        Assert.Equal(160.0, service.CurrentSettings.CapsuleWidth);
+        Assert.Equal(200.0, service.CurrentSettings.CapsuleWidth);
+        Assert.Equal(0.0, service.CurrentSettings.OffsetY);
     }
 
     [Fact]
@@ -152,9 +154,39 @@ public sealed class SettingsServiceTests : IDisposable
         Assert.Equal(175.0, service.CurrentSettings.CapsuleWidth);
         Assert.Equal(45, service.CurrentSettings.DefaultMediaPriority);
 
-        // File should now contain SchemaVersion = 1
+        // File should now contain SchemaVersion = 2
         string reloadedJson = File.ReadAllText(filePath);
-        Assert.Contains("\"SchemaVersion\": 1", reloadedJson);
+        Assert.Contains("\"SchemaVersion\": 2", reloadedJson);
+    }
+
+    [Fact]
+    public void Load_WhenSchemaVersionIs1_MigratesToSchemaVersion2_NormalizesOffsetYAndCapsuleCornerRadius()
+    {
+        string filePath = Path.Combine(_testDirectory, "settings_v1.json");
+        // Legacy JSON schema with version 1 (Phase 7 floating pill settings)
+        const string v1Json = """
+        {
+            "SchemaVersion": 1,
+            "OffsetY": 8.0,
+            "CapsuleCornerRadius": 18.0,
+            "CapsuleWidth": 160.0
+        }
+        """;
+
+        File.WriteAllText(filePath, v1Json);
+
+        using var service = new SettingsService(filePath, debounceMilliseconds: 100);
+        service.Load();
+
+        Assert.Equal(2, service.CurrentSettings.SchemaVersion);
+        Assert.Equal(0.0, service.CurrentSettings.OffsetY);
+        Assert.Equal(14.0, service.CurrentSettings.CapsuleCornerRadius);
+        Assert.Equal(200.0, service.CurrentSettings.CapsuleWidth);
+
+        string reloadedJson = File.ReadAllText(filePath);
+        Assert.Contains("\"SchemaVersion\": 2", reloadedJson);
+        Assert.Contains("\"OffsetY\": 0", reloadedJson);
+        Assert.Contains("\"CapsuleCornerRadius\": 14", reloadedJson);
     }
 
     [Fact]
@@ -164,27 +196,27 @@ public sealed class SettingsServiceTests : IDisposable
         using var service = new SettingsService(filePath, debounceMilliseconds: 120);
 
         service.Load();
-        Assert.Equal(160.0, service.CurrentSettings.CapsuleWidth);
+        Assert.Equal(200.0, service.CurrentSettings.CapsuleWidth);
 
         // Rapid changes in slider simulation
-        service.CurrentSettings.CapsuleWidth = 165.0;
+        service.CurrentSettings.CapsuleWidth = 205.0;
         service.SaveDebounced();
 
-        service.CurrentSettings.CapsuleWidth = 170.0;
+        service.CurrentSettings.CapsuleWidth = 210.0;
         service.SaveDebounced();
 
-        service.CurrentSettings.CapsuleWidth = 175.0;
+        service.CurrentSettings.CapsuleWidth = 215.0;
         service.SaveDebounced();
 
-        // Immediately after, disk file has not been written with 175 yet
+        // Immediately after, disk file has not been written with 215 yet
         string immediatelyAfter = File.ReadAllText(filePath);
-        Assert.DoesNotContain("175", immediatelyAfter);
+        Assert.DoesNotContain("215", immediatelyAfter);
 
         // Wait for debounce period (120ms + buffer)
         await Task.Delay(250);
 
         string afterDebounce = File.ReadAllText(filePath);
-        Assert.Contains("175", afterDebounce);
+        Assert.Contains("215", afterDebounce);
     }
 
     [Fact]
@@ -221,7 +253,7 @@ public sealed class SettingsServiceTests : IDisposable
     {
         var original = new AppSettings
         {
-            SchemaVersion = 1,
+            SchemaVersion = 2,
             CapsuleWidth = 210.0,
             CapsuleHeight = 44.0,
             CapsuleCornerRadius = 22.0,

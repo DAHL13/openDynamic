@@ -8,8 +8,9 @@ public sealed class AppSettings
 {
     /// <summary>
     /// Current configuration schema version for migration tracking.
+    /// Version 2 introduces the top rectangular notch format (OffsetY = 0.0, CapsuleCornerRadius = 14.0).
     /// </summary>
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 2;
 
     /// <summary>
     /// Configuration schema version. Defaults to <see cref="CurrentSchemaVersion"/>.
@@ -31,27 +32,27 @@ public sealed class AppSettings
 
     /// <summary>
     /// Vertical offset in DIPs from the top of the monitor area.
-    /// Default is 8.0.
+    /// Default is 0.0 DIP to anchor the notch flush against the top display bezel.
     /// </summary>
-    public double OffsetY { get; set; } = 8.0;
+    public double OffsetY { get; set; } = 0.0;
 
     /// <summary>
-    /// Width of the capsule in compact mode in DIPs.
-    /// Default is 160.0.
+    /// Width of the notch in compact mode in DIPs.
+    /// Default is 200.0.
     /// </summary>
-    public double CapsuleWidth { get; set; } = 160.0;
+    public double CapsuleWidth { get; set; } = 200.0;
 
     /// <summary>
-    /// Height of the capsule in compact mode in DIPs.
+    /// Height of the notch in compact mode in DIPs.
     /// Default is 36.0.
     /// </summary>
     public double CapsuleHeight { get; set; } = 36.0;
 
     /// <summary>
-    /// Corner radius of the capsule in compact mode in DIPs.
-    /// Default is 18.0.
+    /// Corner radius of the notch bottom corners in compact mode in DIPs.
+    /// Default is 14.0. Top corners are always flat (0 DIP).
     /// </summary>
-    public double CapsuleCornerRadius { get; set; } = 18.0;
+    public double CapsuleCornerRadius { get; set; } = 14.0;
 
     /// <summary>
     /// Custom scale factor multiplier applied to the island dimensions.

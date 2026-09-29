@@ -318,7 +318,7 @@
                                 <Grid>
                                     <StackPanel>
                                         <TextBlock Text="Margen Superior (Offset Y)" Style="{StaticResource SettingTitle}"/>
-                                        <TextBlock Text="Distancia desde el borde superior de la pantalla hasta la cápsula." Style="{StaticResource SettingDesc}"/>
+                                        <TextBlock Text="Distancia desde el marco superior de la pantalla hasta la muesca (0 DIP para anclaje al bisel)." Style="{StaticResource SettingDesc}"/>
                                     </StackPanel>
                                     <TextBlock Text="{Binding OffsetY, StringFormat='{}{0:0} DIP'}" Style="{StaticResource ValueBadge}"/>
                                 </Grid>
@@ -331,12 +331,12 @@
                             <StackPanel>
                                 <Grid>
                                     <StackPanel>
-                                        <TextBlock Text="Ancho Base de la Cápsula (Compacto)" Style="{StaticResource SettingTitle}"/>
-                                        <TextBlock Text="Ancho en reposo y modo compacto (por defecto 160 DIP)." Style="{StaticResource SettingDesc}"/>
+                                        <TextBlock Text="Ancho Base de la Muesca (Compacto)" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Ancho en reposo y modo compacto (por defecto 200 DIP)." Style="{StaticResource SettingDesc}"/>
                                     </StackPanel>
                                     <TextBlock Text="{Binding CapsuleWidth, StringFormat='{}{0:0} DIP'}" Style="{StaticResource ValueBadge}"/>
                                 </Grid>
-                                <Slider Minimum="120" Maximum="240" Value="{Binding CapsuleWidth}" SmallChange="2" LargeChange="10"/>
+                                <Slider Minimum="120" Maximum="260" Value="{Binding CapsuleWidth}" SmallChange="2" LargeChange="10"/>
                             </StackPanel>
                         </Border>
 
@@ -345,7 +345,7 @@
                             <StackPanel>
                                 <Grid>
                                     <StackPanel>
-                                        <TextBlock Text="Alto Base de la Cápsula" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Alto Base de la Muesca" Style="{StaticResource SettingTitle}"/>
                                         <TextBlock Text="Grosor vertical en modo compacto (por defecto 36 DIP)." Style="{StaticResource SettingDesc}"/>
                                     </StackPanel>
                                     <TextBlock Text="{Binding CapsuleHeight, StringFormat='{}{0:0} DIP'}" Style="{StaticResource ValueBadge}"/>
@@ -359,8 +359,8 @@
                             <StackPanel>
                                 <Grid>
                                     <StackPanel>
-                                        <TextBlock Text="Radio de Esquinas" Style="{StaticResource SettingTitle}"/>
-                                        <TextBlock Text="Curvatura elástica de los bordes (por defecto 18 DIP para cápsula perfecta)." Style="{StaticResource SettingDesc}"/>
+                                        <TextBlock Text="Radio de Esquinas Inferiores" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Curvatura elástica inferior (por defecto 14 DIP para acabado notch rectangular con borde superior plano)." Style="{StaticResource SettingDesc}"/>
                                     </StackPanel>
                                     <TextBlock Text="{Binding CapsuleCornerRadius, StringFormat='{}{0:0} DIP'}" Style="{StaticResource ValueBadge}"/>
                                 </Grid>

@@ -106,6 +106,18 @@ public sealed class SettingsService : ISettingsService
                         $"Migrating settings schema from v{loaded.SchemaVersion} to v{AppSettings.CurrentSchemaVersion}.",
                         null);
 
+                    if (loaded.SchemaVersion < 2)
+                    {
+                        // Migration v1 -> v2: Transition from floating pill (8 DIP offset, 18 corner radius)
+                        // to top rectangular notch flush against the bezel (0 DIP offset, 14 corner radius).
+                        loaded.OffsetY = 0.0;
+                        loaded.CapsuleCornerRadius = 14.0;
+                        if (Math.Abs(loaded.CapsuleWidth - 160.0) < 0.001)
+                        {
+                            loaded.CapsuleWidth = 200.0;
+                        }
+                    }
+
                     loaded.SchemaVersion = AppSettings.CurrentSchemaVersion;
                     CurrentSettings = loaded;
                     WriteSettingsToDisk(CurrentSettings);

@@ -6,6 +6,35 @@
              mc:Ignorable="d" 
              Width="320"
              Background="Transparent">
+    <UserControl.Resources>
+        <!-- Flat, theme-independent ProgressBar Style honoring Foreground, rounded pill corners, and custom height -->
+        <Style x:Key="HardwareProgressBarStyle" TargetType="ProgressBar">
+            <Setter Property="Height" Value="4" />
+            <Setter Property="Minimum" Value="0" />
+            <Setter Property="Maximum" Value="100" />
+            <Setter Property="Background" Value="#2C2C2E" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ProgressBar">
+                        <Grid x:Name="PART_Track" ClipToBounds="True">
+                            <!-- Track Background -->
+                            <Border Background="{TemplateBinding Background}"
+                                    CornerRadius="2"
+                                    Height="4" />
+                            <!-- Progress Fill Indicator -->
+                            <Border x:Name="PART_Indicator"
+                                    HorizontalAlignment="Left"
+                                    Background="{TemplateBinding Foreground}"
+                                    CornerRadius="2"
+                                    Height="4" />
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
     <Grid Margin="18,12,18,14">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -40,16 +69,11 @@
                                    HorizontalAlignment="Right" />
                     </DockPanel>
                     <!-- Progress bar -->
-                    <Border Height="4" Background="#2C2C2E" CornerRadius="2" Margin="0,0,0,4">
-                        <ProgressBar Value="{Binding CpuUsagePercent}"
-                                     Minimum="0"
-                                     Maximum="100"
-                                     Height="4"
-                                     Foreground="#4CD964"
-                                     Background="Transparent"
-                                     BorderThickness="0" />
-                    </Border>
-                    <TextBlock Text="Carga de Procesador" FontSize="9" Foreground="#636366" Margin="0,2,0,0" />
+                    <ProgressBar Style="{StaticResource HardwareProgressBarStyle}"
+                                 Value="{Binding CpuUsagePercent, Mode=OneWay}"
+                                 Foreground="#4CD964"
+                                 Margin="0,0,0,4" />
+                    <TextBlock Text="Carga de Procesador" FontSize="9" Foreground="#8E8E93" Margin="0,2,0,0" />
                 </StackPanel>
             </Border>
 
@@ -65,16 +89,11 @@
                                    HorizontalAlignment="Right" />
                     </DockPanel>
                     <!-- Progress bar -->
-                    <Border Height="4" Background="#2C2C2E" CornerRadius="2" Margin="0,0,0,4">
-                        <ProgressBar Value="{Binding RamUsagePercent}"
-                                     Minimum="0"
-                                     Maximum="100"
-                                     Height="4"
-                                     Foreground="#5E5CE6"
-                                     Background="Transparent"
-                                     BorderThickness="0" />
-                    </Border>
-                    <TextBlock Text="{Binding RamDetailText}" FontSize="9" Foreground="#636366" Margin="0,2,0,0" />
+                    <ProgressBar Style="{StaticResource HardwareProgressBarStyle}"
+                                 Value="{Binding RamUsagePercent, Mode=OneWay}"
+                                 Foreground="#5E5CE6"
+                                 Margin="0,0,0,4" />
+                    <TextBlock Text="{Binding MemoryUsageText}" FontSize="9" Foreground="#8E8E93" Margin="0,2,0,0" />
                 </StackPanel>
             </Border>
         </UniformGrid>

@@ -6,10 +6,10 @@ namespace OpenDynamic.Tests.Positioning;
 public class IslandPositionCalculatorTests
 {
     [Theory]
-    [InlineData(1.0, 96.0, 640, 240, 640, 8)]
-    [InlineData(1.25, 120.0, 800, 300, 560, 10)]
-    [InlineData(1.50, 144.0, 960, 360, 480, 12)]
-    [InlineData(2.0, 192.0, 1280, 480, 320, 16)]
+    [InlineData(1.0, 96.0, 640, 240, 640, 0)]
+    [InlineData(1.25, 120.0, 800, 300, 560, 0)]
+    [InlineData(1.50, 144.0, 960, 360, 480, 0)]
+    [InlineData(2.0, 192.0, 1280, 480, 320, 0)]
     public void CalculatePlacement_On1080pMonitor_CalculatesCorrectPhysicalCoordinatesForStandardScales(
         double expectedScale,
         double dpiValue,
@@ -44,7 +44,7 @@ public class IslandPositionCalculatorTests
         Assert.Equal(640, placement.Width);
         Assert.Equal(240, placement.Height);
         Assert.Equal((3840 - 640) / 2, placement.X); // 1600
-        Assert.Equal(8, placement.Y);
+        Assert.Equal(0, placement.Y);
     }
 
     [Fact]
@@ -58,7 +58,7 @@ public class IslandPositionCalculatorTests
         Assert.Equal(1280, placement.Width);
         Assert.Equal(480, placement.Height);
         Assert.Equal((3840 - 1280) / 2, placement.X); // 1280
-        Assert.Equal(16, placement.Y);
+        Assert.Equal(0, placement.Y);
     }
 
     [Fact]
@@ -74,7 +74,7 @@ public class IslandPositionCalculatorTests
         Assert.Equal(240, placement.Height);
         // -1920 + (1920 - 640) / 2 = -1920 + 640 = -1280
         Assert.Equal(-1280, placement.X);
-        Assert.Equal(8, placement.Y);
+        Assert.Equal(0, placement.Y);
     }
 
     [Fact]
@@ -90,8 +90,8 @@ public class IslandPositionCalculatorTests
         Assert.Equal(300, placement.Height);
         // 1920 + (2560 - 800) / 2 = 1920 + 880 = 2800
         Assert.Equal(2800, placement.X);
-        // 120 + 8 * 1.25 = 120 + 10 = 130
-        Assert.Equal(130, placement.Y);
+        // 120 + 0 * 1.25 = 120
+        Assert.Equal(120, placement.Y);
     }
 
     [Fact]
@@ -185,7 +185,7 @@ public class IslandPositionCalculatorTests
 
         // Island centered on secondary monitor: 1920 + (2560 - 640)/2 = 1920 + 960 = 2880
         Assert.Equal(2880, placement.X);
-        Assert.Equal(8, placement.Y);
+        Assert.Equal(0, placement.Y);
         Assert.Equal(640, placement.Width);
         Assert.Equal(240, placement.Height);
     }
@@ -201,7 +201,7 @@ public class IslandPositionCalculatorTests
 
         // Island centered on portrait monitor: -1080 + (1080 - 640)/2 = -1080 + 220 = -860
         Assert.Equal(-860, placement.X);
-        Assert.Equal(8, placement.Y);
+        Assert.Equal(0, placement.Y);
         Assert.Equal(640, placement.Width);
         Assert.Equal(240, placement.Height);
     }
@@ -219,7 +219,7 @@ public class IslandPositionCalculatorTests
         // At 150% scale, base 640x240 becomes 960x360.
         // Horizontally centered on secondary monitor: 1920 + (3840 - 960)/2 = 1920 + 1440 = 3360.
         Assert.Equal(3360, placement.X);
-        Assert.Equal((int)Math.Round(8 * 1.5), placement.Y); // 12
+        Assert.Equal(0, placement.Y);
         Assert.Equal(960, placement.Width);
         Assert.Equal(360, placement.Height);
     }
@@ -234,7 +234,7 @@ public class IslandPositionCalculatorTests
         var placement = IslandPositionCalculator.CalculatePlacement(fallbackPrimary, dpi);
 
         Assert.Equal(640, placement.X);
-        Assert.Equal(8, placement.Y);
+        Assert.Equal(0, placement.Y);
         Assert.Equal(640, placement.Width);
         Assert.Equal(240, placement.Height);
     }

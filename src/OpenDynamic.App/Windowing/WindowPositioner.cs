@@ -18,6 +18,10 @@ public class WindowPositioner
 {
     public TargetMonitorMode TargetMode { get; set; } = TargetMonitorMode.Primary;
 
+    /// <summary>
+    /// Top margin in DIP from the top of the monitor area.
+    /// Defaults to <see cref="IslandPositionCalculator.DefaultTopMarginDip"/> (0.0 DIP for top notch bezel anchoring).
+    /// </summary>
     public double TopMarginDip { get; set; } = IslandPositionCalculator.DefaultTopMarginDip;
 
     public double OffsetXDip { get; set; } = 0.0;

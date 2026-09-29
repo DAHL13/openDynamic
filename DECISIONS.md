@@ -294,6 +294,34 @@
     - Se habilita `<PublishReadyToRun>true</PublishReadyToRun>` en `OpenDynamic.App.csproj`.
     - Publicación `win-x64` genera binarios precompilados a código nativo Ahead-of-Time para arranque instantáneo en frío, sin aplicar trimming destructivo incompatible con WPF.
 
+---
+
+## ADR-017: Rediseño Visual de Cápsula Flotante a Muesca Rectangular Superior (Notch)
+
+- **Estado:** Aceptado
+- **Fecha:** 2026-09-29
+- **Contexto:** Antes de proceder a la Fase 9, se requiere una actualización estética fundamental de openDynamic: transicionar del factor de forma de "Píldora flotante" (despegada de la parte superior por 8 DIPs con curvatura simétrica semicircular) a "Muesca rectangular superior" (Notch anclado al marco superior absoluto de la pantalla). Esta transformación debe mantener intactas la reactividad, las animaciones de física de resortes elásticos, la arquitectura de widgets, el paso de clics por píxel y el consumo de CPU ~0% en reposo.
+- **Decisiones Técnicas:**
+  - **1. Geometría y Anclaje al Bisel Superior:**
+    - Margen superior predeterminado ajustado estrictamente a 0 DIP (`OffsetY = 0.0` en `AppSettings.cs`, `DefaultTopMarginDip = 0.0` en `IslandPositionCalculator.cs` y `TopMarginDip = 0.0` en `WindowPositioner.cs`). La muesca nace directamente pegada al borde superior absoluto de la pantalla.
+    - En reposo (`Hidden`), la muesca descansa contra el bisel superior con una altura sutil de 4 DIPs (80x4 DIPs, opacidad 0.01), actuando como sensor receptivo para hover y rueda del ratón (`MouseWheel`) sin obstruir la pantalla.
+    - En modo `Compact`, la muesca se despliega hacia abajo desde el marco superior con dimensiones 200x36 DIPs (ancho en rango 180–220 DIP, alto 36 DIP).
+    - En modo `Expanded`, la muesca se extiende vertical y horizontalmente manteniendo su anclaje en el borde superior con dimensiones 400x160 DIPs (ancho en rango 360–420 DIP, alto en rango 150–170 DIP).
+    - En modo `Split`, la muesca principal (234x36 DIPs) y la burbuja satélite (36x36 DIPs) nacen pegadas al bisel superior con separación de 10 DIPs (envergadura total 280 DIPs).
+  - **2. Esquinas Asimétricas y Recorte Geométrico Preciso:**
+    - Sustitución de `CornerRadius` simétrico (que formaba la cápsula circular completa) por esquinas asimétricas:
+      * Esquinas superiores (Top-Left y Top-Right): 0 DIP (completamente ortogonales y pegadas al marco).
+      * Esquinas inferiores (Bottom-Left y Bottom-Right): curvadas con radio suave de 14 DIPs (`CornerRadius="0,0,14,14"`).
+    - Recorte interno (`Clip`) en `IslandView.xaml.cs` reimplementado mediante `CreateNotchClipGeometry`: genera una `PathGeometry` congelada (`Freeze()`) con borde superior plano `(0,0)->(width,0)`, aristas laterales rectas y arcos inferiores suaves con `ArcSegment` (radio $r$, sentido horario). Esto previene que los elementos hijos (álbumes, textos, barras de progreso) se desborden de las esquinas redondeadas inferiores mientras garantiza que no exista recorte en las esquinas superiores contra el marco.
+    - `CornerRadiusSpring` en `IslandAnimator` se preserva para animar de forma elástica la curvatura de las esquinas inferiores durante las transiciones de estado.
+  - **3. Preservación Estricta de Principios de Arquitectura:**
+    - **Regla de Oro 6 cumplida:** La ventana Win32 overlay permanece con tamaño fijo (640x240 DIP) y fondo transparente (`Background="Transparent"`). Únicamente se redimensiona el `Border` interior mediante los resortes. Cero llamadas a `SetWindowPos` para redimensionamiento en tiempo de animación.
+    - **Regla de Oro 1 cumplida:** El bucle de renderizado se desuscribe de `CompositionTarget.Rendering` al asentarse los resortes (~0% CPU en reposo).
+    - **Compatibilidad total de widgets:** Todos los widgets existentes (Media, Hardware, Timer, Batería, Volumen) y sus respectivas vistas compactas y expandidas se adaptan con márgenes limpios y legibilidad garantizada dentro del nuevo formato notch.
+    - **Migración Automática de Configuración (Schema v2):** Se incrementa `CurrentSchemaVersion = 2` en `AppSettings.cs`. En `SettingsService.Load()`, las configuraciones existentes con `SchemaVersion < 2` (procedentes de versiones previas con `OffsetY = 8.0` y `CapsuleCornerRadius = 18.0`) se normalizan automáticamente a `OffsetY = 0.0` y `CapsuleCornerRadius = 14.0`, guardándose inmediatamente en disco.
+    - **Comandos de Restablecimiento en ViewModel:** Se alinean `ResetPosition()` y `ResetToDefaults()` en `SettingsViewModel.cs` con `OffsetY = 0.0`, `CapsuleCornerRadius = 14.0` y llamada explícita a `ApplyPositionLive()`.
+
+
 
 
 

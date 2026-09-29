@@ -426,13 +426,16 @@ public partial class SettingsViewModel : ObservableObject
     {
         TargetMonitorIndex = 0;
         OffsetX = 0.0;
-        OffsetY = 8.0;
-        CapsuleWidth = 160.0;
+        OffsetY = 0.0;
+        CapsuleWidth = 200.0;
         CapsuleHeight = 36.0;
-        CapsuleCornerRadius = 18.0;
+        CapsuleCornerRadius = 14.0;
         ScaleFactor = 1.0;
         ApplyPositionLive();
     }
+
+    [RelayCommand]
+    public void ResetToDefaults() => ResetAllDefaults();
 
     [RelayCommand]
     public void ResetAllDefaults()

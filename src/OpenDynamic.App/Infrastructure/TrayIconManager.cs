@@ -190,7 +190,9 @@ public sealed class TrayIconManager : IDisposable
         {
             Log.Information("Reiniciar Posición requested from tray context menu.");
             _settingsService.CurrentSettings.OffsetX = 0.0;
-            _settingsService.CurrentSettings.OffsetY = 8.0;
+            _settingsService.CurrentSettings.OffsetY = 0.0;
+            _settingsService.CurrentSettings.CapsuleWidth = 200.0;
+            _settingsService.CurrentSettings.CapsuleCornerRadius = 14.0;
             _settingsService.CurrentSettings.TargetMonitorIndex = 0;
             _settingsService.SaveDebounced();
 

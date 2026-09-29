@@ -58,13 +58,13 @@ public partial class IslandWindow : Window
 
         _hoverEnterTimer = new DispatcherTimer
         {
-            Interval = TimeSpan.FromMilliseconds(150)
+            Interval = TimeSpan.FromMilliseconds(250)
         };
         _hoverEnterTimer.Tick += OnHoverEnterTimerTick;
 
         _hoverLeaveTimer = new DispatcherTimer
         {
-            Interval = TimeSpan.FromMilliseconds(400)
+            Interval = TimeSpan.FromMilliseconds(350)
         };
         _hoverLeaveTimer.Tick += OnHoverLeaveTimerTick;
 
@@ -357,33 +357,59 @@ public partial class IslandWindow : Window
     private void SetupMouseInteractions()
     {
         var mainCapsule = IslandHostView.CapsuleBorder;
+        var satellite = IslandHostView.SatelliteBubble;
 
-        mainCapsule.MouseEnter += (s, e) =>
+        bool IsPointerOverNotch()
+        {
+            return IslandHostView.IsMouseOver ||
+                   mainCapsule.IsMouseOver ||
+                   satellite.IsMouseOver;
+        }
+
+        void OnPointerEnter()
         {
             _hoverLeaveTimer.Stop();
 
-            if (_animator.StateMachine.CurrentState == IslandState.Compact)
+            var state = _orchestrator.StateMachine.CurrentState;
+            if (state is IslandState.Compact or IslandState.Split)
             {
-                _hoverEnterTimer.Stop();
-                _hoverEnterTimer.Start();
+                if (!_hoverEnterTimer.IsEnabled)
+                {
+                    _hoverEnterTimer.Start();
+                }
             }
-            else if (_animator.StateMachine.CurrentState == IslandState.Hidden)
+            else if (state == IslandState.Hidden)
             {
                 Log.Information("MouseEnter detected on Hidden sensor notch. Restoring capsule.");
                 _orchestrator.RequestRestore();
             }
-        };
+        }
 
-        mainCapsule.MouseLeave += (s, e) =>
+        void OnPointerLeave()
         {
+            // CRITICAL: If cursor is still physically within the notch boundary,
+            // ignore internal boundary transitions across borders/child controls.
+            if (IsPointerOverNotch())
+            {
+                return;
+            }
+
             _hoverEnterTimer.Stop();
 
-            if (_animator.StateMachine.CurrentState == IslandState.Expanded)
+            var state = _orchestrator.StateMachine.CurrentState;
+            if (state == IslandState.Expanded)
             {
                 _hoverLeaveTimer.Stop();
                 _hoverLeaveTimer.Start();
             }
-        };
+        }
+
+        IslandHostView.MouseEnter += (s, e) => OnPointerEnter();
+        IslandHostView.MouseLeave += (s, e) => OnPointerLeave();
+        mainCapsule.MouseEnter += (s, e) => OnPointerEnter();
+        mainCapsule.MouseLeave += (s, e) => OnPointerLeave();
+        satellite.MouseEnter += (s, e) => OnPointerEnter();
+        satellite.MouseLeave += (s, e) => OnPointerLeave();
 
         mainCapsule.MouseLeftButtonUp += (s, e) =>
         {
@@ -410,12 +436,12 @@ public partial class IslandWindow : Window
             if (e.Delta > 0)
             {
                 // Scroll Up: Collapse / Hide
-                if (_animator.StateMachine.CurrentState == IslandState.Expanded)
+                if (_orchestrator.StateMachine.CurrentState == IslandState.Expanded)
                 {
                     Log.Information("MouseWheel Up detected on Expanded capsule. Collapsing.");
                     _orchestrator.RequestCollapse();
                 }
-                else if (_animator.StateMachine.CurrentState is IslandState.Compact or IslandState.Split)
+                else if (_orchestrator.StateMachine.CurrentState is IslandState.Compact or IslandState.Split)
                 {
                     Log.Information("MouseWheel Up detected. Hiding island.");
                     _orchestrator.RequestHide();
@@ -424,12 +450,12 @@ public partial class IslandWindow : Window
             else if (e.Delta < 0)
             {
                 // Scroll Down: Expand / Reveal
-                if (_animator.StateMachine.CurrentState is IslandState.Compact or IslandState.Split)
+                if (_orchestrator.StateMachine.CurrentState is IslandState.Compact or IslandState.Split)
                 {
                     Log.Information("MouseWheel Down detected. Expanding capsule.");
                     _orchestrator.RequestExpand();
                 }
-                else if (_animator.StateMachine.CurrentState == IslandState.Hidden)
+                else if (_orchestrator.StateMachine.CurrentState == IslandState.Hidden)
                 {
                     Log.Information("MouseWheel Down detected on Hidden capsule. Restoring.");
                     _orchestrator.RequestRestore();
@@ -440,7 +466,7 @@ public partial class IslandWindow : Window
         };
 
         // Satellite bubble click in Split mode: interactive multitasking swap (Hito M4)
-        IslandHostView.SatelliteBubble.MouseLeftButtonUp += (s, e) =>
+        satellite.MouseLeftButtonUp += (s, e) =>
         {
             Log.Information("Satellite bubble clicked in Split mode. Swapping primary and secondary activities.");
             _orchestrator.SwapSplitActivities();
@@ -448,13 +474,17 @@ public partial class IslandWindow : Window
         };
     }
 
-
     private void OnHoverEnterTimerTick(object? sender, EventArgs e)
     {
         _hoverEnterTimer.Stop();
-        if (IslandHostView.CapsuleBorder.IsMouseOver && _animator.StateMachine.CurrentState == IslandState.Compact)
+        bool isMouseOver = IslandHostView.IsMouseOver ||
+                           IslandHostView.CapsuleBorder.IsMouseOver ||
+                           IslandHostView.SatelliteBubble.IsMouseOver;
+        var state = _orchestrator.StateMachine.CurrentState;
+
+        if (isMouseOver && state is IslandState.Compact or IslandState.Split)
         {
-            Log.Debug("Hover enter delay elapsed (150ms). Expanding capsule.");
+            Log.Debug("Hover enter delay elapsed (250ms). Expanding capsule.");
             _orchestrator.RequestExpand();
         }
     }
@@ -462,9 +492,14 @@ public partial class IslandWindow : Window
     private void OnHoverLeaveTimerTick(object? sender, EventArgs e)
     {
         _hoverLeaveTimer.Stop();
-        if (!IslandHostView.CapsuleBorder.IsMouseOver && _animator.StateMachine.CurrentState == IslandState.Expanded)
+        bool isMouseOver = IslandHostView.IsMouseOver ||
+                           IslandHostView.CapsuleBorder.IsMouseOver ||
+                           IslandHostView.SatelliteBubble.IsMouseOver;
+        var state = _orchestrator.StateMachine.CurrentState;
+
+        if (!isMouseOver && state == IslandState.Expanded)
         {
-            Log.Debug("Hover leave delay elapsed (400ms). Collapsing capsule.");
+            Log.Debug("Hover leave delay elapsed (350ms). Collapsing capsule.");
             _orchestrator.RequestCollapse();
         }
     }

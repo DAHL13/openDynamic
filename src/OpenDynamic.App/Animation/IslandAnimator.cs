@@ -7,7 +7,7 @@ using Serilog;
 namespace OpenDynamic.App.Animation;
 
 /// <summary>
-/// Orchestrates spring animations for capsule dimensions (Width, Height, CornerRadius, Opacity).
+/// Orchestrates spring animations for notch dimensions (Width, Height, bottom CornerRadius, Opacity).
 /// Subscribes to <see cref="CompositionTarget.Rendering"/> ONLY during active motion,
 /// unsubscribing immediately upon settling to guarantee ~0% CPU usage in idle (Golden Rule 1).
 /// </summary>
@@ -21,6 +21,9 @@ public sealed class IslandAnimator : IDisposable
 
     public Spring WidthSpring { get; }
     public Spring HeightSpring { get; }
+    /// <summary>
+    /// Animates the bottom corner radius of the notch. Top corners remain fixed at 0 DIP against the screen bezel.
+    /// </summary>
     public Spring CornerRadiusSpring { get; }
     public Spring OpacitySpring { get; }
 

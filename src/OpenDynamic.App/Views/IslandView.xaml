@@ -6,13 +6,15 @@
              mc:Ignorable="d" 
              Background="{x:Null}">
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Top">
-        <!-- Main Island Capsule -->
+        <!-- Main Island Notch Container -->
         <Border x:Name="MainCapsuleBorder"
-                Width="160"
+                Width="200"
                 Height="36"
                 Background="#FF000000"
-                CornerRadius="18"
-                ClipToBounds="True"
+                BorderBrush="#26FFFFFF"
+                BorderThickness="1,0,1,1"
+                CornerRadius="0,0,14,14"
+                ClipToBounds="False"
                 Cursor="Hand">
             <Grid x:Name="PrimaryContentContainer" ClipToBounds="True">
                 <ContentControl x:Name="PrimaryContent"
@@ -23,13 +25,15 @@
             </Grid>
         </Border>
 
-        <!-- Satellite Bubble (Active in Split Multitasking Mode) -->
+        <!-- Satellite Notch (Active in Split Multitasking Mode) -->
         <Border x:Name="SatelliteBorder"
                 Width="36"
                 Height="36"
                 Background="#FF000000"
-                CornerRadius="18"
-                ClipToBounds="True"
+                BorderBrush="#26FFFFFF"
+                BorderThickness="1,0,1,1"
+                CornerRadius="0,0,14,14"
+                ClipToBounds="False"
                 Margin="10,0,0,0"
                 Visibility="Collapsed"
                 Cursor="Hand">
