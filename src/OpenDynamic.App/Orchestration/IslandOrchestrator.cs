@@ -32,6 +32,9 @@ public sealed class IslandOrchestrator : IDisposable
 
     private IIslandWidget? _activePrimaryWidget;
     private IIslandWidget? _activeSecondaryWidget;
+    private bool _isSplitSwapped;
+    private string? _lastSplitPrimaryId;
+    private string? _lastSplitSecondaryId;
 
     // View reuse cache to prevent layered window flickering on property changes
     private UserControl? _currentPrimaryView;
@@ -60,7 +63,9 @@ public sealed class IslandOrchestrator : IDisposable
     public IIslandWidget? ActivePrimaryWidget => _activePrimaryWidget;
     public IIslandWidget? ActiveSecondaryWidget => _activeSecondaryWidget;
     public bool IsUserExpanded => _userExpanded;
+    public bool IsSplitSwapped => _isSplitSwapped;
     public IReadOnlySet<string> QuarantinedWidgetIds => _quarantinedWidgetIds;
+
 
     /// <summary>
     /// Default idle state when no activities are active (defaults to <see cref="IslandState.Hidden"/>).
@@ -271,8 +276,39 @@ public sealed class IslandOrchestrator : IDisposable
 
         var result = _priorityResolver.Resolve(activeCandidates, DateTimeOffset.UtcNow);
 
-        _activePrimaryWidget = result.Primary as IIslandWidget;
-        _activeSecondaryWidget = result.Secondary as IIslandWidget;
+        var resolvedPrimary = result.Primary as IIslandWidget;
+        var resolvedSecondary = result.Secondary as IIslandWidget;
+
+        // Support interactive Split multitasking swap (Golden Rule M4)
+        if (resolvedPrimary != null && resolvedSecondary != null)
+        {
+            if (_lastSplitPrimaryId != resolvedPrimary.Id || _lastSplitSecondaryId != resolvedSecondary.Id)
+            {
+                _lastSplitPrimaryId = resolvedPrimary.Id;
+                _lastSplitSecondaryId = resolvedSecondary.Id;
+            }
+
+            if (_isSplitSwapped)
+            {
+                _activePrimaryWidget = resolvedSecondary;
+                _activeSecondaryWidget = resolvedPrimary;
+            }
+            else
+            {
+                _activePrimaryWidget = resolvedPrimary;
+                _activeSecondaryWidget = resolvedSecondary;
+            }
+        }
+        else
+        {
+            _isSplitSwapped = false;
+            _lastSplitPrimaryId = null;
+            _lastSplitSecondaryId = null;
+
+            _activePrimaryWidget = resolvedPrimary;
+            _activeSecondaryWidget = null;
+        }
+
 
         // Schedule timer if an active transient alert has an expiration scheduled
         if (result.NextExpirationUtc.HasValue)
@@ -603,6 +639,26 @@ public sealed class IslandOrchestrator : IDisposable
             TransitionTo(IslandState.Compact);
         }
     }
+
+    /// <summary>
+    /// Interactively swaps primary and secondary activities in Split mode (Hito M4).
+    /// Clicking the satellite bubble moves the secondary activity to the main capsule
+    /// and the primary activity to the satellite bubble.
+    /// </summary>
+    public void SwapSplitActivities()
+    {
+        if (_stateMachine.CurrentState != IslandState.Split &&
+            !(_activePrimaryWidget != null && _activeSecondaryWidget != null))
+        {
+            Log.Debug("SwapSplitActivities ignored: Island is not currently presenting Split multitasking.");
+            return;
+        }
+
+        _isSplitSwapped = !_isSplitSwapped;
+        Log.Information("SwapSplitActivities: Swapped Split presentations. IsSplitSwapped is now {IsSwapped}.", _isSplitSwapped);
+        UpdateOrchestration();
+    }
+
 
     private static void DispatchToUIThread(Action action)
     {
