@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using OpenDynamic.Core.Animation;
 using OpenDynamic.Core.State;
 using Serilog;
 
@@ -17,6 +18,8 @@ public partial class IslandView : UserControl
     private const double SatelliteGap = 10.0;
     private const double SatelliteDiameter = 36.0;
     private const double SatelliteSpan = SatelliteGap + SatelliteDiameter; // 46 DIP
+
+    private MotionProfile _currentMotionProfile = MotionProfile.Full;
 
     public Border CapsuleBorder => MainCapsuleBorder;
     public Border SatelliteBubble => SatelliteBorder;
@@ -161,12 +164,32 @@ public partial class IslandView : UserControl
     }
 
     /// <summary>
-    /// Smoothly swaps content on a ContentControl using a fast opacity fade (80ms).
+    /// Updates the motion profile used for cross-fade transitions and visual dynamics.
     /// </summary>
-    private static void TransitionContent(ContentControl container, UserControl? newContent)
+    public void UpdateMotionProfile(MotionProfile profile)
+    {
+        _currentMotionProfile = profile ?? MotionProfile.Full;
+    }
+
+    /// <summary>
+    /// Smoothly swaps content on a ContentControl using opacity cross-fade according to the active motion profile.
+    /// In reduced mode (&lt;=150ms total), uses accelerated, direct transitions.
+    /// </summary>
+    private void TransitionContent(ContentControl container, UserControl? newContent)
     {
         if (ReferenceEquals(container.Content, newContent))
         {
+            return;
+        }
+
+        int outMs = _currentMotionProfile.CrossFadeOutDurationMs;
+        int inMs = _currentMotionProfile.CrossFadeInDurationMs;
+
+        if (outMs <= 0 && inMs <= 0)
+        {
+            container.BeginAnimation(OpacityProperty, null);
+            container.Content = newContent;
+            container.Opacity = 1.0;
             return;
         }
 
@@ -176,7 +199,7 @@ public partial class IslandView : UserControl
             container.Content = newContent;
             if (newContent != null)
             {
-                var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(100));
+                var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(inMs));
                 container.BeginAnimation(OpacityProperty, fadeIn);
             }
             return;
@@ -185,7 +208,7 @@ public partial class IslandView : UserControl
         if (newContent == null)
         {
             // Fading out
-            var fadeOut = new DoubleAnimation(container.Opacity, 0.0, TimeSpan.FromMilliseconds(80));
+            var fadeOut = new DoubleAnimation(container.Opacity, 0.0, TimeSpan.FromMilliseconds(outMs));
             fadeOut.Completed += (_, _) =>
             {
                 container.Content = null;
@@ -196,11 +219,11 @@ public partial class IslandView : UserControl
         }
 
         // Fade out current, swap, and fade in new
-        var crossFadeOut = new DoubleAnimation(container.Opacity, 0.0, TimeSpan.FromMilliseconds(70));
+        var crossFadeOut = new DoubleAnimation(container.Opacity, 0.0, TimeSpan.FromMilliseconds(outMs));
         crossFadeOut.Completed += (_, _) =>
         {
             container.Content = newContent;
-            var crossFadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(90));
+            var crossFadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(inMs));
             container.BeginAnimation(OpacityProperty, crossFadeIn);
         };
         container.BeginAnimation(OpacityProperty, crossFadeOut);
