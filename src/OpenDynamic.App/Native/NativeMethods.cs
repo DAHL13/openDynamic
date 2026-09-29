@@ -187,7 +187,10 @@ public static class NativeMethods
 
     // Power Messages & Constants
     public const int WM_POWERBROADCAST = 0x0218;
+    public const int PBT_APMSUSPEND = 0x0004;
+    public const int PBT_APMRESUMESUSPEND = 0x0007;
     public const int PBT_APMPOWERSTATUSCHANGE = 0x000A;
+    public const int PBT_APMRESUMEAUTOMATIC = 0x0012;
     public const int PBT_POWERSETTINGCHANGE = 0x8013;
     public const uint DEVICE_NOTIFY_WINDOW_HANDLE = 0x00000000;
 

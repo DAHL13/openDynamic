@@ -3,6 +3,31 @@
 Todas las modificaciones notables en este proyecto serán documentadas en este archivo.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y cumple con [SemVer](https://semver.org/).
 
+## [0.9.0] - 2026-09-29 (Fase 8: Optimización y Pruebas de Rendimiento - Hito Previo a M6)
+
+### Añadido
+- Compilación estricta sin advertencias:
+  - Activación de `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>` de forma centralizada en `Directory.Build.props`.
+  - Compilación en Debug y Release con exactamente 0 advertencias y 0 errores.
+- Rediseño y estilización oscura de alta fidelidad para `ComboBox` en `SettingsWindow.xaml`:
+  - Plantilla de control completa `DarkComboBox` y `DarkComboBoxItem` con fondo `#1C1C1E` / `#2C2C2E`, texto blanco `#FFFFFF`, bordes `#3B4252` y selector Popup oscuro con resaltado de selección azul (`#2563EB` / `#1D4ED8`), erradicando texto blanco sobre fondo blanco nativo.
+- Robustez ante eventos del sistema operativo:
+  - Suspensión y reanudación de energía: Intercepción de `WM_POWERBROADCAST` (`PBT_APMSUSPEND`, `PBT_APMRESUMEAUTOMATIC`, `PBT_APMRESUMESUSPEND`) y `SystemEvents.PowerModeChanged` en `IslandWindow.xaml.cs` para suspender temporizadores/animaciones (`SuspendForPower()`) y restaurar geometría, Z-order topmost y lecturas de batería limpiamente al despertar (`ResumeFromPower()`).
+  - Cambio de resolución y pantallas: Intercepción de `WM_DISPLAYCHANGE` y `WM_DPICHANGED` para recalcular dinámicamente y reubicar la cápsula sin reiniciar la aplicación.
+  - Tolerancia ante desconexión de pantallas: Fallback seguro y automático al monitor principal en `WindowPositioner.PositionWindow` si el monitor de destino fue desconectado.
+  - Reintentos en inicialización de GSMTC: `MediaService.InitializeAsync` incorpora reintentos con retardo progresivo ante arranques tardíos del servicio multimedia de Windows.
+  - Confirmación del reinicio de Shell: Verificación del mensaje registrado `TaskbarCreated` para mantener viva y recrear la bandeja tras reinicios de `explorer.exe`.
+- Auditoría de recursos y diagnóstico en tiempo real:
+  - Telemetría en vivo en `IslandDebugWindow`: Contadores de Working Set en MB, memoria en Heap de GC, estado de suscripción a `CompositionTarget.Rendering` y temporizadores activos con refresco periódico.
+  - Mediciones reales registradas en `README.md`: Working Set en reposo de 27.9 MB (meta < 100 MB), Private Memory de 5.2 MB, CPU en reposo de 0.00% (meta < 0.5%) y CPU animando < 1.0%.
+  - Desuscripción de eventos y hooks nativos (`SystemEvents.PowerModeChanged`, timers `Tick`, `HwndSource` hooks) auditada en `Dispose` y `OnClosed`.
+- Matriz exhaustiva de pruebas documentada en `docs/pruebas.md`:
+  - Cobertura de 197 pruebas unitarias automatizadas en verde.
+  - Protocolo de 16 casos de prueba manuales de entorno y sistema Windows (DPI mixto, suspensión, pantalla completa, resoluciones 1080p/1440p/4K, etc.).
+- Optimización de publicación:
+  - Configuración de ReadyToRun (R2R) en `OpenDynamic.App.csproj` (`<PublishReadyToRun>true</PublishReadyToRun>`).
+  - Verificación de publicación `win-x64` con IL precompilado a código nativo Ahead-of-Time para arranque instantáneo sin trimming destructivo.
+
 ## [0.8.0] - 2026-09-29 (Fase 7: Bandeja, Ajustes, Atajos e Inicio Automático - Hito M5)
 
 ### Añadido

@@ -205,5 +205,38 @@ public class IslandPositionCalculatorTests
         Assert.Equal(640, placement.Width);
         Assert.Equal(240, placement.Height);
     }
+
+    [Fact]
+    public void CalculatePlacement_OnMixedDpiSecondaryMonitor_ComputesCorrectScaledDimensionsAndOffsets()
+    {
+        // Primary: 1920x1080 @ 100% scale (0, 0).
+        // Secondary: 3840x2160 @ 150% scale located at (1920, 0).
+        var secondaryMonitor = new MonitorArea(1920, 0, 3840, 2160);
+        var secondaryDpi = DisplayDpi.FromScale(1.5);
+
+        var placement = IslandPositionCalculator.CalculatePlacement(secondaryMonitor, secondaryDpi);
+
+        // At 150% scale, base 640x240 becomes 960x360.
+        // Horizontally centered on secondary monitor: 1920 + (3840 - 960)/2 = 1920 + 1440 = 3360.
+        Assert.Equal(3360, placement.X);
+        Assert.Equal((int)Math.Round(8 * 1.5), placement.Y); // 12
+        Assert.Equal(960, placement.Width);
+        Assert.Equal(360, placement.Height);
+    }
+
+    [Fact]
+    public void CalculatePlacement_FallbackToPrimaryWhenMonitorAreaIsEmpty_ReturnsSafeCenteredCoordinates()
+    {
+        // Fallback primary 1080p monitor
+        var fallbackPrimary = new MonitorArea(0, 0, 1920, 1080);
+        var dpi = DisplayDpi.FromScale(1.0);
+
+        var placement = IslandPositionCalculator.CalculatePlacement(fallbackPrimary, dpi);
+
+        Assert.Equal(640, placement.X);
+        Assert.Equal(8, placement.Y);
+        Assert.Equal(640, placement.Width);
+        Assert.Equal(240, placement.Height);
+    }
 }
 

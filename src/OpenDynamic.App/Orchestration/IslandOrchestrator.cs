@@ -206,6 +206,14 @@ public sealed class IslandOrchestrator : IDisposable
     public bool IsFullscreenSuppressed => _isFullscreenSuppressed;
     private bool _isFullscreenSuppressed;
 
+    public bool IsPowerSuspended => _isPowerSuspended;
+    private bool _isPowerSuspended;
+
+    /// <summary>
+    /// Indicates whether a transient expiration timer is currently running.
+    /// </summary>
+    public bool HasActiveTransientTimer => _transientTimer != null && _transientTimer.IsEnabled;
+
     /// <summary>
     /// Immediately hides the island, suspends all transient timers and halts animations
     /// when an application enters fullscreen mode.
@@ -240,7 +248,6 @@ public sealed class IslandOrchestrator : IDisposable
         Log.Information("IslandOrchestrator: Suspended for fullscreen. Animations halted and island hidden.");
     }
 
-
     /// <summary>
     /// Resumes normal orchestration and restores previous active presentation upon exiting fullscreen mode.
     /// </summary>
@@ -254,13 +261,57 @@ public sealed class IslandOrchestrator : IDisposable
     }
 
     /// <summary>
+    /// Suspends all timers, halts animations, and pauses widget activities when the system enters sleep/suspension (WM_POWERBROADCAST).
+    /// </summary>
+    public void SuspendForPower()
+    {
+        _isPowerSuspended = true;
+
+        // Cancel transient expiration timer
+        _transientTimer?.Stop();
+        _transientTimer = null;
+
+        // Halt any in-flight spring animation
+        _animator.SnapTo(_animator.TargetDimensions);
+
+        lock (_widgets)
+        {
+            foreach (var widget in _widgets)
+            {
+                try
+                {
+                    widget.SetDisplayState(WidgetDisplayMode.Compact, isVisible: false);
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, "Error updating display state on widget '{WidgetId}' during power suspend.", widget.Id);
+                }
+            }
+        }
+
+        Log.Information("IslandOrchestrator: Suspended for power event (PBT_APMSUSPEND). All timers and animations halted.");
+    }
+
+    /// <summary>
+    /// Resumes orchestration cleanly when the system wakes up from sleep/suspension.
+    /// </summary>
+    public void ResumeFromPower()
+    {
+        if (!_isPowerSuspended) return;
+
+        _isPowerSuspended = false;
+        Log.Information("IslandOrchestrator: Resumed from power event. Restoring active widgets and layout.");
+        DispatchToUIThread(UpdateOrchestration);
+    }
+
+    /// <summary>
     /// Evaluates active widget priorities, commands appropriate state transitions,
     /// schedules expiration for transient activities, and delivers views to <see cref="IslandView"/>.
     /// Guaranteed to run on the WPF UI thread.
     /// </summary>
     public void UpdateOrchestration()
     {
-        if (_disposed || _isFullscreenSuppressed) return;
+        if (_disposed || _isFullscreenSuppressed || _isPowerSuspended) return;
 
         // Cancel previous expiration timer
         _transientTimer?.Stop();
@@ -521,9 +572,9 @@ public sealed class IslandOrchestrator : IDisposable
     /// </summary>
     public bool TransitionTo(IslandState targetState)
     {
-        if (_isFullscreenSuppressed && targetState != IslandState.Hidden)
+        if ((_isFullscreenSuppressed || _isPowerSuspended) && targetState != IslandState.Hidden)
         {
-            Log.Debug("Transition to {TargetState} suppressed because fullscreen is active.", targetState);
+            Log.Debug("Transition to {TargetState} suppressed because fullscreen or power suspension is active.", targetState);
             return false;
         }
 

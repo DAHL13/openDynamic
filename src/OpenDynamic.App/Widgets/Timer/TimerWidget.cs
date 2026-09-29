@@ -288,8 +288,12 @@ public sealed class TimerWidget : IslandWidgetBase
     {
         if (disposing)
         {
-            _tickTimer?.Stop();
-            _tickTimer = null;
+            if (_tickTimer != null)
+            {
+                _tickTimer.Stop();
+                _tickTimer.Tick -= OnTickTimerTick;
+                _tickTimer = null;
+            }
 
             _controller.Tick -= OnControllerTick;
             _controller.Completed -= OnControllerCompleted;
