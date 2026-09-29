@@ -19,6 +19,7 @@ public abstract class IslandWidgetBase : ObservableObject, IIslandWidget
     private TimeSpan? _transientDuration;
     private IslandActivity? _currentActivity;
     private WidgetDisplayMode _displayMode = WidgetDisplayMode.Compact;
+    private bool _isVisibleOnIsland;
     private bool _isDisposed;
 
     public abstract string Id { get; }
@@ -91,6 +92,21 @@ public abstract class IslandWidgetBase : ObservableObject, IIslandWidget
     {
         get => _displayMode;
         internal set => SetProperty(ref _displayMode, value);
+    }
+
+    public bool IsVisibleOnIsland
+    {
+        get => _isVisibleOnIsland;
+        protected set => SetProperty(ref _isVisibleOnIsland, value);
+    }
+
+    /// <summary>
+    /// Updates the display state and visibility. Subclasses can override to manage resource timers.
+    /// </summary>
+    public virtual void SetDisplayState(WidgetDisplayMode mode, bool isVisible)
+    {
+        DisplayMode = mode;
+        IsVisibleOnIsland = isVisible;
     }
 
     public event EventHandler? Changed;

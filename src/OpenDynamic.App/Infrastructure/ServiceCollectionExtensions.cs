@@ -41,6 +41,11 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<OpenDynamic.Core.Power.IBatteryMonitor>(sp => sp.GetRequiredService<Services.PowerService>());
         services.AddSingleton<Widgets.Battery.BatteryWidget>();
 
+        // Hardware Monitoring Services
+        services.AddSingleton<Services.HardwareService>();
+        services.AddSingleton<OpenDynamic.Core.Hardware.IHardwareMonitor>(sp => sp.GetRequiredService<Services.HardwareService>());
+        services.AddSingleton<Widgets.Hardware.HardwareWidget>();
+
         return services;
     }
 }

@@ -217,8 +217,24 @@ public sealed class IslandOrchestrator : IDisposable
         // Halt any animation and snap immediately to Hidden (Golden Rule 1: 0% CPU)
         _animator.SnapTo(IslandState.Hidden);
 
+        lock (_widgets)
+        {
+            foreach (var widget in _widgets)
+            {
+                try
+                {
+                    widget.SetDisplayState(WidgetDisplayMode.Compact, isVisible: false);
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, "Error updating display state on widget '{WidgetId}' during fullscreen suspend.", widget.Id);
+                }
+            }
+        }
+
         Log.Information("IslandOrchestrator: Suspended for fullscreen. Animations halted and island hidden.");
     }
+
 
     /// <summary>
     /// Resumes normal orchestration and restores previous active presentation upon exiting fullscreen mode.
@@ -366,9 +382,42 @@ public sealed class IslandOrchestrator : IDisposable
         // Deliver views to IslandView
         _islandView?.PresentViews(primaryView, secondaryView, targetState);
 
+        // Notify all widgets of active display state and visibility for resource management (Golden Rule 1)
+        lock (_widgets)
+        {
+            foreach (var widget in _widgets)
+            {
+                try
+                {
+                    if (targetState == IslandState.Hidden)
+                    {
+                        widget.SetDisplayState(WidgetDisplayMode.Compact, isVisible: false);
+                    }
+                    else if (ReferenceEquals(widget, _activePrimaryWidget))
+                    {
+                        var mode = targetState == IslandState.Expanded ? WidgetDisplayMode.Expanded : WidgetDisplayMode.Compact;
+                        widget.SetDisplayState(mode, isVisible: true);
+                    }
+                    else if (ReferenceEquals(widget, _activeSecondaryWidget) && targetState == IslandState.Split)
+                    {
+                        widget.SetDisplayState(WidgetDisplayMode.Split, isVisible: true);
+                    }
+                    else
+                    {
+                        widget.SetDisplayState(WidgetDisplayMode.Compact, isVisible: false);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, "Error updating display state on widget '{WidgetId}'.", widget.Id);
+                }
+            }
+        }
+
         // Command state transition with exclusive authority
         TransitionTo(targetState);
     }
+
 
     /// <summary>
     /// Safely creates a view from a widget, catching and quarantining on exception.
