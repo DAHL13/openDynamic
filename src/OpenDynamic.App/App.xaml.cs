@@ -41,6 +41,9 @@ public partial class App : Application
 
         Log.Information("openDynamic initialized successfully (Single instance acquired, ShutdownMode=OnExplicitShutdown).");
 
+        var islandWindow = Services.GetRequiredService<Windowing.IslandWindow>();
+        islandWindow.Show();
+
         SetupTemporaryShutdownMechanisms(e.Args);
     }
 
@@ -153,6 +156,10 @@ public partial class App : Application
     {
         try
         {
+            if (Services is IDisposable disposableServices)
+            {
+                disposableServices.Dispose();
+            }
             _singleInstance?.Dispose();
         }
         finally

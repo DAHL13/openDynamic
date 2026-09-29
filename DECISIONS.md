@@ -65,3 +65,19 @@
 - **Fecha:** 2026-09-28
 - **Contexto:** El repositorio remoto en `https://github.com/DAHL13/openDynamic` se encontraba vacío.
 - **Decisión:** Se conecta el repositorio local al remoto existente `origin` sin crear un nuevo repositorio. No se añade un archivo de licencia arbitrario por cuenta del agente para respetar la decisión legal y de autoría del usuario; se documenta aquí.
+
+---
+
+## ADR-006: Ventana Overlay con Renderizado por Capas, Click-Through por Píxel y Topmost Reactivo
+
+- **Estado:** Aceptado
+- **Fecha:** 2026-09-28
+- **Contexto:** La Fase 1 (M1) requiere una ventana flotante para la Dynamic Island con alta tasa de respuesta, ausencia de parpadeo, z-order permanente sobre otras ventanas y capacidad de recibir clics solo en la cápsula visible sin robar foco ni bloquear la interacción con el escritorio en las zonas vacías.
+- **Decisiones:**
+  - **Tamaño físico fijo:** Se fija `IslandWindow` en 640x240 DIP con `WindowStyle="None"`, `AllowsTransparency="True"` y `Background="Transparent"`. La ventana nativa jamás se redimensiona durante las animaciones (Regla de oro 6); el contenido interno (cápsula) se escalará y transformará en fases posteriores.
+  - **Click-through sin WS_EX_TRANSPARENT:** Prohibido el estilo `WS_EX_TRANSPARENT`. El paso de clics a las aplicaciones subyacentes se confía al alfa 0 (completamente transparente) del motor de ventanas por capas de Windows y WPF. La cápsula mantiene un fondo opaco (`#FF000000`), garantizando que capture eventos de ratón.
+  - **No activación ni robo de foco:** Se configuran en el HWND los estilos `WS_EX_TOOLWINDOW` (exclusión de Alt+Tab y barra de tareas) y `WS_EX_NOACTIVATE`. En el procedimiento de ventana (`WndProc`), se intercepta `WM_MOUSEACTIVATE` retornando `MA_NOACTIVATE (3)` para no robar el foco de teclado al hacer clic en la cápsula.
+  - **Topmost reactivo sin timers:** Se implementa `ForegroundWatcher` mediante `SetWinEventHook` escuchando `EVENT_SYSTEM_FOREGROUND` con `WINEVENT_SKIPOWNPROCESS`. La posición `HWND_TOPMOST` se reafirma únicamente cuando cambia la ventana activa, consumiendo 0% CPU en reposo (Regla de oro 1).
+  - **Cero dependencias de WinForms:** Todo el cálculo de monitores, resolución y DPI se efectúa mediante P/Invoke a Win32 (`MonitorFromWindow`, `MonitorFromPoint`, `GetMonitorInfo`, `GetDpiForMonitor`, `GetDpiForWindow`) en `NativeMethods`.
+  - **Aislamiento del cálculo en Core:** El cálculo geométrico y la compensación de escala DPI se aíslan en la clase estática pura `IslandPositionCalculator` dentro de `OpenDynamic.Core.Positioning`, permitiendo pruebas unitarias sin dependencias de plataforma al 100%, 125%, 150% y 200% de escala.
+
