@@ -403,5 +403,22 @@ public static class NativeMethods
 
     [DllImport("kernel32.dll", SetLastError = true)]
     public static extern UIntPtr GlobalSize(IntPtr hMem);
+
+    [Flags]
+    public enum RegNotifyFilter : uint
+    {
+        ChangeName = 1,
+        ChangeAttributes = 2,
+        ChangeLastSet = 4,
+        ChangeSecurity = 8
+    }
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    public static extern int RegNotifyChangeKeyValue(
+        Microsoft.Win32.SafeHandles.SafeRegistryHandle hKey,
+        bool bWatchSubtree,
+        RegNotifyFilter dwNotifyFilter,
+        Microsoft.Win32.SafeHandles.SafeWaitHandle hEvent,
+        bool fAsynchronous);
 }
 
