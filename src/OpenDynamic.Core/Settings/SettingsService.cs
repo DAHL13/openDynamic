@@ -139,6 +139,17 @@ public sealed class SettingsService : ISettingsService
                         loaded.IgnoredDeviceNames ??= new List<string>();
                     }
 
+                    if (loaded.SchemaVersion < 5)
+                    {
+                        // Migration v4 -> v5: Introduce Stopwatch widget settings, priority (45), and configurable timer presets.
+                        loaded.EnableStopwatchWidget = true;
+                        loaded.DefaultStopwatchPriority = 45;
+                        if (loaded.TimerPresetsMinutes == null || loaded.TimerPresetsMinutes.Count == 0)
+                        {
+                            loaded.TimerPresetsMinutes = new List<int> { 1, 5, 10, 15 };
+                        }
+                    }
+
                     loaded.SchemaVersion = AppSettings.CurrentSchemaVersion;
                     CurrentSettings = loaded;
                     WriteSettingsToDisk(CurrentSettings);

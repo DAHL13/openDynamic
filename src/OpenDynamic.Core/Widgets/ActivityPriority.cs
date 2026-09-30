@@ -10,6 +10,7 @@ public static class ActivityPriority
     public const int Hardware = 10;
     public const int Low = 10;
     public const int Media = 30;
+    public const int Stopwatch = 45;
     public const int Timer = 50;
     public const int Normal = 50;
     public const int Device = 60;

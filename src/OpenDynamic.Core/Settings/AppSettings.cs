@@ -13,8 +13,9 @@ public sealed class AppSettings
     /// Current configuration schema version for migration tracking.
     /// Version 3 introduces the MotionMode setting (Auto, Reduced, Full).
     /// Version 4 introduces Network and Device alert settings, priorities, and ignored devices.
+    /// Version 5 introduces Stopwatch widget settings, priority (45), and configurable timer presets.
     /// </summary>
-    public const int CurrentSchemaVersion = 4;
+    public const int CurrentSchemaVersion = 5;
 
     /// <summary>
     /// Configuration schema version. Defaults to <see cref="CurrentSchemaVersion"/>.
@@ -239,6 +240,28 @@ public sealed class AppSettings
     /// </summary>
     public int PomodoroBreakDurationMinutes { get; set; } = 5;
 
+    /// <summary>
+    /// Quick preset durations in minutes displayed in the expanded timer widget and settings.
+    /// Default values: [1, 5, 10, 15].
+    /// </summary>
+    public List<int> TimerPresetsMinutes { get; set; } = new() { 1, 5, 10, 15 };
+
+    #endregion
+
+    #region Stopwatch Settings
+
+    /// <summary>
+    /// Flag to enable or disable the stopwatch widget.
+    /// Default is true.
+    /// </summary>
+    public bool EnableStopwatchWidget { get; set; } = true;
+
+    /// <summary>
+    /// Default priority value for active running stopwatch activity.
+    /// Default is 45.
+    /// </summary>
+    public int DefaultStopwatchPriority { get; set; } = 45;
+
     #endregion
 
     #region Network Settings
@@ -350,6 +373,9 @@ public sealed class AppSettings
             TimerAlertTransientDurationSeconds = this.TimerAlertTransientDurationSeconds,
             PomodoroWorkDurationMinutes = this.PomodoroWorkDurationMinutes,
             PomodoroBreakDurationMinutes = this.PomodoroBreakDurationMinutes,
+            TimerPresetsMinutes = new List<int>(this.TimerPresetsMinutes ?? new List<int> { 1, 5, 10, 15 }),
+            EnableStopwatchWidget = this.EnableStopwatchWidget,
+            DefaultStopwatchPriority = this.DefaultStopwatchPriority,
             ToggleIslandHotkey = this.ToggleIslandHotkey,
             EnableGlobalHotkeys = this.EnableGlobalHotkeys,
             StartWithWindows = this.StartWithWindows,
@@ -403,6 +429,9 @@ public sealed class AppSettings
         TimerAlertTransientDurationSeconds = other.TimerAlertTransientDurationSeconds;
         PomodoroWorkDurationMinutes = other.PomodoroWorkDurationMinutes;
         PomodoroBreakDurationMinutes = other.PomodoroBreakDurationMinutes;
+        TimerPresetsMinutes = new List<int>(other.TimerPresetsMinutes ?? new List<int> { 1, 5, 10, 15 });
+        EnableStopwatchWidget = other.EnableStopwatchWidget;
+        DefaultStopwatchPriority = other.DefaultStopwatchPriority;
         ToggleIslandHotkey = other.ToggleIslandHotkey;
         EnableGlobalHotkeys = other.EnableGlobalHotkeys;
         StartWithWindows = other.StartWithWindows;
