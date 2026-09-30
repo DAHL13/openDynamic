@@ -434,3 +434,55 @@
      - `SettingsService.Load()` migra automáticamente configuraciones previas con `SchemaVersion < 4`, inicializando alertas de red (65, 3.0 s), alertas de dispositivos (60, 3.0 s) y lista de exclusión de dispositivos vacía.
      - Se incorporan tarjetas de configuración con interruptores, deslizadores y gestión de lista de ignorados con accesibilidad completa (`AutomationProperties.Name`) en la pestaña "Widgets y Prioridades" de `SettingsWindow.xaml`.
 
+---
+
+## ADR-020: Cronómetro y Gestión de Múltiples Temporizadores Basados en Marcas de Tiempo (Fase 12)
+
+- **Estado:** Aceptado
+- **Fecha:** 2026-09-29
+- **Contexto:**
+  Para el ciclo v1.1 (Fase 12), openDynamic amplía las capacidades de control temporal permitiendo gestionar hasta 5 temporizadores simultáneos con etiquetas personalizables, botones de preajustes rápidos (1, 5, 10, 15 min), encolado de alertas secuenciales al finalizar y un cronómetro de alta precisión con vueltas (splits). Se exige estricta pureza en Core (Regla de oro 5), consumo de 0% CPU en reposo (Regla de oro 1), ausencia total de robo de foco o entrada de texto en la isla flotante (Regla de oro 3) y un único DispatcherTimer compartido en UI (Regla de oro 11).
+
+- **Decisiones Técnicas:**
+
+  1. **Lógica Pura de Core y Ausencia Absoluta de Deriva Temporal (Regla de Oro 5):**
+     - Se implementa `StopwatchController` en `OpenDynamic.Core.Stopwatch`, calculando el tiempo transcurrido estrictamente mediante marcas de tiempo UTC absolutas provistas por `TimeProvider` (`ElapsedTime = _accumulated + (now - _sessionStartUtc)`). Se prohíbe taxativamente la acumulación iterativa de ticks.
+     - Soporta inicio, pausa con congelamiento exacto de acumulación sin deriva temporal, reanudación y registro de vueltas (`StopwatchLap`) que calcula tanto la duración de la vuelta individual como el tiempo acumulado (*split time*), con formateo `mm:ss.cc` y `h:mm:ss`.
+     - Se implementa `TimerCollection` en `OpenDynamic.Core.Timer`, administrando un tope estricto de hasta 5 instancias de `TimerController` con identificador único y etiqueta amigable.
+     - Compatibilidad hacia atrás: El temporizador y el Pomodoro existentes pasan a constituir el primer elemento de la colección con identificador `"primary"`. Las pruebas unitarias originales de Fase 6 en `TimerControllerTests` permanecen 100% intactas y en verde sin modificación.
+
+  2. **Regla del Temporizador Principal en la Cápsula:**
+     - En todo momento, la cápsula compacta de la muesca visualiza el temporizador que **termina antes** entre los que se encuentran actualmente en estado `Running` (ordenados ascendentemente por `TargetEndTimeUtc`).
+     - Si ninguno está en marcha pero hay pausados, se prioriza el que tenga menor tiempo restante. Si todos están detenidos, se muestra el temporizador predeterminado.
+
+  3. **Presupuesto de Rendimiento y DispatcherTimer Único Compartido (Reglas de Oro 1 y 11):**
+     - Se introduce `TimingUiCoordinator` como servicio centralizado en `OpenDynamic.App.Services`.
+     - Se elimina cualquier `DispatcherTimer` interno individual en `TimerWidget` y `StopwatchWidget`.
+     - Existe un **único** `DispatcherTimer` compartido para toda la interfaz visual. Dicho timer permanece activo **únicamente si el cronómetro está corriendo o si hay al menos un temporizador activo visible en la isla**.
+     - Cuando todos los temporizadores y el cronómetro están pausados, detenidos o inactivos, el `DispatcherTimer` se detiene por completo garantizando 0% CPU.
+     - Vencimiento en segundo plano: Los temporizadores en marcha continúan su curso mediante marcas de tiempo UTC y programan un temporizador de precisión vía `TimeProvider.CreateTimer` hacia el próximo vencimiento (`earliestTarget - now`), despertando reactivamente la UI sin necesidad de refrescos periódicos en segundo plano.
+
+  4. **Sin Entrada de Texto en la Isla Flotante (Reglas de Oro 3 y 6):**
+     - De acuerdo con la arquitectura de ventana overlay sin activación (`WS_EX_NOACTIVATE` y retorno `MA_NOACTIVATE` en `WM_MOUSEACTIVATE`), queda terminantemente prohibido incorporar campos de entrada de texto (`TextBox`) o robo de foco en la Dynamic Island.
+     - La personalización de etiquetas y la creación de temporizadores con nombres específicos se realiza **exclusivamente desde Ajustes (`SettingsWindow`)**. En la vista expandida de la isla solo se ofrecen botones de preajustes rápidos (1, 5, 10, 15 min), sumadores (+1m/+5m) y controles de reproducción/borrado.
+
+  5. **Encolado Secuencial de Alertas de Finalización:**
+     - Al expirar un temporizador, se emite una alerta transitoria en la muesca de prioridad 100 (`ActivityPriority.TimerAlert`) durante 5 segundos con el nombre del temporizador finalizado y retroalimentación auditiva del sistema.
+     - Si dos o más temporizadores concluyen simultáneamente o durante la exhibición de una alerta previa, `TimerCollection` encola las alertas y las reproduce en secuencia estricta de 5 segundos cada una.
+
+  6. **Jerarquía Global de Prioridades:**
+     - Se añade `ActivityPriority.Stopwatch = 45`.
+     - Jerarquía consolidada:
+       `TimerAlert (100) > Battery (90) > Volume (80) > Network (65) > Device (60) > Timer (50) > Stopwatch (45) > Media (30) > Hardware (10)`.
+     - Con temporizador (50) y cronómetro (45) activos concurrentemente, `PriorityResolver` activa de forma determinista el modo Split, asignando el lado primario al temporizador y el secundario al cronómetro.
+
+  7. **Persistencia Segura de Temporizadores:**
+     - Se implementa `TimerPersistenceService` serializando los temporizadores en marcha o pausados en `%AppData%\openDynamic\timers.json`.
+     - Al iniciar la aplicación, los temporizadores vigentes se reanudan calculando el tiempo restante real (`TargetEndTimeUtc - now`). Los temporizadores que vencieron con la app apagada se detectan y notifican una sola vez.
+
+  8. **Migración de Configuración a Schema v5:**
+     - Se incrementa `CurrentSchemaVersion = 5` en `AppSettings.cs`.
+     - Se incorporan `EnableStopwatchWidget` (default: `true`), `DefaultStopwatchPriority` (default: `45`) y `TimerPresetsMinutes` (default: `[1, 5, 10, 15]`).
+     - `SettingsService.Load()` efectúa la migración automática de esquemas anteriores (< 5) sin pérdida de datos del usuario, validado por pruebas unitarias automatizadas.
+
+

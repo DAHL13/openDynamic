@@ -64,6 +64,7 @@ openDynamic adopta una estética de **muesca rectangular superior (Notch)** pega
 | **Fase 9** | **Empaquetado Inno Setup, decisión de runtime (ADR-016), CI/CD y documentación técnica (M6)** | **Completada** |
 | **Fase 10** | **Accesibilidad integral, perfiles de movimiento, alto contraste y UI Automation (v1.1)** | **Completada** |
 | **Fase 11** | **Red (Wi-Fi/Ethernet) y dispositivos periféricos USB/Bluetooth reactivos (v1.1)** | **Completada** |
+| **Fase 12** | **Cronómetro de precisión y múltiples temporizadores con preajustes y cola de alertas (v1.1)** | **Completada** |
 
 ---
 

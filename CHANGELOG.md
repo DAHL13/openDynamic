@@ -3,6 +3,37 @@
 Todas las modificaciones notables en este proyecto serán documentadas en este archivo.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y cumple con [SemVer](https://semver.org/).
 
+## [1.1.0-dev] - 2026-09-29 (Fase 12: Cronómetro y Varios Temporizadores)
+
+### Añadido
+- **Cronómetro de Alta Precisión en Core (`OpenDynamic.Core.Stopwatch`):**
+  - Modelos puros `StopwatchState`, `StopwatchLap`, `StopwatchSnapshot` y controlador `StopwatchController` sin dependencias de plataforma (Regla de Oro 5).
+  - Cálculo estricto basado en marcas de tiempo UTC provistas por `TimeProvider` (`ElapsedTime = accumulated + (now - sessionStartUtc)`), eliminando completamente la acumulación iterativa de ticks y la deriva temporal.
+  - Soporte de vueltas (*laps*) con cálculo independiente del tiempo de vuelta y el tiempo acumulado (*split time*), y formateo dual `mm:ss.cc` y `h:mm:ss`.
+- **Colección de Múltiples Temporizadores en Core (`OpenDynamic.Core.Timer`):**
+  - `TimerCollection`: Administración de hasta 5 temporizadores simultáneos (`TimerController`) con identificador único y etiqueta configurable.
+  - Regla de selección del temporizador principal: La cápsula compacta de la Dynamic Island muestra siempre el temporizador que termina antes entre los que están corriendo.
+  - Encolado secuencial de alertas: Cuando expiran temporizadores concurrentemente, las alertas transitorias (prioridad 100, 5 segundos cada una) se encolan y presentan secuencialmente con su etiqueta y sonido del sistema.
+  - Despertar de bajo consumo: Programación de temporizadores de precisión mediante `TimeProvider.CreateTimer` para expirar reactivamente sin sondeo continuo cuando la isla está oculta o inactiva.
+  - Compatibilidad total: El temporizador y Pomodoro previos pasan a ser el primer elemento (`"primary"`), manteniendo en verde y sin modificaciones las pruebas unitarias de Fase 6.
+- **Persistencia Segura de Temporizadores (`OpenDynamic.Core.Timer.TimerPersistenceService`):**
+  - Serialización de temporizadores activos en `%AppData%\openDynamic\timers.json`.
+  - Restauración automática de temporizadores vigentes al iniciar y reporte único de temporizadores que vencieron con la aplicación cerrada.
+- **Presupuesto de Rendimiento y Coordinador de UI (`OpenDynamic.App.Services.TimingUiCoordinator`):**
+  - Un único `DispatcherTimer` compartido para toda la aplicación (Reglas de Oro 1 y 11), activo únicamente si el cronómetro está corriendo o si hay al menos un temporizador activo visible. Detención absoluta (0% CPU) en reposo o pausa.
+- **Widgets y Vistas en la Muesca (`OpenDynamic.App.Widgets`):**
+  - `StopwatchWidget`: Prioridad 45 (`ActivityPriority.Stopwatch`), vistas `StopwatchCompactView`, `StopwatchExpandedView` (con lista de vueltas cronológica invertida y botones de vuelta/iniciar/reiniciar) y `StopwatchSplitView`.
+  - `TimerWidget`: Vista expandida renovada `TimerExpandedView` con preajustes rápidos (1, 5, 10, 15 min), sumadores (+1m/+5m) y lista interactiva de temporizadores en marcha.
+- **Aislamiento de Entrada de Texto en Ajustes (`SettingsWindow`):**
+  - Creación de temporizadores y edición de nombres restringida exclusivamente a `SettingsWindow` para preservar la arquitectura `WS_EX_NOACTIVATE` sin robo de foco en la Dynamic Island.
+  - Tarjeta dedicada de configuración del cronómetro con interruptor y control de prioridad.
+- **Migración de Esquema de Configuración (Schema v5):**
+  - Incremento a `CurrentSchemaVersion = 5` en `AppSettings.cs` con propiedades `EnableStopwatchWidget`, `DefaultStopwatchPriority` y `TimerPresetsMinutes`.
+  - Migración transparente en `SettingsService.Load()` para versiones `< 5`.
+- **Pruebas Automatizadas:**
+  - Nuevas suites de pruebas unitarias: `StopwatchControllerTests`, `TimerCollectionTests`, `TimerPersistenceServiceTests`, `PriorityResolverPhase12Tests` y actualización de `SettingsServiceTests` (migración v5).
+  - Suite completa de 286 pruebas unitarias en verde.
+
 ## [1.1.0-dev] - 2026-09-29 (Fase 11: Red y Dispositivos Periféricos)
 
 ### Añadido
