@@ -37,7 +37,7 @@
                                  VerticalAlignment="Center">
                         <ProgressBar.Template>
                             <ControlTemplate TargetType="ProgressBar">
-                                <Grid>
+                                <Grid x:Name="PART_Track" ClipToBounds="True">
                                     <Border x:Name="PART_Indicator"
                                             HorizontalAlignment="Left"
                                             CornerRadius="1">

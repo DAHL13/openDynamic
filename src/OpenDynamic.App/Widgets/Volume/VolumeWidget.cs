@@ -102,19 +102,19 @@ public sealed class VolumeWidget : IslandWidgetBase
 
         try
         {
-            _volumeLevel = _volumeController.Volume;
-            _isMuted = _volumeController.IsMuted;
-            _percentage = VolumeCalculator.ToPercentage(_volumeLevel);
-            _iconType = VolumeCalculator.GetVolumeIconType(_volumeLevel, _isMuted);
-            _statusText = _isMuted ? "Silenciado" : $"{_percentage}%";
+            VolumeLevel = _volumeController.Volume;
+            IsMuted = _volumeController.IsMuted;
+            Percentage = VolumeCalculator.ToPercentage(VolumeLevel);
+            IconType = VolumeCalculator.GetVolumeIconType(VolumeLevel, IsMuted);
+            StatusText = IsMuted ? "Silenciado" : $"{Percentage}%";
 
             if (_volumeController is VolumeService vs && !string.IsNullOrEmpty(vs.CurrentDeviceFriendlyName))
             {
-                _deviceName = vs.CurrentDeviceFriendlyName;
+                DeviceName = vs.CurrentDeviceFriendlyName;
             }
 
             _volumeController.VolumeChanged += OnVolumeChanged;
-            Log.Debug("VolumeWidget initialized with level {Level:P0} (Muted: {Muted})", _volumeLevel, _isMuted);
+            Log.Debug("VolumeWidget initialized with level {Level:P0} (Muted: {Muted})", VolumeLevel, IsMuted);
         }
         catch (Exception ex)
         {
@@ -187,6 +187,27 @@ public sealed class VolumeWidget : IslandWidgetBase
         catch (Exception ex)
         {
             Log.Error(ex, "Error adjusting volume via mouse wheel in VolumeWidget.");
+        }
+    }
+
+    /// <summary>
+    /// Sets system volume directly (e.g. from expanded slider interaction),
+    /// immediately resetting the transient grace timer.
+    /// </summary>
+    /// <param name="newVolume">Normalized level in the range [0.0f, 1.0f].</param>
+    public void SetVolume(float newVolume)
+    {
+        try
+        {
+            _volumeController.SetVolume(Math.Clamp(newVolume, 0f, 1f));
+
+            var duration = TimeSpan.FromSeconds(_settings.VolumeTransientDurationSeconds);
+            Activate(transientDuration: duration, priorityOverride: _settings.DefaultVolumePriority);
+            ResetTransientTimer(duration);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Error setting volume in VolumeWidget.");
         }
     }
 

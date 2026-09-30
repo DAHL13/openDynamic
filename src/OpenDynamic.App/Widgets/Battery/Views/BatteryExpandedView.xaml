@@ -41,7 +41,7 @@
                              Value="{Binding Percent, Mode=OneWay}">
                     <ProgressBar.Template>
                         <ControlTemplate TargetType="ProgressBar">
-                            <Grid>
+                            <Grid x:Name="PART_Track" ClipToBounds="True">
                                 <Border Background="#33FFFFFF"
                                         CornerRadius="7"
                                         Height="14" />

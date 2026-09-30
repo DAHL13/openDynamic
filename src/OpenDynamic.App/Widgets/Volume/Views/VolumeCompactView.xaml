@@ -101,7 +101,7 @@
                      AutomationProperties.Name="Nivel de volumen maestro">
             <ProgressBar.Template>
                 <ControlTemplate TargetType="ProgressBar">
-                    <Grid>
+                    <Grid x:Name="PART_Track" ClipToBounds="True">
                         <!-- Track Background -->
                         <Border Background="#33FFFFFF"
                                 CornerRadius="3"

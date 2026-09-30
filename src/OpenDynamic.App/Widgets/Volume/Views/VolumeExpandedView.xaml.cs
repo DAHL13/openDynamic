@@ -28,7 +28,7 @@ public partial class VolumeExpandedView : UserControl
             float target = (float)(e.NewValue / 100.0);
             if (MathF.Abs(widget.VolumeLevel - target) > 0.015f)
             {
-                widget.AdjustVolume((int)((e.NewValue - e.OldValue) * 12.0));
+                widget.SetVolume(target);
             }
         }
     }

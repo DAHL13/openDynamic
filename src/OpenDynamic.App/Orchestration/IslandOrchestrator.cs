@@ -33,6 +33,7 @@ public sealed class IslandOrchestrator : IDisposable
 
     private IIslandWidget? _activePrimaryWidget;
     private IIslandWidget? _activeSecondaryWidget;
+    private System.Windows.Media.Color? _currentMediaAccentColor;
     private bool _isSplitSwapped;
     private string? _lastSplitPrimaryId;
     private string? _lastSplitSecondaryId;
@@ -102,13 +103,14 @@ public sealed class IslandOrchestrator : IDisposable
 
         WeakReferenceMessenger.Default.Register<MediaAccentColorChangedMessage>(this, (_, msg) =>
         {
+            _currentMediaAccentColor = msg.AccentColor;
             DispatchToUIThread(() =>
             {
                 if (_activePrimaryWidget is Widgets.Media.MediaWidget &&
                     _settings.EnableDynamicMediaColor &&
                     _stateMachine.CurrentState != IslandState.Hidden)
                 {
-                    _islandView?.ApplyAccentBorder(msg.AccentColor);
+                    _islandView?.ApplyAccentBorder(_currentMediaAccentColor);
                 }
                 else
                 {
@@ -497,7 +499,14 @@ public sealed class IslandOrchestrator : IDisposable
             _settings.EnableDynamicMediaColor &&
             targetState != IslandState.Hidden)
         {
-            _islandView?.ApplyAccentBorder(mediaWidget.AccentColor);
+            var colorToApply = _currentMediaAccentColor;
+            if (colorToApply == null && mediaWidget.AccentColor != System.Windows.Media.Color.FromRgb(255, 255, 255))
+            {
+                colorToApply = mediaWidget.AccentColor;
+                _currentMediaAccentColor = colorToApply;
+            }
+
+            _islandView?.ApplyAccentBorder(colorToApply);
         }
         else
         {
