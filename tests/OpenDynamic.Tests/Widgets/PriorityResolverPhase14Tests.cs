@@ -8,12 +8,12 @@ public sealed class PriorityResolverPhase14Tests
 {
     private sealed class MockSource : IActivitySource
     {
-        public string Id { get; init; } = "";
-        public int Priority { get; init; }
-        public bool IsActive { get; init; } = true;
-        public bool IsTransient { get; init; }
-        public DateTimeOffset? LastActivatedUtc { get; init; }
-        public TimeSpan? TransientDuration { get; init; }
+        public string Id { get; set; } = "";
+        public int Priority { get; set; }
+        public bool IsActive { get; set; } = true;
+        public bool IsTransient { get; set; }
+        public DateTimeOffset? LastActivatedUtc { get; set; }
+        public TimeSpan? TransientDuration { get; set; }
         public IslandActivity? CurrentActivity => null;
 #pragma warning disable CS0067
         public event EventHandler? Changed;
@@ -252,6 +252,63 @@ public sealed class PriorityResolverPhase14Tests
         Assert.Equal("clipboard", result.Primary?.Id);
         Assert.Equal("timer", result.Secondary?.Id);
         Assert.Equal(IslandState.Split, result.SuggestedState);
+        Assert.Null(result.NextExpirationUtc);
+    }
+
+    [Fact]
+    public void ExpandedClipboard_TransitionsFromTransientToPersistent_ClearsNextExpirationUtc()
+    {
+        var resolver = new PriorityResolver();
+        var startTime = DateTimeOffset.UtcNow;
+
+        // Step 1: Initial transient state (2.0 seconds)
+        var source = new MockSource
+        {
+            Id = "clipboard",
+            Priority = ActivityPriority.Clipboard,
+            IsActive = true,
+            IsTransient = true,
+            LastActivatedUtc = startTime,
+            TransientDuration = TimeSpan.FromSeconds(2.0)
+        };
+
+        var initialResult = resolver.Resolve(new[] { source }, startTime.AddSeconds(0.5));
+        Assert.NotNull(initialResult.Primary);
+        Assert.NotNull(initialResult.NextExpirationUtc);
+        Assert.Equal(startTime.AddSeconds(2.0), initialResult.NextExpirationUtc.Value);
+
+        // Step 2: User expands notch -> OnExpand pauses transient state
+        source.IsTransient = false;
+        source.TransientDuration = null;
+
+        var expandedResult = resolver.Resolve(new[] { source }, startTime.AddSeconds(1.0));
+        Assert.NotNull(expandedResult.Primary);
+        Assert.Equal("clipboard", expandedResult.Primary.Id);
+        Assert.Null(expandedResult.NextExpirationUtc);
+    }
+
+    [Fact]
+    public void ExpandedClipboard_ExpiredTransientDuration_IsNotDiscardedWhenIsTransientIsFalse()
+    {
+        var resolver = new PriorityResolver();
+        var startTime = DateTimeOffset.UtcNow;
+
+        var expandedSource = new MockSource
+        {
+            Id = "clipboard",
+            Priority = ActivityPriority.Clipboard,
+            IsActive = true,
+            IsTransient = false,
+            LastActivatedUtc = startTime,
+            TransientDuration = null
+        };
+
+        // Evaluate 10 minutes later: must never be discarded as expired
+        var tenMinutesLater = startTime.AddMinutes(10);
+        var result = resolver.Resolve(new[] { expandedSource }, tenMinutesLater);
+
+        Assert.NotNull(result.Primary);
+        Assert.Equal("clipboard", result.Primary.Id);
         Assert.Null(result.NextExpirationUtc);
     }
 }

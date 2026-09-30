@@ -152,7 +152,7 @@ public sealed class ClipboardWidget : IslandWidgetBase
             RefreshRecentItems();
 
             // If the widget is already expanded, do not start transient auto-close timer
-            if (DisplayMode == OpenDynamic.Core.Widgets.WidgetDisplayMode.Expanded)
+            if (DisplayMode == OpenDynamic.Core.Widgets.WidgetDisplayMode.Expanded || !IsTransient)
             {
                 return;
             }
@@ -235,6 +235,20 @@ public sealed class ClipboardWidget : IslandWidgetBase
         _feedbackTimer.Start();
     }
 
+    public override void SetDisplayState(OpenDynamic.Core.Widgets.WidgetDisplayMode mode, bool isVisible)
+    {
+        base.SetDisplayState(mode, isVisible);
+
+        if (mode == OpenDynamic.Core.Widgets.WidgetDisplayMode.Expanded)
+        {
+            // Immediately stop any transient timer and pause transient status while expanded
+            _transientTimer?.Stop();
+            _transientTimer = null;
+            IsTransient = false;
+            TransientDuration = null;
+        }
+    }
+
     public override void OnExpand()
     {
         base.OnExpand();
@@ -274,10 +288,10 @@ public sealed class ClipboardWidget : IslandWidgetBase
             _transientTimer.Stop();
             _transientTimer = null;
 
-            // Defensive guard: never deactivate if the user is currently in Expanded mode
-            if (DisplayMode == OpenDynamic.Core.Widgets.WidgetDisplayMode.Expanded)
+            // Defensive guard: never deactivate if the user is currently in Expanded mode or non-transient
+            if (DisplayMode == OpenDynamic.Core.Widgets.WidgetDisplayMode.Expanded || !IsTransient)
             {
-                Log.Debug("ClipboardWidget transient lifespan expired while in Expanded mode; ignoring deactivation.");
+                Log.Debug("ClipboardWidget transient lifespan expired while in Expanded mode or non-transient; ignoring deactivation.");
                 return;
             }
 

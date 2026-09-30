@@ -376,6 +376,14 @@ public partial class IslandWindow : Window
 
         Dispatcher.InvokeAsync(() =>
         {
+            // Click-away: if another application window receives foreground focus while expanded, collapse cleanly
+            if (_orchestrator.StateMachine.CurrentState == IslandState.Expanded)
+            {
+                Log.Debug("Foreground window changed while Island is Expanded. Collapsing capsule due to click-away.");
+                _hoverLeaveTimer.Stop();
+                _orchestrator.RequestCollapse();
+            }
+
             if (_hwnd != IntPtr.Zero && IsVisible && !_orchestrator.IsFullscreenSuppressed)
             {
                 _windowPositioner.ReassertTopmost(_hwnd);
@@ -518,8 +526,40 @@ public partial class IslandWindow : Window
             }
         }
 
+        this.PreviewMouseDown += (s, e) =>
+        {
+            if (_orchestrator.StateMachine.CurrentState == IslandState.Expanded && !IsPointerOverNotch())
+            {
+                Log.Debug("Click outside notch detected within IslandWindow bounds. Collapsing capsule due to click-away.");
+                _hoverLeaveTimer.Stop();
+                _orchestrator.RequestCollapse();
+            }
+        };
+
         IslandHostView.MouseEnter += (s, e) => OnPointerEnter();
         IslandHostView.MouseLeave += (s, e) => OnPointerLeave();
+        IslandHostView.PreviewMouseMove += (s, e) =>
+        {
+            if (_hoverLeaveTimer.IsEnabled)
+            {
+                _hoverLeaveTimer.Stop();
+            }
+        };
+        IslandHostView.PreviewMouseWheel += (s, e) =>
+        {
+            if (_hoverLeaveTimer.IsEnabled)
+            {
+                _hoverLeaveTimer.Stop();
+            }
+        };
+        IslandHostView.PreviewMouseDown += (s, e) =>
+        {
+            if (_hoverLeaveTimer.IsEnabled)
+            {
+                _hoverLeaveTimer.Stop();
+            }
+        };
+
         mainCapsule.MouseEnter += (s, e) => OnPointerEnter();
         mainCapsule.MouseLeave += (s, e) => OnPointerLeave();
         satellite.MouseEnter += (s, e) => OnPointerEnter();

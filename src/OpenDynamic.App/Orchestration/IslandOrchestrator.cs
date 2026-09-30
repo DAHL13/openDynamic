@@ -389,32 +389,6 @@ public sealed class IslandOrchestrator : IDisposable
         }
 
 
-        // Schedule timer if an active transient alert has an expiration scheduled
-        // NOTE: In Expanded mode, transient auto-close is paused so the user can interact freely.
-        if (!_userExpanded && result.NextExpirationUtc.HasValue)
-        {
-            var delay = result.NextExpirationUtc.Value - DateTimeOffset.UtcNow;
-            if (delay <= TimeSpan.Zero)
-            {
-                // Already expired: trigger next cycle asynchronously
-                DispatchToUIThread(UpdateOrchestration);
-                return;
-            }
-
-            _transientTimer = new DispatcherTimer
-            {
-                Interval = delay
-            };
-            _transientTimer.Tick += (s, e) =>
-            {
-                _transientTimer.Stop();
-                _transientTimer = null;
-                Log.Debug("Transient activity lifespan expired. Re-evaluating priorities.");
-                UpdateOrchestration();
-            };
-            _transientTimer.Start();
-        }
-
         // Determine destination state
         IslandState targetState;
         if (_activePrimaryWidget == null)
@@ -437,6 +411,32 @@ public sealed class IslandOrchestrator : IDisposable
             {
                 targetState = IslandState.Compact;
             }
+        }
+
+        // Schedule timer if an active transient alert has an expiration scheduled
+        // NOTE: In Expanded mode, transient auto-close is paused so the user can interact freely.
+        if (!_userExpanded && targetState != IslandState.Expanded && _stateMachine.CurrentState != IslandState.Expanded && result.NextExpirationUtc.HasValue)
+        {
+            var delay = result.NextExpirationUtc.Value - DateTimeOffset.UtcNow;
+            if (delay <= TimeSpan.Zero)
+            {
+                // Already expired: trigger next cycle asynchronously
+                DispatchToUIThread(UpdateOrchestration);
+                return;
+            }
+
+            _transientTimer = new DispatcherTimer
+            {
+                Interval = delay
+            };
+            _transientTimer.Tick += (s, e) =>
+            {
+                _transientTimer.Stop();
+                _transientTimer = null;
+                Log.Debug("Transient activity lifespan expired. Re-evaluating priorities.");
+                UpdateOrchestration();
+            };
+            _transientTimer.Start();
         }
 
         // Render views with fault isolation and view reuse to eliminate flickering
