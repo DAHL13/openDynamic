@@ -332,6 +332,39 @@ public sealed class SettingsServiceTests : IDisposable
     }
 
     [Fact]
+    public void Load_WhenSchemaVersionIs6_MigratesToSchemaVersion7_SetsDefaultOptInClipboardSettings()
+    {
+        string filePath = Path.Combine(_testDirectory, "settings_v6.json");
+        // Schema version 6 (Phase 13 with Media Color/Gestures but without Clipboard)
+        const string v6Json = """
+        {
+            "SchemaVersion": 6,
+            "EnableMediaWidget": true,
+            "EnableDynamicMediaColor": true,
+            "CapsuleWidth": 210.0
+        }
+        """;
+
+        File.WriteAllText(filePath, v6Json);
+
+        using var service = new SettingsService(filePath, debounceMilliseconds: 100);
+        service.Load();
+
+        Assert.Equal(AppSettings.CurrentSchemaVersion, service.CurrentSettings.SchemaVersion);
+        Assert.Equal(210.0, service.CurrentSettings.CapsuleWidth);
+        Assert.False(service.CurrentSettings.EnableClipboardWidget);
+        Assert.Equal(55, service.CurrentSettings.DefaultClipboardPriority);
+        Assert.Equal(2.0, service.CurrentSettings.ClipboardTransientDurationSeconds);
+        Assert.True(service.CurrentSettings.ShowClipboardPreview);
+        Assert.Equal(5, service.CurrentSettings.ClipboardHistoryCapacity);
+        Assert.Equal(10, service.CurrentSettings.ClipboardExpirationMinutes);
+
+        string reloadedJson = File.ReadAllText(filePath);
+        Assert.Contains($"\"SchemaVersion\": {AppSettings.CurrentSchemaVersion}", reloadedJson);
+        Assert.Contains("\"EnableClipboardWidget\": false", reloadedJson);
+    }
+
+    [Fact]
     public void Load_WhenMotionModeIsConfigured_PersistsAndDeserializesCorrectly()
     {
         string filePath = Path.Combine(_testDirectory, "settings_motion.json");
@@ -447,7 +480,13 @@ public sealed class SettingsServiceTests : IDisposable
             ToggleIslandHotkey = "Win+Alt+O",
             EnableGlobalHotkeys = false,
             StartWithWindows = true,
-            MotionMode = OpenDynamic.Core.Animation.MotionMode.Reduced
+            MotionMode = OpenDynamic.Core.Animation.MotionMode.Reduced,
+            EnableClipboardWidget = true,
+            DefaultClipboardPriority = 55,
+            ClipboardTransientDurationSeconds = 2.5,
+            ShowClipboardPreview = false,
+            ClipboardHistoryCapacity = 7,
+            ClipboardExpirationMinutes = 15
         };
 
         var cloned = original.Clone();
@@ -477,6 +516,12 @@ public sealed class SettingsServiceTests : IDisposable
         Assert.Equal(original.PomodoroWorkDurationMinutes, cloned.PomodoroWorkDurationMinutes);
         Assert.Equal(original.ToggleIslandHotkey, cloned.ToggleIslandHotkey);
         Assert.Equal(original.StartWithWindows, cloned.StartWithWindows);
+        Assert.Equal(original.EnableClipboardWidget, cloned.EnableClipboardWidget);
+        Assert.Equal(original.DefaultClipboardPriority, cloned.DefaultClipboardPriority);
+        Assert.Equal(original.ClipboardTransientDurationSeconds, cloned.ClipboardTransientDurationSeconds);
+        Assert.Equal(original.ShowClipboardPreview, cloned.ShowClipboardPreview);
+        Assert.Equal(original.ClipboardHistoryCapacity, cloned.ClipboardHistoryCapacity);
+        Assert.Equal(original.ClipboardExpirationMinutes, cloned.ClipboardExpirationMinutes);
 
         var destination = new AppSettings();
         destination.CopyFrom(original);
@@ -485,5 +530,7 @@ public sealed class SettingsServiceTests : IDisposable
         Assert.Equal(original.ToggleIslandHotkey, destination.ToggleIslandHotkey);
         Assert.Equal(original.StartWithWindows, destination.StartWithWindows);
         Assert.Equal(original.MotionMode, destination.MotionMode);
+        Assert.Equal(original.EnableClipboardWidget, destination.EnableClipboardWidget);
+        Assert.Equal(original.ClipboardHistoryCapacity, destination.ClipboardHistoryCapacity);
     }
 }

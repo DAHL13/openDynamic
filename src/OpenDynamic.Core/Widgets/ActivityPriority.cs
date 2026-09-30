@@ -13,6 +13,7 @@ public static class ActivityPriority
     public const int Stopwatch = 45;
     public const int Timer = 50;
     public const int Normal = 50;
+    public const int Clipboard = 55;
     public const int Device = 60;
     public const int Network = 65;
     public const int Volume = 80;

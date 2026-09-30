@@ -15,8 +15,9 @@ public sealed class AppSettings
     /// Version 4 introduces Network and Device alert settings, priorities, and ignored devices.
     /// Version 5 introduces Stopwatch widget settings, priority (45), and configurable timer presets.
     /// Version 6 introduces Dynamic Album Art Color and Horizontal Media Gestures with sensitivity.
+    /// Version 7 introduces Opt-In In-Memory Clipboard History, transient notices, preview toggle, capacity and expiration settings.
     /// </summary>
-    public const int CurrentSchemaVersion = 6;
+    public const int CurrentSchemaVersion = 7;
 
     /// <summary>
     /// Configuration schema version. Defaults to <see cref="CurrentSchemaVersion"/>.
@@ -332,6 +333,47 @@ public sealed class AppSettings
 
     #endregion
 
+    #region Clipboard Settings
+
+    /// <summary>
+    /// Flag to enable or disable the in-memory clipboard history widget.
+    /// Strictly OFF by default for absolute privacy (Golden Rule 10).
+    /// </summary>
+    public bool EnableClipboardWidget { get; set; } = false;
+
+    /// <summary>
+    /// Default priority value for clipboard transient notices.
+    /// Default is 55.
+    /// </summary>
+    public int DefaultClipboardPriority { get; set; } = 55;
+
+    /// <summary>
+    /// Lifespan in seconds for clipboard transient alerts.
+    /// Default is 2.0 seconds.
+    /// </summary>
+    public double ClipboardTransientDurationSeconds { get; set; } = 2.0;
+
+    /// <summary>
+    /// Flag to show sanitized text preview in clipboard alerts.
+    /// If false, only displays generic "Texto copiado".
+    /// Default is true.
+    /// </summary>
+    public bool ShowClipboardPreview { get; set; } = true;
+
+    /// <summary>
+    /// Maximum number of recent items kept in memory (1 to 10).
+    /// Default is 5.
+    /// </summary>
+    public int ClipboardHistoryCapacity { get; set; } = 5;
+
+    /// <summary>
+    /// Lifespan in minutes before an in-memory clipboard entry expires and is purged.
+    /// Default is 10 minutes.
+    /// </summary>
+    public int ClipboardExpirationMinutes { get; set; } = 10;
+
+    #endregion
+
     #region Hotkeys and Autostart
 
     /// <summary>
@@ -408,7 +450,13 @@ public sealed class AppSettings
             EnableDeviceAlerts = this.EnableDeviceAlerts,
             DefaultDevicePriority = this.DefaultDevicePriority,
             DeviceTransientDurationSeconds = this.DeviceTransientDurationSeconds,
-            IgnoredDeviceNames = new List<string>(this.IgnoredDeviceNames)
+            IgnoredDeviceNames = new List<string>(this.IgnoredDeviceNames),
+            EnableClipboardWidget = this.EnableClipboardWidget,
+            DefaultClipboardPriority = this.DefaultClipboardPriority,
+            ClipboardTransientDurationSeconds = this.ClipboardTransientDurationSeconds,
+            ShowClipboardPreview = this.ShowClipboardPreview,
+            ClipboardHistoryCapacity = this.ClipboardHistoryCapacity,
+            ClipboardExpirationMinutes = this.ClipboardExpirationMinutes
         };
     }
 
@@ -467,5 +515,11 @@ public sealed class AppSettings
         DefaultDevicePriority = other.DefaultDevicePriority;
         DeviceTransientDurationSeconds = other.DeviceTransientDurationSeconds;
         IgnoredDeviceNames = new List<string>(other.IgnoredDeviceNames ?? Enumerable.Empty<string>());
+        EnableClipboardWidget = other.EnableClipboardWidget;
+        DefaultClipboardPriority = other.DefaultClipboardPriority;
+        ClipboardTransientDurationSeconds = other.ClipboardTransientDurationSeconds;
+        ShowClipboardPreview = other.ShowClipboardPreview;
+        ClipboardHistoryCapacity = other.ClipboardHistoryCapacity;
+        ClipboardExpirationMinutes = other.ClipboardExpirationMinutes;
     }
 }

@@ -158,6 +158,17 @@ public sealed class SettingsService : ISettingsService
                         loaded.MediaGestureSensitivity = 120.0;
                     }
 
+                    if (loaded.SchemaVersion < 7)
+                    {
+                        // Migration v6 -> v7: Introduce In-Memory Clipboard History (Strictly Opt-In, false by default).
+                        loaded.EnableClipboardWidget = false;
+                        loaded.DefaultClipboardPriority = 55;
+                        loaded.ClipboardTransientDurationSeconds = 2.0;
+                        loaded.ShowClipboardPreview = true;
+                        loaded.ClipboardHistoryCapacity = 5;
+                        loaded.ClipboardExpirationMinutes = 10;
+                    }
+
                     loaded.SchemaVersion = AppSettings.CurrentSchemaVersion;
                     CurrentSettings = loaded;
                     WriteSettingsToDisk(CurrentSettings);
