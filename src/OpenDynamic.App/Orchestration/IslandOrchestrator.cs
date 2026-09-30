@@ -102,12 +102,20 @@ public sealed class IslandOrchestrator : IDisposable
 
         WeakReferenceMessenger.Default.Register<MediaAccentColorChangedMessage>(this, (_, msg) =>
         {
-            if (_activePrimaryWidget is Widgets.Media.MediaWidget &&
-                _settings.EnableDynamicMediaColor &&
-                _stateMachine.CurrentState != IslandState.Hidden)
+            DispatchToUIThread(() =>
             {
-                _islandView?.Dispatcher.InvokeAsync(() => _islandView.ApplyAccentBorder(msg.AccentColor));
-            }
+                if (_activePrimaryWidget is Widgets.Media.MediaWidget &&
+                    _settings.EnableDynamicMediaColor &&
+                    _stateMachine.CurrentState != IslandState.Hidden)
+                {
+                    _islandView?.ApplyAccentBorder(msg.AccentColor);
+                }
+                else
+                {
+                    // Any non-media widget MUST display default system border (#55FFFFFF)
+                    _islandView?.ApplyAccentBorder(null);
+                }
+            });
         });
     }
 
@@ -242,6 +250,7 @@ public sealed class IslandOrchestrator : IDisposable
 
         // Halt any animation and snap immediately to Hidden (Golden Rule 1: 0% CPU)
         _animator.SnapTo(IslandState.Hidden);
+        _islandView?.ApplyAccentBorder(null);
 
         lock (_widgets)
         {
@@ -286,6 +295,7 @@ public sealed class IslandOrchestrator : IDisposable
 
         // Halt any in-flight spring animation
         _animator.SnapTo(_animator.TargetDimensions);
+        _islandView?.ApplyAccentBorder(null);
 
         lock (_widgets)
         {
@@ -773,6 +783,7 @@ public sealed class IslandOrchestrator : IDisposable
         _transientTimer = null;
 
         WeakReferenceMessenger.Default.UnregisterAll(this);
+        _islandView?.ApplyAccentBorder(null);
 
         _currentPrimaryView = null;
         _currentPrimaryWidgetId = null;
