@@ -152,7 +152,7 @@ public sealed class ClipboardWidget : IslandWidgetBase
             RefreshRecentItems();
 
             // If the widget is already expanded, do not start transient auto-close timer
-            if (DisplayMode == OpenDynamic.Core.Widgets.WidgetDisplayMode.Expanded || !IsTransient)
+            if (DisplayMode == OpenDynamic.Core.Widgets.WidgetDisplayMode.Expanded)
             {
                 return;
             }
