@@ -63,6 +63,7 @@ public partial class SettingsViewModel : ObservableObject
     private readonly NetworkService? _networkService;
     private readonly DeviceService? _deviceService;
     private readonly ITimerCollection? _timerCollection;
+    private readonly ClipboardService? _clipboardService;
 
     private readonly AppSettings _settings;
 
@@ -223,6 +224,25 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string? _selectedIgnoredDevice;
 
+    // Clipboard History (Phase 14 - Strict RAM Residency)
+    [ObservableProperty]
+    private bool _enableClipboardWidget;
+
+    [ObservableProperty]
+    private int _defaultClipboardPriority;
+
+    [ObservableProperty]
+    private double _clipboardTransientDurationSeconds;
+
+    [ObservableProperty]
+    private bool _showClipboardPreview;
+
+    [ObservableProperty]
+    private int _clipboardHistoryCapacity;
+
+    [ObservableProperty]
+    private int _clipboardExpirationMinutes;
+
     // Motion and Animations (Phase 10)
     [ObservableProperty]
     private MotionMode _motionMode;
@@ -261,7 +281,8 @@ public partial class SettingsViewModel : ObservableObject
         Func<IslandWindow>? getIslandWindow = null,
         NetworkService? networkService = null,
         DeviceService? deviceService = null,
-        ITimerCollection? timerCollection = null)
+        ITimerCollection? timerCollection = null,
+        ClipboardService? clipboardService = null)
     {
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _orchestrator = orchestrator ?? throw new ArgumentNullException(nameof(orchestrator));
@@ -272,6 +293,7 @@ public partial class SettingsViewModel : ObservableObject
         _networkService = networkService;
         _deviceService = deviceService;
         _timerCollection = timerCollection;
+        _clipboardService = clipboardService;
 
         _settings = _settingsService.CurrentSettings;
 
@@ -332,6 +354,13 @@ public partial class SettingsViewModel : ObservableObject
         _deviceTransientDurationSeconds = _settings.DeviceTransientDurationSeconds;
 
         _ignoredDeviceNames = new ObservableCollection<string>(_settings.IgnoredDeviceNames ?? Enumerable.Empty<string>());
+
+        _enableClipboardWidget = _settings.EnableClipboardWidget;
+        _defaultClipboardPriority = _settings.DefaultClipboardPriority;
+        _clipboardTransientDurationSeconds = _settings.ClipboardTransientDurationSeconds;
+        _showClipboardPreview = _settings.ShowClipboardPreview;
+        _clipboardHistoryCapacity = _settings.ClipboardHistoryCapacity;
+        _clipboardExpirationMinutes = _settings.ClipboardExpirationMinutes;
 
         _hideOnFullscreen = _settings.HideOnFullscreen;
         _startWithWindows = _autostartService.IsEnabled();
@@ -692,6 +721,57 @@ public partial class SettingsViewModel : ObservableObject
             _deviceService?.UpdateIgnoredDevices();
             _settingsService.SaveDebounced();
         }
+    }
+
+    partial void OnEnableClipboardWidgetChanged(bool value)
+    {
+        _settings.EnableClipboardWidget = value;
+        _settingsService.SaveDebounced();
+        _clipboardService?.UpdateEnabledState(value);
+    }
+
+    partial void OnDefaultClipboardPriorityChanged(int value)
+    {
+        _settings.DefaultClipboardPriority = value;
+        _settingsService.SaveDebounced();
+    }
+
+    partial void OnClipboardTransientDurationSecondsChanged(double value)
+    {
+        _settings.ClipboardTransientDurationSeconds = value;
+        _settingsService.SaveDebounced();
+    }
+
+    partial void OnShowClipboardPreviewChanged(bool value)
+    {
+        _settings.ShowClipboardPreview = value;
+        _settingsService.SaveDebounced();
+    }
+
+    partial void OnClipboardHistoryCapacityChanged(int value)
+    {
+        _settings.ClipboardHistoryCapacity = Math.Clamp(value, 1, 10);
+        if (_clipboardService != null)
+        {
+            _clipboardService.HistoryManager.Capacity = _settings.ClipboardHistoryCapacity;
+        }
+        _settingsService.SaveDebounced();
+    }
+
+    partial void OnClipboardExpirationMinutesChanged(int value)
+    {
+        _settings.ClipboardExpirationMinutes = Math.Max(1, value);
+        if (_clipboardService != null)
+        {
+            _clipboardService.HistoryManager.Expiration = TimeSpan.FromMinutes(_settings.ClipboardExpirationMinutes);
+        }
+        _settingsService.SaveDebounced();
+    }
+
+    [RelayCommand]
+    public void ClearClipboardHistory()
+    {
+        _clipboardService?.ClearHistory();
     }
 
     partial void OnHideOnFullscreenChanged(bool value)

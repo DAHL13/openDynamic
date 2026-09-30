@@ -769,6 +769,92 @@
                                 </StackPanel>
                             </StackPanel>
                         </Border>
+
+                        <!-- Portapapeles Reciente (Fase 14 - Strict RAM Residency) -->
+                        <Border Style="{StaticResource SettingCard}">
+                            <StackPanel>
+                                <TextBlock Text="📋 Portapapeles Reciente (Estrictamente en RAM)" Style="{StaticResource SectionHeader}"/>
+
+                                <!-- Warning/Privacy Box -->
+                                <Border Background="#1A22C55E" BorderBrush="#3322C55E" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,0,0,12">
+                                    <TextBlock Text="🔒 Privacidad Absoluta: El historial vive exclusivamente en memoria RAM. Queda terminantemente prohibido almacenar texto o imágenes en disco o en logs. Al bloquear la sesión de Windows o suspender el equipo, la memoria se vacía automáticamente."
+                                               Foreground="#86EFAC" FontSize="11" TextWrapping="Wrap"/>
+                                </Border>
+
+                                <!-- Activar Historial del Portapapeles -->
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Activar Historial del Portapapeles" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Muestra avisos transitorios de copiado y permite recuperar elementos recientes en la vista expandida (Desactivado por defecto)" Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <CheckBox Grid.Column="1" IsChecked="{Binding EnableClipboardWidget}"
+                                              VerticalAlignment="Center" AutomationProperties.Name="Activar Historial del Portapapeles"/>
+                                </Grid>
+
+                                <!-- Mostrar Vista Previa -->
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Mostrar Vista Previa del Texto" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Muestra las primeras palabras del texto en el aviso de la isla en vez de solo 'Texto copiado'" Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <CheckBox Grid.Column="1" IsChecked="{Binding ShowClipboardPreview}"
+                                              IsEnabled="{Binding EnableClipboardWidget}"
+                                              VerticalAlignment="Center" AutomationProperties.Name="Mostrar Vista Previa del Texto"/>
+                                </Grid>
+
+                                <!-- Cantidad de elementos (Capacidad) -->
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Elementos Recientes Guardados" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Cantidad máxima de elementos recientes en memoria (1 a 10, por defecto 5)" Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="1" Text="{Binding ClipboardHistoryCapacity}" Style="{StaticResource ValueBadge}"/>
+                                </Grid>
+                                <Slider Minimum="1" Maximum="10" SmallChange="1" LargeChange="2"
+                                        IsSnapToTickEnabled="True" TickFrequency="1"
+                                        Value="{Binding ClipboardHistoryCapacity}"
+                                        IsEnabled="{Binding EnableClipboardWidget}"
+                                        Margin="0,0,0,14" AutomationProperties.Name="Cantidad de elementos recientes"/>
+
+                                <!-- Tiempo de expiración -->
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Tiempo de Expiración en Memoria" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Minutos tras los cuales los elementos se eliminan de la memoria RAM (1 a 60 min, por defecto 10 min)" Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="1" Text="{Binding ClipboardExpirationMinutes, StringFormat='{}{0} min'}" Style="{StaticResource ValueBadge}"/>
+                                </Grid>
+                                <Slider Minimum="1" Maximum="60" SmallChange="1" LargeChange="5"
+                                        IsSnapToTickEnabled="True" TickFrequency="1"
+                                        Value="{Binding ClipboardExpirationMinutes}"
+                                        IsEnabled="{Binding EnableClipboardWidget}"
+                                        Margin="0,0,0,14" AutomationProperties.Name="Tiempo de expiración en memoria"/>
+
+                                <!-- Botón Borrar Historial Ahora -->
+                                <Button Content="🗑 Borrar Historial Ahora"
+                                        Command="{Binding ClearClipboardHistoryCommand}"
+                                        Height="32" Padding="14,0"
+                                        Background="#252A36" Foreground="#F87171" BorderBrush="#374151" BorderThickness="1"
+                                        HorizontalAlignment="Left"
+                                        AutomationProperties.Name="Borrar historial del portapapeles ahora"/>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>

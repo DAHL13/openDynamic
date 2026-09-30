@@ -135,7 +135,8 @@ public static class ServiceCollectionExtensions
             () => sp.GetRequiredService<IslandWindow>(),
             sp.GetRequiredService<NetworkService>(),
             sp.GetRequiredService<DeviceService>(),
-            sp.GetRequiredService<Core.Timer.ITimerCollection>()));
+            sp.GetRequiredService<Core.Timer.ITimerCollection>(),
+            sp.GetRequiredService<ClipboardService>()));
         services.AddSingleton<SettingsWindow>();
 
         // System Tray Icon Manager
@@ -144,7 +145,8 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<WindowPositioner>(),
             sp.GetRequiredService<ISettingsService>(),
             () => sp.GetRequiredService<IslandWindow>(),
-            () => sp.GetRequiredService<SettingsWindow>().ShowSettings()));
+            () => sp.GetRequiredService<SettingsWindow>().ShowSettings(),
+            sp.GetRequiredService<ClipboardService>()));
 
         return services;
     }

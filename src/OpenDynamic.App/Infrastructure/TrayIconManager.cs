@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using H.NotifyIcon;
 using OpenDynamic.App.Orchestration;
+using OpenDynamic.App.Services;
 using OpenDynamic.App.Widgets.Hardware;
 using OpenDynamic.App.Windowing;
 using OpenDynamic.Core.Settings;
@@ -23,6 +24,7 @@ public sealed class TrayIconManager : IDisposable
     private readonly ISettingsService _settingsService;
     private readonly Func<Window>? _getIslandWindow;
     private readonly Action? _openSettingsAction;
+    private readonly ClipboardService? _clipboardService;
 
     private TaskbarIcon? _taskbarIcon;
     private MenuItem? _hardwareMenuItem;
@@ -38,13 +40,15 @@ public sealed class TrayIconManager : IDisposable
         WindowPositioner windowPositioner,
         ISettingsService settingsService,
         Func<Window>? getIslandWindow = null,
-        Action? openSettingsAction = null)
+        Action? openSettingsAction = null,
+        ClipboardService? clipboardService = null)
     {
         _orchestrator = orchestrator ?? throw new ArgumentNullException(nameof(orchestrator));
         _windowPositioner = windowPositioner ?? throw new ArgumentNullException(nameof(windowPositioner));
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _getIslandWindow = getIslandWindow;
         _openSettingsAction = openSettingsAction;
+        _clipboardService = clipboardService;
     }
 
     /// <summary>
@@ -181,7 +185,41 @@ public sealed class TrayIconManager : IDisposable
         };
         menu.Items.Add(_hardwareMenuItem);
 
-        // 3. Reiniciar Posición
+        // 3. Portapapeles Reciente (Fase 14)
+        var clipboardMenu = new MenuItem
+        {
+            Header = "📋 Portapapeles Reciente"
+        };
+
+        var toggleClipboardItem = new MenuItem
+        {
+            Header = _settingsService.CurrentSettings.EnableClipboardWidget ? "⏸ Pausar Monitoreo" : "▶ Reanudar Monitoreo"
+        };
+        toggleClipboardItem.Click += (_, _) =>
+        {
+            bool newState = !_settingsService.CurrentSettings.EnableClipboardWidget;
+            _settingsService.CurrentSettings.EnableClipboardWidget = newState;
+            _clipboardService?.UpdateEnabledState(newState);
+            _settingsService.SaveDebounced();
+            toggleClipboardItem.Header = newState ? "⏸ Pausar Monitoreo" : "▶ Reanudar Monitoreo";
+            Log.Information("Clipboard monitoring toggled from tray icon: {Enabled}", newState);
+        };
+        clipboardMenu.Items.Add(toggleClipboardItem);
+
+        var clearClipboardItem = new MenuItem
+        {
+            Header = "🗑 Borrar Historial en Memoria"
+        };
+        clearClipboardItem.Click += (_, _) =>
+        {
+            _clipboardService?.ClearHistory();
+            Log.Information("In-memory clipboard history cleared from tray icon.");
+        };
+        clipboardMenu.Items.Add(clearClipboardItem);
+
+        menu.Items.Add(clipboardMenu);
+
+        // 4. Reiniciar Posición
         var resetPosItem = new MenuItem
         {
             Header = "🔄 Reiniciar Posición"
@@ -210,7 +248,7 @@ public sealed class TrayIconManager : IDisposable
 
         menu.Items.Add(new Separator());
 
-        // 4. Salir de openDynamic
+        // 5. Salir de openDynamic
         var exitItem = new MenuItem
         {
             Header = "❌ Salir de openDynamic"
@@ -223,7 +261,7 @@ public sealed class TrayIconManager : IDisposable
         };
         menu.Items.Add(exitItem);
 
-        // Keep checkbox in sync when context menu opens
+        // Keep items in sync when context menu opens
         menu.Opened += (_, _) =>
         {
             var hwWidget = _orchestrator.RegisteredWidgets.OfType<HardwareWidget>().FirstOrDefault();
@@ -231,6 +269,10 @@ public sealed class TrayIconManager : IDisposable
             {
                 _hardwareMenuItem.IsChecked = hwWidget.IsActive;
             }
+
+            toggleClipboardItem.Header = _settingsService.CurrentSettings.EnableClipboardWidget
+                ? "⏸ Pausar Monitoreo"
+                : "▶ Reanudar Monitoreo";
         };
 
         return menu;
