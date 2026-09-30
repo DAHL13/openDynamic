@@ -265,7 +265,7 @@ public sealed class SettingsServiceTests : IDisposable
     }
 
     [Fact]
-    public void Load_WhenSchemaVersionIs4_MigratesToSchemaVersion5_SetsDefaultStopwatchAndPresets()
+    public void Load_WhenSchemaVersionIs4_MigratesToCurrentSchema_SetsDefaultStopwatchAndPresets()
     {
         string filePath = Path.Combine(_testDirectory, "settings_v4.json");
         // Schema version 4 (Phase 11 with Network/Device alerts but without Stopwatch and TimerPresets)
@@ -283,17 +283,52 @@ public sealed class SettingsServiceTests : IDisposable
         using var service = new SettingsService(filePath, debounceMilliseconds: 100);
         service.Load();
 
-        Assert.Equal(5, service.CurrentSettings.SchemaVersion);
+        Assert.Equal(AppSettings.CurrentSchemaVersion, service.CurrentSettings.SchemaVersion);
         Assert.Equal(210.0, service.CurrentSettings.CapsuleWidth);
         Assert.True(service.CurrentSettings.EnableStopwatchWidget);
         Assert.Equal(45, service.CurrentSettings.DefaultStopwatchPriority);
         Assert.NotNull(service.CurrentSettings.TimerPresetsMinutes);
         Assert.Equal(new List<int> { 1, 5, 10, 15 }, service.CurrentSettings.TimerPresetsMinutes);
+        Assert.True(service.CurrentSettings.EnableDynamicMediaColor);
+        Assert.True(service.CurrentSettings.EnableMediaGestures);
+        Assert.Equal(120.0, service.CurrentSettings.MediaGestureSensitivity);
 
         string reloadedJson = File.ReadAllText(filePath);
-        Assert.Contains("\"SchemaVersion\": 5", reloadedJson);
+        Assert.Contains($"\"SchemaVersion\": {AppSettings.CurrentSchemaVersion}", reloadedJson);
         Assert.Contains("\"EnableStopwatchWidget\": true", reloadedJson);
         Assert.Contains("\"DefaultStopwatchPriority\": 45", reloadedJson);
+    }
+
+    [Fact]
+    public void Load_WhenSchemaVersionIs5_MigratesToSchemaVersion6_SetsDefaultDynamicColorAndGestures()
+    {
+        string filePath = Path.Combine(_testDirectory, "settings_v5.json");
+        // Schema version 5 (Phase 12 with Stopwatch but without Dynamic Color / Gestures)
+        const string v5Json = """
+        {
+            "SchemaVersion": 5,
+            "EnableMediaWidget": true,
+            "EnableStopwatchWidget": true,
+            "DefaultStopwatchPriority": 45,
+            "CapsuleWidth": 205.0
+        }
+        """;
+
+        File.WriteAllText(filePath, v5Json);
+
+        using var service = new SettingsService(filePath, debounceMilliseconds: 100);
+        service.Load();
+
+        Assert.Equal(AppSettings.CurrentSchemaVersion, service.CurrentSettings.SchemaVersion);
+        Assert.Equal(205.0, service.CurrentSettings.CapsuleWidth);
+        Assert.True(service.CurrentSettings.EnableDynamicMediaColor);
+        Assert.True(service.CurrentSettings.EnableMediaGestures);
+        Assert.Equal(120.0, service.CurrentSettings.MediaGestureSensitivity);
+
+        string reloadedJson = File.ReadAllText(filePath);
+        Assert.Contains($"\"SchemaVersion\": {AppSettings.CurrentSchemaVersion}", reloadedJson);
+        Assert.Contains("\"EnableDynamicMediaColor\": true", reloadedJson);
+        Assert.Contains("\"EnableMediaGestures\": true", reloadedJson);
     }
 
     [Fact]

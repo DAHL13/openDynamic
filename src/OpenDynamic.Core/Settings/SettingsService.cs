@@ -150,6 +150,14 @@ public sealed class SettingsService : ISettingsService
                         }
                     }
 
+                    if (loaded.SchemaVersion < 6)
+                    {
+                        // Migration v5 -> v6: Introduce Dynamic Album Art Color and Horizontal Media Gestures.
+                        loaded.EnableDynamicMediaColor = true;
+                        loaded.EnableMediaGestures = true;
+                        loaded.MediaGestureSensitivity = 120.0;
+                    }
+
                     loaded.SchemaVersion = AppSettings.CurrentSchemaVersion;
                     CurrentSettings = loaded;
                     WriteSettingsToDisk(CurrentSettings);

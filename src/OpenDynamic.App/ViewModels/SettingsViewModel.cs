@@ -100,6 +100,15 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private int _mediaPauseGracePeriodSeconds;
 
+    [ObservableProperty]
+    private bool _enableDynamicMediaColor;
+
+    [ObservableProperty]
+    private bool _enableMediaGestures;
+
+    [ObservableProperty]
+    private double _mediaGestureSensitivity;
+
     // Volume
     [ObservableProperty]
     private bool _enableVolumeWidget;
@@ -282,6 +291,9 @@ public partial class SettingsViewModel : ObservableObject
         _enableMediaWidget = _settings.EnableMediaWidget;
         _defaultMediaPriority = _settings.DefaultMediaPriority;
         _mediaPauseGracePeriodSeconds = _settings.MediaPauseGracePeriodSeconds;
+        _enableDynamicMediaColor = _settings.EnableDynamicMediaColor;
+        _enableMediaGestures = _settings.EnableMediaGestures;
+        _mediaGestureSensitivity = _settings.MediaGestureSensitivity;
 
         _enableVolumeWidget = _settings.EnableVolumeWidget;
         _defaultVolumePriority = _settings.DefaultVolumePriority;
@@ -405,6 +417,24 @@ public partial class SettingsViewModel : ObservableObject
     partial void OnMediaPauseGracePeriodSecondsChanged(int value)
     {
         _settings.MediaPauseGracePeriodSeconds = value;
+        _settingsService.SaveDebounced();
+    }
+
+    partial void OnEnableDynamicMediaColorChanged(bool value)
+    {
+        _settings.EnableDynamicMediaColor = value;
+        _settingsService.SaveDebounced();
+    }
+
+    partial void OnEnableMediaGesturesChanged(bool value)
+    {
+        _settings.EnableMediaGestures = value;
+        _settingsService.SaveDebounced();
+    }
+
+    partial void OnMediaGestureSensitivityChanged(double value)
+    {
+        _settings.MediaGestureSensitivity = value;
         _settingsService.SaveDebounced();
     }
 

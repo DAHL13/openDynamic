@@ -443,7 +443,45 @@
                                         <TextBlock Text="Tiempo de Gracia tras Pausa (Segundos)" Style="{StaticResource SettingDesc}"/>
                                         <TextBlock Text="{Binding MediaPauseGracePeriodSeconds, StringFormat='{}{0} s'}" Style="{StaticResource ValueBadge}"/>
                                     </Grid>
-                                    <Slider Minimum="0" Maximum="30" Value="{Binding MediaPauseGracePeriodSeconds}" SmallChange="1"/>
+                                    <Slider Minimum="0" Maximum="30" Value="{Binding MediaPauseGracePeriodSeconds}" SmallChange="1"
+                                            AutomationProperties.Name="Tiempo de Gracia tras Pausa"/>
+                                </StackPanel>
+
+                                <!-- Phase 13: Dynamic Cover Color -->
+                                <Grid Margin="0,12,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="Color Dinámico de la Carátula" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Extrae el color de acento de la portada del álbum para la barra, ecualizador y borde de la muesca." Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <CheckBox IsChecked="{Binding EnableDynamicMediaColor}"
+                                              HorizontalAlignment="Right"
+                                              VerticalAlignment="Center"
+                                              AutomationProperties.Name="Color Dinámico de la Carátula"
+                                              AutomationProperties.HelpText="Activa o desactiva la extracción del color dominante del álbum"/>
+                                </Grid>
+
+                                <!-- Phase 13: Horizontal Gestures -->
+                                <Grid Margin="0,12,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="Gestos Horizontales en la Música" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Rueda horizontal del ratón, deslizamiento con dos dedos en touchpad o arrastre para cambiar de pista." Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <CheckBox IsChecked="{Binding EnableMediaGestures}"
+                                              HorizontalAlignment="Right"
+                                              VerticalAlignment="Center"
+                                              AutomationProperties.Name="Gestos Horizontales en la Música"
+                                              AutomationProperties.HelpText="Activa o desactiva los gestos horizontales para cambiar de canción"/>
+                                </Grid>
+
+                                <!-- Phase 13: Gesture Sensitivity -->
+                                <StackPanel Margin="0,8,0,0" IsEnabled="{Binding EnableMediaGestures}">
+                                    <Grid>
+                                        <TextBlock Text="Sensibilidad de Gestos Horizontales" Style="{StaticResource SettingDesc}"/>
+                                        <TextBlock Text="{Binding MediaGestureSensitivity, StringFormat='{}{0:0} deltas'}" Style="{StaticResource ValueBadge}"/>
+                                    </Grid>
+                                    <Slider Minimum="60" Maximum="240" Value="{Binding MediaGestureSensitivity}" SmallChange="10"
+                                            AutomationProperties.Name="Sensibilidad de Gestos Horizontales"
+                                            AutomationProperties.HelpText="Ajusta el umbral de activación para la rueda horizontal y gestos táctiles"/>
                                 </StackPanel>
                             </StackPanel>
                         </Border>

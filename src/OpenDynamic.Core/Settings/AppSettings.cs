@@ -14,8 +14,9 @@ public sealed class AppSettings
     /// Version 3 introduces the MotionMode setting (Auto, Reduced, Full).
     /// Version 4 introduces Network and Device alert settings, priorities, and ignored devices.
     /// Version 5 introduces Stopwatch widget settings, priority (45), and configurable timer presets.
+    /// Version 6 introduces Dynamic Album Art Color and Horizontal Media Gestures with sensitivity.
     /// </summary>
-    public const int CurrentSchemaVersion = 5;
+    public const int CurrentSchemaVersion = 6;
 
     /// <summary>
     /// Configuration schema version. Defaults to <see cref="CurrentSchemaVersion"/>.
@@ -99,6 +100,24 @@ public sealed class AppSettings
     /// Default is 30.
     /// </summary>
     public int DefaultMediaPriority { get; set; } = 30;
+
+    /// <summary>
+    /// Flag to enable dynamic accent color extraction from current album art.
+    /// Default is true.
+    /// </summary>
+    public bool EnableDynamicMediaColor { get; set; } = true;
+
+    /// <summary>
+    /// Flag to enable horizontal gestures (wheel tilt and touch drag) to skip media tracks.
+    /// Default is true.
+    /// </summary>
+    public bool EnableMediaGestures { get; set; } = true;
+
+    /// <summary>
+    /// Sensitivity threshold for horizontal gestures in delta units.
+    /// Default is 120.0 (standard mouse wheel step).
+    /// </summary>
+    public double MediaGestureSensitivity { get; set; } = 120.0;
 
     #endregion
 
@@ -353,6 +372,9 @@ public sealed class AppSettings
             EnableMediaWidget = this.EnableMediaWidget,
             MediaPauseGracePeriodSeconds = this.MediaPauseGracePeriodSeconds,
             DefaultMediaPriority = this.DefaultMediaPriority,
+            EnableDynamicMediaColor = this.EnableDynamicMediaColor,
+            EnableMediaGestures = this.EnableMediaGestures,
+            MediaGestureSensitivity = this.MediaGestureSensitivity,
             EnableVolumeWidget = this.EnableVolumeWidget,
             DefaultVolumePriority = this.DefaultVolumePriority,
             VolumeTransientDurationSeconds = this.VolumeTransientDurationSeconds,
@@ -409,6 +431,9 @@ public sealed class AppSettings
         EnableMediaWidget = other.EnableMediaWidget;
         MediaPauseGracePeriodSeconds = other.MediaPauseGracePeriodSeconds;
         DefaultMediaPriority = other.DefaultMediaPriority;
+        EnableDynamicMediaColor = other.EnableDynamicMediaColor;
+        EnableMediaGestures = other.EnableMediaGestures;
+        MediaGestureSensitivity = other.MediaGestureSensitivity;
         EnableVolumeWidget = other.EnableVolumeWidget;
         DefaultVolumePriority = other.DefaultVolumePriority;
         VolumeTransientDurationSeconds = other.VolumeTransientDurationSeconds;
