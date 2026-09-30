@@ -113,7 +113,8 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<IAutostartService>(),
             () => sp.GetRequiredService<IslandWindow>(),
             sp.GetRequiredService<NetworkService>(),
-            sp.GetRequiredService<DeviceService>()));
+            sp.GetRequiredService<DeviceService>(),
+            sp.GetRequiredService<Core.Timer.ITimerCollection>()));
         services.AddSingleton<SettingsWindow>();
 
         // System Tray Icon Manager

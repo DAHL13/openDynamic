@@ -532,6 +532,101 @@
                                     </Grid>
                                     <Slider Minimum="1" Maximum="20" Value="{Binding PomodoroBreakDurationMinutes}" SmallChange="1"/>
                                 </StackPanel>
+
+                                <!-- Multi-Timer Management Section (Phase 12) -->
+                                <Border Margin="0,14,0,0" Padding="0,10,0,0" BorderBrush="#22FFFFFF" BorderThickness="0,1,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="Temporizadores configurados (máx. 5)" Style="{StaticResource SettingDesc}" FontWeight="SemiBold" Foreground="#FFFFFF"/>
+                                        <TextBlock Text="Edita los nombres o añade nuevos. Sin robo de foco en la Dynamic Island." FontSize="11" Foreground="{DynamicResource AppTextMutedBrush}" Margin="0,2,0,8"/>
+
+                                        <!-- Timers List -->
+                                        <ItemsControl ItemsSource="{Binding EditableTimers}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="0,3">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+
+                                                        <TextBox Text="{Binding Label, UpdateSourceTrigger=PropertyChanged}"
+                                                                 Height="28" VerticalContentAlignment="Center"
+                                                                 Padding="6,0" Margin="0,0,8,0"
+                                                                 Background="#242732" Foreground="#FFFFFF" BorderBrush="#3B4252"
+                                                                 AutomationProperties.Name="Etiqueta del temporizador"/>
+
+                                                        <TextBlock Grid.Column="1" Text="{Binding DurationDisplay}"
+                                                                   VerticalAlignment="Center" Margin="0,0,8,0"
+                                                                   FontSize="11" Foreground="{DynamicResource AppTextMutedBrush}"/>
+
+                                                        <Button Grid.Column="2" Content="✕"
+                                                                Command="{Binding DataContext.DeleteCustomTimerCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                                CommandParameter="{Binding Id}"
+                                                                Width="24" Height="28"
+                                                                Background="#3F2D2D" Foreground="#FF6B6B" BorderThickness="0"
+                                                                Cursor="Hand"
+                                                                AutomationProperties.Name="Eliminar temporizador"/>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+
+                                        <!-- Add Timer Row -->
+                                        <Grid Margin="0,8,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <TextBox Text="{Binding NewTimerLabel, UpdateSourceTrigger=PropertyChanged}"
+                                                     Height="30" VerticalContentAlignment="Center"
+                                                     Padding="8,0" Margin="0,0,8,0"
+                                                     Background="#242732" Foreground="#FFFFFF" BorderBrush="#3B4252"
+                                                     AutomationProperties.Name="Nombre del nuevo temporizador"/>
+
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0">
+                                                <TextBlock Text="{Binding NewTimerDurationMinutes, StringFormat='{}{0} min'}"
+                                                           FontSize="11" Foreground="{DynamicResource AppTextMutedBrush}"
+                                                           VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                                <Slider Minimum="1" Maximum="120" Value="{Binding NewTimerDurationMinutes}" Width="90" SmallChange="1"
+                                                        AutomationProperties.Name="Duración en minutos del nuevo temporizador"/>
+                                            </StackPanel>
+
+                                            <Button Grid.Column="2" Content="Crear"
+                                                    Command="{Binding AddCustomTimerCommand}"
+                                                    IsEnabled="{Binding CanAddNewTimer}"
+                                                    Height="30" Padding="12,0"
+                                                    Background="#2563EB" Foreground="#FFFFFF" BorderThickness="0"
+                                                    Cursor="Hand"
+                                                    AutomationProperties.Name="Crear nuevo temporizador"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Stopwatch Card (Phase 12) -->
+                        <Border Style="{StaticResource SettingCard}">
+                            <StackPanel>
+                                <Grid>
+                                    <StackPanel>
+                                        <TextBlock Text="⏱ Cronómetro" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Cronómetro continuo con registro de vueltas (splits) y sin deriva temporal." Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <CheckBox IsChecked="{Binding EnableStopwatchWidget}" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                              AutomationProperties.Name="Activar widget de cronómetro"/>
+                                </Grid>
+
+                                <StackPanel Margin="0,12,0,0">
+                                    <Grid>
+                                        <TextBlock Text="Prioridad del Cronómetro" Style="{StaticResource SettingDesc}"/>
+                                        <TextBlock Text="{Binding DefaultStopwatchPriority}" Style="{StaticResource ValueBadge}"/>
+                                    </Grid>
+                                    <Slider Minimum="20" Maximum="60" Value="{Binding DefaultStopwatchPriority}" SmallChange="5"
+                                            AutomationProperties.Name="Prioridad del cronómetro"/>
+                                </StackPanel>
                             </StackPanel>
                         </Border>
 

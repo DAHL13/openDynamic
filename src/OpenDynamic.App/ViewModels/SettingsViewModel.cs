@@ -8,9 +8,44 @@ using OpenDynamic.App.Windowing;
 using OpenDynamic.Core.Animation;
 using OpenDynamic.Core.Autostart;
 using OpenDynamic.Core.Settings;
+using OpenDynamic.Core.Stopwatch;
+using OpenDynamic.Core.Timer;
 using Serilog;
 
 namespace OpenDynamic.App.ViewModels;
+
+/// <summary>
+/// Display item wrapper allowing user to edit timer label in SettingsWindow.
+/// </summary>
+public sealed class EditableTimerItem : ObservableObject
+{
+    private readonly TimerController _controller;
+    private readonly Action _onChanged;
+
+    public string Id => _controller.Id;
+
+    public string Label
+    {
+        get => _controller.Label;
+        set
+        {
+            if (_controller.Label != value)
+            {
+                _controller.Label = value ?? string.Empty;
+                OnPropertyChanged();
+                _onChanged();
+            }
+        }
+    }
+
+    public string DurationDisplay => $"{_controller.TotalDuration.TotalMinutes:F0} min";
+
+    public EditableTimerItem(TimerController controller, Action onChanged)
+    {
+        _controller = controller;
+        _onChanged = onChanged;
+    }
+}
 
 /// <summary>
 /// ViewModel for the application settings window.
@@ -27,6 +62,7 @@ public partial class SettingsViewModel : ObservableObject
     private readonly Func<IslandWindow>? _getIslandWindow;
     private readonly NetworkService? _networkService;
     private readonly DeviceService? _deviceService;
+    private readonly ITimerCollection? _timerCollection;
 
     private readonly AppSettings _settings;
 
@@ -113,6 +149,26 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private int _pomodoroBreakDurationMinutes;
 
+    // Multi-timer management (Phase 12)
+    [ObservableProperty]
+    private ObservableCollection<EditableTimerItem> _editableTimers = new();
+
+    [ObservableProperty]
+    private string _newTimerLabel = string.Empty;
+
+    [ObservableProperty]
+    private int _newTimerDurationMinutes = 10;
+
+    [ObservableProperty]
+    private bool _canAddNewTimer = true;
+
+    // Stopwatch (Phase 12)
+    [ObservableProperty]
+    private bool _enableStopwatchWidget;
+
+    [ObservableProperty]
+    private int _defaultStopwatchPriority;
+
     // Hotkey & Autostart
     [ObservableProperty]
     private bool _hideOnFullscreen;
@@ -195,7 +251,8 @@ public partial class SettingsViewModel : ObservableObject
         IAutostartService autostartService,
         Func<IslandWindow>? getIslandWindow = null,
         NetworkService? networkService = null,
-        DeviceService? deviceService = null)
+        DeviceService? deviceService = null,
+        ITimerCollection? timerCollection = null)
     {
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _orchestrator = orchestrator ?? throw new ArgumentNullException(nameof(orchestrator));
@@ -205,6 +262,7 @@ public partial class SettingsViewModel : ObservableObject
         _getIslandWindow = getIslandWindow;
         _networkService = networkService;
         _deviceService = deviceService;
+        _timerCollection = timerCollection;
 
         _settings = _settingsService.CurrentSettings;
 
@@ -243,6 +301,15 @@ public partial class SettingsViewModel : ObservableObject
         _defaultTimerPriority = _settings.DefaultTimerPriority;
         _pomodoroWorkDurationMinutes = _settings.PomodoroWorkDurationMinutes;
         _pomodoroBreakDurationMinutes = _settings.PomodoroBreakDurationMinutes;
+
+        _enableStopwatchWidget = _settings.EnableStopwatchWidget;
+        _defaultStopwatchPriority = _settings.DefaultStopwatchPriority;
+
+        if (_timerCollection != null)
+        {
+            _timerCollection.TimersChanged += (_, _) => ReloadEditableTimers();
+            ReloadEditableTimers();
+        }
 
         _enableNetworkAlerts = _settings.EnableNetworkAlerts;
         _defaultNetworkPriority = _settings.DefaultNetworkPriority;
@@ -442,6 +509,71 @@ public partial class SettingsViewModel : ObservableObject
     {
         _settings.PomodoroBreakDurationMinutes = value;
         _settingsService.SaveDebounced();
+    }
+
+    partial void OnEnableStopwatchWidgetChanged(bool value)
+    {
+        _settings.EnableStopwatchWidget = value;
+        _settingsService.SaveDebounced();
+
+        var sw = _orchestrator.RegisteredWidgets.OfType<Widgets.Stopwatch.StopwatchWidget>().FirstOrDefault();
+        if (sw != null && !value && sw.IsActive)
+        {
+            sw.Reset();
+        }
+    }
+
+    partial void OnDefaultStopwatchPriorityChanged(int value)
+    {
+        _settings.DefaultStopwatchPriority = value;
+        _settingsService.SaveDebounced();
+
+        var sw = _orchestrator.RegisteredWidgets.OfType<Widgets.Stopwatch.StopwatchWidget>().FirstOrDefault();
+        if (sw != null)
+        {
+            sw.Priority = value;
+        }
+    }
+
+    [RelayCommand]
+    public void AddCustomTimer()
+    {
+        if (_timerCollection == null) return;
+        if (_timerCollection.Timers.Count >= _timerCollection.MaxTimers) return;
+
+        string label = string.IsNullOrWhiteSpace(NewTimerLabel)
+            ? $"Temporizador {_timerCollection.Timers.Count + 1}"
+            : NewTimerLabel.Trim();
+
+        int mins = Math.Clamp(NewTimerDurationMinutes, 1, 180);
+        _timerCollection.AddTimer(label, TimeSpan.FromMinutes(mins));
+
+        NewTimerLabel = string.Empty;
+        ReloadEditableTimers();
+        _settingsService.SaveDebounced();
+    }
+
+    [RelayCommand]
+    public void DeleteCustomTimer(string id)
+    {
+        if (_timerCollection == null) return;
+        _timerCollection.RemoveTimer(id);
+        ReloadEditableTimers();
+        _settingsService.SaveDebounced();
+    }
+
+    private void ReloadEditableTimers()
+    {
+        if (_timerCollection == null) return;
+        EditableTimers.Clear();
+        foreach (var timer in _timerCollection.Timers)
+        {
+            EditableTimers.Add(new EditableTimerItem(timer, () =>
+            {
+                _settingsService.SaveDebounced();
+            }));
+        }
+        CanAddNewTimer = _timerCollection.Timers.Count < _timerCollection.MaxTimers;
     }
 
     partial void OnEnableNetworkAlertsChanged(bool value)
@@ -669,6 +801,9 @@ public partial class SettingsViewModel : ObservableObject
         DefaultTimerPriority = _settings.DefaultTimerPriority;
         PomodoroWorkDurationMinutes = _settings.PomodoroWorkDurationMinutes;
         PomodoroBreakDurationMinutes = _settings.PomodoroBreakDurationMinutes;
+
+        EnableStopwatchWidget = _settings.EnableStopwatchWidget;
+        DefaultStopwatchPriority = _settings.DefaultStopwatchPriority;
 
         EnableNetworkAlerts = _settings.EnableNetworkAlerts;
         DefaultNetworkPriority = _settings.DefaultNetworkPriority;
