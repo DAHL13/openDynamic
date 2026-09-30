@@ -3,6 +3,32 @@
 Todas las modificaciones notables en este proyecto serán documentadas en este archivo.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y cumple con [SemVer](https://semver.org/).
 
+## [1.1.0-dev] - 2026-09-30 (Fase 14: Portapapeles Reciente y Seguro)
+
+### Añadido
+- **Historial de Portapapeles Seguro y Puro en Core (`OpenDynamic.Core.Clipboard`):**
+  - Modelos inmutables y seguros `ClipboardItemKind` (`Text`, `Url`, `Image`, `Files`) y `ClipboardItem` sin dependencias de Windows ni WPF (Regla de Oro 5).
+  - `ClipboardFormatter`: Sanitización de texto a una sola línea, truncado a 80 caracteres con elipsis, clasificación automática de URLs y generación de etiquetas opacas para imágenes y conteo de archivos sin exponer datos sensibles ni rutas de disco (Regla de Oro 10).
+  - `ClipboardHistoryManager`: Almacenamiento estrictamente volátil en memoria RAM, capacidad acotada (1 a 10 elementos, default 5), expiración temporal con `TimeProvider` inyectable (default 10 min), supresión de duplicados consecutivos y vaciado instantáneo (`Clear()`).
+- **Servicio Nativo de Portapapeles Reactivo en App (`OpenDynamic.App.Services.ClipboardService`):**
+  - Registro reactivo de eventos Win32 con `AddClipboardFormatListener` y `WM_CLIPBOARDUPDATE` sobre `HwndSource`. Cero polling permanente (Regla de Oro 1).
+  - Filtrado y exclusión estricta de formatos de administradores de contraseñas (`ExcludeClipboardContentFromMonitorProcessing`, `Clipboard Viewer Ignore`, `CanIncludeInClipboardHistory`, `CanUploadToCloudClipboard`).
+  - Resiliencia y tolerancia ante contención COM (`CLIPBRD_E_CANT_OPEN` / `0x800401D0`) con hasta 3 reintentos asíncronos de 50 ms protegidos con try/catch (Regla de Oro 4).
+  - Vaciado forzado e inmediato de RAM ante bloqueo de sesión (`SessionSwitchReason.SessionLock`), suspensión de energía (`WM_POWERBROADCAST` / `PowerModes.Suspend`), desactivación del interruptor o cierre de la aplicación.
+  - Anonimización y privacidad absoluta en logs de Serilog: se prohíbe registrar texto o rutas, reportando únicamente tipo y longitud (`Kind`, `Length`, `Count`).
+- **Widget y Vistas en la Muesca (`OpenDynamic.App.Widgets.Clipboard`):**
+  - `ClipboardWidget`: Asignado a `ActivityPriority.Clipboard = 55` y auto-expiración transitoria de 2.0 s.
+  - `ClipboardCompactView`: Aviso de copiado adaptado al notch ("Copiado: <vista previa>", "Enlace copiado", "Imagen copiada", "Archivos copiados") y badge identificador "RAM".
+  - `ClipboardExpandedView`: Lista de historial reciente en memoria con affordance de re-copiado sin robar foco (`WS_EX_NOACTIVATE`), mensaje de retroalimentación ("Copiado de nuevo") y botón de borrado inmediato.
+  - `ClipboardSplitView`: Burbuja satélite circular de 36x36 con icono de portapapeles y acento violeta.
+- **Ajustes y Migración de Esquema v7 (`AppSettings`):**
+  - Incremento a `CurrentSchemaVersion = 7` en `AppSettings.cs`.
+  - Migración retrocompatible en `SettingsService.Load()` manteniendo la función estrictamente opt-in (`EnableClipboardWidget = false` por defecto).
+  - Tarjeta de ajustes en `SettingsWindow.xaml` con interruptor de función, selector de vista previa, deslizadores de capacidad y expiración, y botón para borrar historial.
+  - Submenú contextual en el icono de la bandeja del sistema (`TrayIconManager`) para pausar/reanudar monitoreo y vaciar el búfer de memoria.
+- **Pruebas Automatizadas:**
+  - Nuevas suites de pruebas unitarias: `ClipboardHistoryTests` y `PriorityResolverPhase14Tests`, y migración v7 en `SettingsServiceTests`. 327 pruebas en verde.
+
 ## [1.1.0-dev] - 2026-09-29 (Fase 13: Color de Carátula y Gestos en la Música)
 
 ### Añadido

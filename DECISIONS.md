@@ -521,3 +521,53 @@
      - Se incrementa `CurrentSchemaVersion = 6` en `AppSettings.cs`.
      - Se añaden `EnableDynamicMediaColor` (default: `true`), `EnableMediaGestures` (default: `true`) y `MediaGestureSensitivity` (default: `120.0`).
      - `SettingsService.Load()` actualiza transparentemente configuraciones previas (< 6) y se proveen controles accesibles con `AutomationProperties` en la pestaña de Multimedia de `SettingsWindow`.
+
+---
+
+## ADR-022: Historial de Portapapeles Seguro en Memoria RAM, Listener Reactivo Win32 y Exclusión Estricta de Gestores de Contraseñas (Fase 14)
+
+- **Estado:** Aceptado
+- **Fecha:** 2026-09-30
+- **Contexto:**
+  Para la ampliación v1.1 (Fase 14), openDynamic incorpora un widget contextual y un historial de portapapeles reciente para mostrar avisos transitorios tras copiar y permitir volver a copiar elementos recientes desde la muesca expandida. Por la naturaleza extremadamente sensible de la información que pasa por el portapapeles (credenciales, información personal, tokens de sesión), se impone una política de privacidad y seguridad absoluta (Regla de oro 10): función estrictamente opt-in (desactivada por defecto), residencia exclusiva en memoria RAM volátil sin escribir jamás a disco o logs, exclusión inmediata de formatos de administradores de contraseñas, vaciado total de memoria al bloquear sesión o suspender el equipo, escucha nativa por eventos Win32 sin sondeo (`AddClipboardFormatListener`), resiliencia ante bloqueos COM (`CLIPBRD_E_CANT_OPEN`), y respeto absoluto a no robar foco (`WS_EX_NOACTIVATE`).
+
+- **Decisiones Técnicas:**
+
+  1. **Lógica Pura y Aislamiento en Core (Regla de Oro 5):**
+     - Se implementan `ClipboardItemKind` (`Text`, `Url`, `Image`, `Files`), `ClipboardItem`, `ClipboardFormatter` y `ClipboardHistoryManager` en `OpenDynamic.Core.Clipboard` sin ninguna referencia a Windows ni a WPF.
+     - `ClipboardFormatter`: Sanitiza cadenas de texto en una sola línea colapsando espacios y saltos (`\r\n`), trunca de forma segura a 80 caracteres con elipsis, clasifica automáticamente URLs absolutas HTTP/HTTPS/FTP y genera etiquetas opacas para imágenes (`"Imagen copiada"`) y colecciones de archivos (`"{n} archivo(s)"`).
+     - `ClipboardHistoryManager`: Administra la colección en memoria RAM con capacidad configurable (1 a 10 elementos, default 5) y tiempo de expiración configurable (default 10 min) utilizando `TimeProvider` inyectable para pruebas deterministas.
+     - Supresión de Duplicados Consecutivos: Si el nuevo contenido coincide con el elemento superior activo, no se genera una nueva entrada, refrescando únicamente la marca de tiempo de expiración. Al volver a copiar un elemento desde la lista se evita la duplicación.
+
+  2. **Privacidad y Seguridad Absoluta (Regla de Oro 10):**
+     - **Estricto Opt-In:** `EnableClipboardWidget = false` por defecto. Si el usuario no activa explícitamente la función, ningún listener nativo se registra en Windows.
+     - **Cero Persistencia a Disco:** El historial vive exclusivamente en memoria RAM. Queda terminantemente prohibido volcar contenido de portapapeles a `settings.json`, bases de datos o archivos temporales.
+     - **Logs de Auditoría Sanitizados:** Queda prohibido escribir texto copiado, URLs, rutas de archivos o buffers de imagen en los archivos de log de Serilog. Únicamente se registran metadatos agregados (`Kind`, `Length`, `Count`).
+     - **Purga de Memoria en Bloqueo y Suspensión:** Ante eventos de bloqueo de sesión de Windows (`SessionSwitchReason.SessionLock`) o suspensión de energía (`PowerModes.Suspend`, `PBT_APMSUSPEND`), así como al apagar la app o desactivar el interruptor, se invoca inmediatamente `Clear()` vaciando por completo el búfer en memoria RAM.
+
+  3. **Escucha Reactiva Win32 y Exclusión de Gestores de Contraseñas:**
+     - `ClipboardService` en `OpenDynamic.App.Services`: Registra reactivamente `AddClipboardFormatListener` sobre el HWND de `IslandWindow` y procesa el mensaje de ventana `WM_CLIPBOARDUPDATE` (`0x031D`). Cero polling (Regla de Oro 1).
+     - Al desactivar la función o cerrar la ventana, se invoca `RemoveClipboardFormatListener` desenganchando el listener de forma limpia.
+     - **Exclusión de Gestores de Contraseñas:** Se inspeccionan los formatos nativos registrados:
+       * `ExcludeClipboardContentFromMonitorProcessing`
+       * `Clipboard Viewer Ignore`
+       * `CanIncludeInClipboardHistory` (con valor DWORD 0)
+       * `CanUploadToCloudClipboard` (con valor DWORD 0)
+       Si cualquiera de estos formatos está presente en el portapapeles, el procesamiento se aborta de inmediato sin leer ningún dato.
+     - **Detección de Auto-Copia:** Cuando el usuario vuelve a copiar un elemento desde la vista expandida de la isla, se registra la secuencia nativa (`GetClipboardSequenceNumber`) para evitar generar un aviso transitorio recursivo o un duplicado.
+
+  4. **Resiliencia ante Contención COM (`CLIPBRD_E_CANT_OPEN` - Regla de Oro 4):**
+     - El acceso concurrente al portapapeles por navegadores u otras aplicaciones suele arrojar la excepción COM `0x800401D0` (`CLIPBRD_E_CANT_OPEN`). Se implementa un bucle de reintento desacoplado y asíncrono de hasta 3 intentos espaciados por 50 ms antes de descartar pacíficamente el intento sin congelar la interfaz ni tumbar la aplicación.
+
+  5. **Notch UI, No Activación de Foco y Jerarquía de Prioridades:**
+     - `ClipboardWidget`: Asignado a `ActivityPriority.Clipboard = 55`.
+     - Aviso Transitorio: Notificación de 2.0 s en modo compacto que presenta "Copiado: <vista previa>" (o "Texto copiado" si `ShowClipboardPreview == false`).
+     - Modo Expandido (`ClipboardExpandedView`): Presenta la lista reciente con indicador de estado en RAM, retroalimentación táctil/visual ("Copiado de nuevo"), botón de borrado rápido y todos los controles interactivos con `Focusable="False"` garantizando respeto a `WS_EX_NOACTIVATE` sin robar el foco de la ventana activa del usuario.
+     - Jerarquía Consolidada:
+       `TimerAlert (100) > Battery (90) > Volume (80) > Network (65) > Device (60) > Clipboard (55) > Timer (50) > Stopwatch (45) > Media (30) > Hardware (10)`.
+
+  6. **Ajustes, Menú en Bandeja y Migración de Esquema v7 (Regla de Oro 9):**
+     - Se incrementa `CurrentSchemaVersion = 7` en `AppSettings.cs`.
+     - `SettingsService.Load()` efectúa la migración automática para esquemas `< 7`, inicializando `EnableClipboardWidget = false` (opt-in estricto), `DefaultClipboardPriority = 55`, `ClipboardTransientDurationSeconds = 2.0`, `ShowClipboardPreview = true`, `ClipboardHistoryCapacity = 5` y `ClipboardExpirationMinutes = 10`.
+     - Nueva tarjeta en la pestaña "Widgets y Prioridades" de `SettingsWindow.xaml` con interruptores, deslizadores y botón de borrado inmediato.
+     - Submenú en el icono de la bandeja del sistema (`TrayIconManager`) con opciones para pausar/reanudar el monitoreo y vaciar el historial en memoria.
