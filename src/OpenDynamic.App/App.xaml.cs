@@ -84,6 +84,10 @@ public partial class App : Application
         var deviceWidget = Services.GetRequiredService<Widgets.Device.DeviceWidget>();
         orchestrator.RegisterWidget(deviceWidget);
 
+        // Register ClipboardWidget (Priority 55, Transient)
+        var clipboardWidget = Services.GetRequiredService<Widgets.Clipboard.ClipboardWidget>();
+        orchestrator.RegisterWidget(clipboardWidget);
+
         // Initialize System Tray Icon Manager (H.NotifyIcon.Wpf) stored in class field to prevent GC collection
         _trayIconManager = Services.GetRequiredService<TrayIconManager>();
         _trayIconManager.Initialize();

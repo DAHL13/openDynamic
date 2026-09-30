@@ -123,6 +123,7 @@ public static class ServiceCollectionExtensions
                 expiration: TimeSpan.FromMinutes(Math.Max(1, settings.ClipboardExpirationMinutes)));
         });
         services.AddSingleton<ClipboardService>();
+        services.AddSingleton<Widgets.Clipboard.ClipboardWidget>();
 
         // Settings Window & ViewModel
         services.AddSingleton<SettingsViewModel>(sp => new SettingsViewModel(
