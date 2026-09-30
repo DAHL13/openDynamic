@@ -194,6 +194,15 @@ public class AccentColorAdjusterTests
     }
 
     [Fact]
+    public void AdjustColor_LowSaturationCandidate_ReturnsDefaultWhiteFallback()
+    {
+        // Low saturation (S = 0.10, L = 0.50) below the 0.15 chromatic threshold
+        var lowSatColor = RgbColor.FromHsl(120.0, 0.10, 0.50);
+        var adjusted = AccentColorAdjuster.AdjustColor(lowSatColor);
+        Assert.Equal(RgbColor.DefaultAccent, adjusted);
+    }
+
+    [Fact]
     public void RgbColor_HslRoundtrip_PreservesColor()
     {
         var original = RgbColor.FromRgb(180, 60, 220);

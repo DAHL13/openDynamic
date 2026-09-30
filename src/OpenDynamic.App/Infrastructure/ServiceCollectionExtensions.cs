@@ -29,7 +29,11 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IslandLayout>();
         services.AddSingleton<IslandAnimator>();
         services.AddSingleton<PriorityResolver>();
-        services.AddSingleton<IslandOrchestrator>();
+        services.AddSingleton<IslandOrchestrator>(sp => new IslandOrchestrator(
+            sp.GetRequiredService<IslandStateMachine>(),
+            sp.GetRequiredService<IslandAnimator>(),
+            sp.GetRequiredService<PriorityResolver>(),
+            sp.GetRequiredService<AppSettings>()));
         services.AddSingleton<IslandWindow>(sp => new IslandWindow(
             sp.GetRequiredService<WindowPositioner>(),
             sp.GetRequiredService<ForegroundWatcher>(),

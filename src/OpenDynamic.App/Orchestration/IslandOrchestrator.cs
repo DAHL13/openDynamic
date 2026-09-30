@@ -22,6 +22,7 @@ public sealed class IslandOrchestrator : IDisposable
     private readonly IslandStateMachine _stateMachine;
     private readonly IslandAnimator _animator;
     private readonly PriorityResolver _priorityResolver;
+    private readonly Core.Settings.AppSettings _settings;
     private readonly List<IIslandWidget> _widgets = new();
     private readonly HashSet<string> _quarantinedWidgetIds = new();
 
@@ -75,11 +76,13 @@ public sealed class IslandOrchestrator : IDisposable
     public IslandOrchestrator(
         IslandStateMachine stateMachine,
         IslandAnimator animator,
-        PriorityResolver? priorityResolver = null)
+        PriorityResolver? priorityResolver = null,
+        Core.Settings.AppSettings? settings = null)
     {
         _stateMachine = stateMachine ?? throw new ArgumentNullException(nameof(stateMachine));
         _animator = animator ?? throw new ArgumentNullException(nameof(animator));
         _priorityResolver = priorityResolver ?? new PriorityResolver();
+        _settings = settings ?? new Core.Settings.AppSettings();
 
         // Subscribe to decoupled WeakReferenceMessenger events
         WeakReferenceMessenger.Default.Register<ActivityChangedMessage>(this, (_, msg) =>
@@ -95,6 +98,16 @@ public sealed class IslandOrchestrator : IDisposable
         WeakReferenceMessenger.Default.Register<CollapseRequestedMessage>(this, (_, _) =>
         {
             RequestCollapse();
+        });
+
+        WeakReferenceMessenger.Default.Register<MediaAccentColorChangedMessage>(this, (_, msg) =>
+        {
+            if (_activePrimaryWidget is Widgets.Media.MediaWidget &&
+                _settings.EnableDynamicMediaColor &&
+                _stateMachine.CurrentState != IslandState.Hidden)
+            {
+                _islandView?.Dispatcher.InvokeAsync(() => _islandView.ApplyAccentBorder(msg.AccentColor));
+            }
         });
     }
 
@@ -470,7 +483,9 @@ public sealed class IslandOrchestrator : IDisposable
         _islandView?.PresentViews(primaryView, secondaryView, targetState);
 
         // Update dynamic accent border on the notch based on active widget
-        if (_activePrimaryWidget is Widgets.Media.MediaWidget mediaWidget && targetState != IslandState.Hidden)
+        if (_activePrimaryWidget is Widgets.Media.MediaWidget mediaWidget &&
+            _settings.EnableDynamicMediaColor &&
+            targetState != IslandState.Hidden)
         {
             _islandView?.ApplyAccentBorder(mediaWidget.AccentColor);
         }

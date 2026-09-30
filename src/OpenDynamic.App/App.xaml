@@ -5,13 +5,13 @@
     <Application.Resources>
         <!-- Accessibility and Dynamic Theme Resources (Task 5) -->
         <SolidColorBrush x:Key="AppCapsuleBackgroundBrush" Color="#FF000000" />
-        <SolidColorBrush x:Key="AppBorderBrush" Color="#33FFFFFF" />
+        <SolidColorBrush x:Key="AppBorderBrush" Color="#55FFFFFF" />
         <Thickness x:Key="AppNotchBorderThickness">1,0,1,1</Thickness>
         <SolidColorBrush x:Key="AppTextPrimaryBrush" Color="#FFFFFFFF" />
         <SolidColorBrush x:Key="AppTextSecondaryBrush" Color="#FFAAAAAA" />
         <SolidColorBrush x:Key="AppTextMutedBrush" Color="#FF8E8E93" />
         <SolidColorBrush x:Key="AppControlBackgroundBrush" Color="#FF2C2C2E" />
-        <SolidColorBrush x:Key="AppAccentBrush" Color="#FF1ED760" />
+        <SolidColorBrush x:Key="AppAccentBrush" Color="#FFFFFFFF" />
         <SolidColorBrush x:Key="AppAccentTextBrush" Color="#FF000000" />
     </Application.Resources>
 </Application>

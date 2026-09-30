@@ -9,7 +9,7 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 - **Extracción Algorítmica Pura de Color en Core (`OpenDynamic.Core.Media.Color`):**
   - Estructura pura e inmutable `RgbColor` con conversión bidireccional HSL y cálculo de matiz, saturación y luminosidad sin dependencias de Windows ni WPF (Regla de Oro 5).
   - `DominantColorExtractor`: Muestreo en cuadrícula de baja resolución (32x32 = 1024 píxeles), agrupación en 16 cubetas angulares de Hue (22.5°), ponderación por saturación cuadrática y eliminación estricta de casi negros, casi blancos y grises neutros.
-  - `AccentColorAdjuster`: Ajusta el color candidato forzando saturación mínima ($S \ge 0.50$) y acotando luminosidad ($0.45 \le L \le 0.80$) para asegurar máxima legibilidad y contraste contra el fondo negro de la muesca. Retorna `#1ED760` como fallback si la portada carece de color dominante válido.
+  - `AccentColorAdjuster`: Ajusta el color candidato forzando saturación mínima ($S \ge 0.50$) y acotando luminosidad ($0.45 \le L \le 0.80$) para asegurar máxima legibilidad y contraste contra el fondo negro de la muesca. Retorna `#FFFFFF` (blanco estándar) como fallback si la portada carece de color dominante válido o es monocromática.
 - **Detector de Gestos Horizontales en Core (`OpenDynamic.Core.Media.Gestures`):**
   - `SwipeGestureDetector`: Máquina de estados pura con `TimeProvider` inyectable para pruebas deterministas.
   - Acumula deltas horizontales y absorbe la inercia del touchpad con una ventana de enfriamiento (*cooldown*) de 400 ms para eliminar saltos accidentales dobles de canción.

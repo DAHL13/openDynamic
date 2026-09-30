@@ -498,7 +498,7 @@
   1. **Aislamiento de Algoritmos Puros en Core (Regla de Oro 5):**
      - Se implementan `RgbColor`, `DominantColorExtractor` y `AccentColorAdjuster` en `OpenDynamic.Core.Media.Color` libres de dependencias de `System.Drawing`, Win32 o WPF.
      - `DominantColorExtractor`: Muestrea el mapa de píxeles BGRA sobre una cuadrícula reducida (32x32 = 1024 píxeles), clasifica en 16 cubetas angulares de matiz (Hue, 22.5° cada una), descarta de manera rigurosa casi negros ($L < 0.15$ o $RGB < 35$), casi blancos ($L > 0.88$ o $RGB > 225$) y grises desaturados ($S < 0.18$ o $\Delta < 25$), y pondera la cubeta ganadora combinando saturación cuadrática y luminosidad balanceada ($S^2 \cdot (1 - |L - 0.5|)$).
-     - `AccentColorAdjuster`: Recibe el color dominante y garantiza legibilidad y viveza sobre el fondo negro azabache (`#000000`) del notch, forzando saturación mínima ($S \ge 0.50$), luminosidad acotada ($0.45 \le L \le 0.80$) y recurriendo al acento institucional (`#1ED760`) si la portada es monocromática, negra o nula.
+     - `AccentColorAdjuster`: Recibe el color dominante y garantiza legibilidad y viveza sobre el fondo negro azabache (`#000000`) del notch, forzando saturación mínima ($S \ge 0.50$), luminosidad acotada ($0.45 \le L \le 0.80$) y recurriendo al acento blanco neutro estándar (`#FFFFFF`) si la portada es monocromática, negra o nula.
      - `SwipeGestureDetector`: Máquina de estados pura en `OpenDynamic.Core.Media.Gestures` con `TimeProvider` inyectable. Acumula deltas horizontales con umbral configurable y aplica un período de enfriamiento (*cooldown*) estricto de 400 ms que absorbe la inercia del touchpad y previene saltos dobles accidentales de pista.
 
   2. **Rendimiento Gráfico, Caché y Subprocesos (Reglas de Oro 1 y 11):**

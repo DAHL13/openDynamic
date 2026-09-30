@@ -29,11 +29,6 @@ public partial class IslandView : UserControl
     public IslandView()
     {
         InitializeComponent();
-
-        WeakReferenceMessenger.Default.Register<MediaAccentColorChangedMessage>(this, (_, msg) =>
-        {
-            Dispatcher.InvokeAsync(() => ApplyAccentBorder(msg.AccentColor));
-        });
     }
 
     /// <summary>
@@ -237,27 +232,45 @@ public partial class IslandView : UserControl
     }
 
     private Color? _currentAccentColor;
+    private bool _isAccentApplied;
+    private SolidColorBrush? _animatingBrush;
+    private ColorAnimation? _activeAnimation;
+    private EventHandler? _activeAnimationCompleted;
 
     /// <summary>
     /// Applies a subtle dynamic accent color to the notch outline border.
     /// In standard motion mode, animates color with a short ColorAnimation (~300ms) only when changing tracks.
     /// In reduced motion mode, applies the color cut instantaneously.
-    /// When null, resets the border brush to the theme default.
-    /// Strictly adheres to performance budget (zero large DropShadowEffects).
+    /// When null, smoothly resets the border brush to the theme default (AppBorderBrush) in ~150ms.
+    /// Strictly adheres to performance budget (zero large DropShadowEffects) and guarantees border is never null/transparent.
     /// </summary>
     public void ApplyAccentBorder(Color? accentColor)
     {
-        if (_currentAccentColor == accentColor) return;
-        _currentAccentColor = accentColor;
+        // Cancel any pending/running border animations to prevent race conditions
+        if (_animatingBrush != null && _activeAnimation != null && _activeAnimationCompleted != null)
+        {
+            _activeAnimation.Completed -= _activeAnimationCompleted;
+            _animatingBrush.BeginAnimation(SolidColorBrush.ColorProperty, null);
+            _animatingBrush = null;
+            _activeAnimation = null;
+            _activeAnimationCompleted = null;
+        }
 
         if (accentColor == null)
         {
-            MainCapsuleBorder.BeginAnimation(Border.BorderBrushProperty, null);
-            SatelliteBorder.BeginAnimation(Border.BorderBrushProperty, null);
+            // If already at system default and border brush is assigned, avoid redundant transitions
+            if (!_isAccentApplied && MainCapsuleBorder.BorderBrush != null)
+            {
+                return;
+            }
 
-            var defaultColor = (Application.Current?.TryFindResource("AppBorderBrush") as SolidColorBrush)?.Color
-                               ?? Color.FromArgb(0x33, 0xFF, 0xFF, 0xFF);
+            _isAccentApplied = false;
+            _currentAccentColor = null;
 
+            var defaultBrush = Application.Current?.TryFindResource("AppBorderBrush") as SolidColorBrush;
+            var defaultColor = defaultBrush?.Color ?? Color.FromArgb(0x55, 0xFF, 0xFF, 0xFF);
+
+            // In reduced motion mode, restore instantaneously
             if (!_currentMotionProfile.AllowDecorative)
             {
                 MainCapsuleBorder.SetResourceReference(Border.BorderBrushProperty, "AppBorderBrush");
@@ -265,29 +278,49 @@ public partial class IslandView : UserControl
                 return;
             }
 
-            var resetStartColor = (MainCapsuleBorder.BorderBrush as SolidColorBrush)?.Color ?? defaultColor;
-            var resetAnimBrush = new SolidColorBrush(resetStartColor);
+            var startColor = (MainCapsuleBorder.BorderBrush as SolidColorBrush)?.Color ?? defaultColor;
+            var resetAnimBrush = new SolidColorBrush(startColor);
             MainCapsuleBorder.BorderBrush = resetAnimBrush;
             SatelliteBorder.BorderBrush = resetAnimBrush;
 
             var resetColorAnim = new ColorAnimation
             {
                 To = defaultColor,
-                Duration = TimeSpan.FromMilliseconds(300),
+                Duration = TimeSpan.FromMilliseconds(150),
                 EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
             };
 
-            resetColorAnim.Completed += (_, _) =>
+            EventHandler? onCompleted = null;
+            onCompleted = (_, _) =>
             {
+                resetColorAnim.Completed -= onCompleted;
                 MainCapsuleBorder.SetResourceReference(Border.BorderBrushProperty, "AppBorderBrush");
                 SatelliteBorder.SetResourceReference(Border.BorderBrushProperty, "AppBorderBrush");
+                if (ReferenceEquals(_activeAnimation, resetColorAnim))
+                {
+                    _animatingBrush = null;
+                    _activeAnimation = null;
+                    _activeAnimationCompleted = null;
+                }
             };
+
+            resetColorAnim.Completed += onCompleted;
+            _animatingBrush = resetAnimBrush;
+            _activeAnimation = resetColorAnim;
+            _activeAnimationCompleted = onCompleted;
 
             resetAnimBrush.BeginAnimation(SolidColorBrush.ColorProperty, resetColorAnim);
             return;
         }
 
         var targetColor = accentColor.Value;
+        if (_isAccentApplied && _currentAccentColor == targetColor && MainCapsuleBorder.BorderBrush != null)
+        {
+            return;
+        }
+
+        _isAccentApplied = true;
+        _currentAccentColor = targetColor;
 
         if (!_currentMotionProfile.AllowDecorative)
         {
@@ -300,8 +333,10 @@ public partial class IslandView : UserControl
         }
 
         // Standard animated transition (~300ms)
-        var startColor = (MainCapsuleBorder.BorderBrush as SolidColorBrush)?.Color ?? Color.FromArgb(0x33, 0xFF, 0xFF, 0xFF);
-        var animBrush = new SolidColorBrush(startColor);
+        var defaultSystemColor = (Application.Current?.TryFindResource("AppBorderBrush") as SolidColorBrush)?.Color
+                                 ?? Color.FromArgb(0x55, 0xFF, 0xFF, 0xFF);
+        var currentStartColor = (MainCapsuleBorder.BorderBrush as SolidColorBrush)?.Color ?? defaultSystemColor;
+        var animBrush = new SolidColorBrush(currentStartColor);
         MainCapsuleBorder.BorderBrush = animBrush;
         SatelliteBorder.BorderBrush = animBrush;
 
@@ -311,6 +346,27 @@ public partial class IslandView : UserControl
             Duration = TimeSpan.FromMilliseconds(300),
             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
         };
+
+        EventHandler? onAnimCompleted = null;
+        onAnimCompleted = (_, _) =>
+        {
+            colorAnim.Completed -= onAnimCompleted;
+            var finalBrush = new SolidColorBrush(targetColor);
+            finalBrush.Freeze();
+            MainCapsuleBorder.BorderBrush = finalBrush;
+            SatelliteBorder.BorderBrush = finalBrush;
+            if (ReferenceEquals(_activeAnimation, colorAnim))
+            {
+                _animatingBrush = null;
+                _activeAnimation = null;
+                _activeAnimationCompleted = null;
+            }
+        };
+
+        colorAnim.Completed += onAnimCompleted;
+        _animatingBrush = animBrush;
+        _activeAnimation = colorAnim;
+        _activeAnimationCompleted = onAnimCompleted;
 
         animBrush.BeginAnimation(SolidColorBrush.ColorProperty, colorAnim);
     }
