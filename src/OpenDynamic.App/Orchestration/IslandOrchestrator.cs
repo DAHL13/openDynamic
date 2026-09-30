@@ -390,7 +390,8 @@ public sealed class IslandOrchestrator : IDisposable
 
 
         // Schedule timer if an active transient alert has an expiration scheduled
-        if (result.NextExpirationUtc.HasValue)
+        // NOTE: In Expanded mode, transient auto-close is paused so the user can interact freely.
+        if (!_userExpanded && result.NextExpirationUtc.HasValue)
         {
             var delay = result.NextExpirationUtc.Value - DateTimeOffset.UtcNow;
             if (delay <= TimeSpan.Zero)
@@ -670,6 +671,10 @@ public sealed class IslandOrchestrator : IDisposable
         }
 
         _userExpanded = true;
+
+        // Cancel transient expiration timer immediately upon entering Expanded mode
+        _transientTimer?.Stop();
+        _transientTimer = null;
 
         if (_activePrimaryWidget != null)
         {

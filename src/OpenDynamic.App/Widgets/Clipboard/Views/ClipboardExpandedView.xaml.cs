@@ -15,6 +15,22 @@ public partial class ClipboardExpandedView : UserControl
         InitializeComponent();
     }
 
+    private void OnPreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (ItemsScrollViewer != null)
+        {
+            ItemsScrollViewer.ScrollToVerticalOffset(ItemsScrollViewer.VerticalOffset - (e.Delta / 3.0));
+            e.Handled = true;
+        }
+    }
+
+    protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
+    {
+        base.OnMouseLeftButtonUp(e);
+        // Prevent background clicks inside the expanded view from bubbling to mainCapsule toggle-collapse
+        e.Handled = true;
+    }
+
     private void OnItemClick(object sender, MouseButtonEventArgs e)
     {
         if (sender is FrameworkElement fe && fe.DataContext is ClipboardItem item)

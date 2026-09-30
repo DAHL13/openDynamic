@@ -114,9 +114,11 @@
             </TextBlock>
 
             <!-- Scrollable Items List -->
-            <ScrollViewer VerticalScrollBarVisibility="Auto"
+            <ScrollViewer x:Name="ItemsScrollViewer"
+                          VerticalScrollBarVisibility="Auto"
                           HorizontalScrollBarVisibility="Disabled"
-                          Focusable="False">
+                          Focusable="False"
+                          PreviewMouseWheel="OnPreviewMouseWheel">
                 <ScrollViewer.Style>
                     <Style TargetType="ScrollViewer">
                         <Setter Property="Visibility" Value="Visible" />

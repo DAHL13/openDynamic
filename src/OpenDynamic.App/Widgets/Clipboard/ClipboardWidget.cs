@@ -1,8 +1,10 @@
 using System.Collections.ObjectModel;
 using System.Windows.Controls;
 using System.Windows.Threading;
+using CommunityToolkit.Mvvm.Messaging;
 using OpenDynamic.App.Services;
 using OpenDynamic.App.Widgets.Clipboard.Views;
+using OpenDynamic.App.Widgets.Messages;
 using OpenDynamic.Core.Clipboard;
 using OpenDynamic.Core.Settings;
 using Serilog;
@@ -149,6 +151,12 @@ public sealed class ClipboardWidget : IslandWidgetBase
 
             RefreshRecentItems();
 
+            // If the widget is already expanded, do not start transient auto-close timer
+            if (DisplayMode == OpenDynamic.Core.Widgets.WidgetDisplayMode.Expanded)
+            {
+                return;
+            }
+
             var duration = TimeSpan.FromSeconds(_settings.ClipboardTransientDurationSeconds > 0
                 ? _settings.ClipboardTransientDurationSeconds
                 : 2.0);
@@ -191,12 +199,18 @@ public sealed class ClipboardWidget : IslandWidgetBase
         // Show non-focus-stealing feedback
         FeedbackMessage = "Copiado de nuevo";
         _feedbackTimer?.Stop();
-        _feedbackTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.8) };
+        _feedbackTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(900) };
         _feedbackTimer.Tick += (s, e) =>
         {
             _feedbackTimer.Stop();
             _feedbackTimer = null;
             FeedbackMessage = null;
+
+            // Gracefully collapse after confirming re-copy to the user
+            if (DisplayMode == OpenDynamic.Core.Widgets.WidgetDisplayMode.Expanded)
+            {
+                WeakReferenceMessenger.Default.Send(new CollapseRequestedMessage());
+            }
         };
         _feedbackTimer.Start();
     }
@@ -206,12 +220,17 @@ public sealed class ClipboardWidget : IslandWidgetBase
         _clipboardService.ClearHistory();
         FeedbackMessage = "Historial borrado";
         _feedbackTimer?.Stop();
-        _feedbackTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.5) };
+        _feedbackTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(900) };
         _feedbackTimer.Tick += (s, e) =>
         {
             _feedbackTimer.Stop();
             _feedbackTimer = null;
             FeedbackMessage = null;
+
+            if (DisplayMode == OpenDynamic.Core.Widgets.WidgetDisplayMode.Expanded)
+            {
+                WeakReferenceMessenger.Default.Send(new CollapseRequestedMessage());
+            }
         };
         _feedbackTimer.Start();
     }
@@ -219,6 +238,16 @@ public sealed class ClipboardWidget : IslandWidgetBase
     public override void OnExpand()
     {
         base.OnExpand();
+
+        // 1. Immediately cancel the transient auto-close timer so the expanded view remains open indefinitely
+        _transientTimer?.Stop();
+        _transientTimer = null;
+
+        // 2. Pause transient status while expanded so PriorityResolver does not discard the widget
+        IsTransient = false;
+        TransientDuration = null;
+
+        // 3. Refresh items in memory
         RefreshRecentItems();
     }
 
@@ -226,6 +255,11 @@ public sealed class ClipboardWidget : IslandWidgetBase
     {
         base.OnCollapse();
         FeedbackMessage = null;
+        _feedbackTimer?.Stop();
+        _feedbackTimer = null;
+
+        // Once collapsed from expanded view, complete the clipboard interaction cycle cleanly
+        Deactivate();
     }
 
     private void ResetTransientTimer(TimeSpan duration)
@@ -239,6 +273,14 @@ public sealed class ClipboardWidget : IslandWidgetBase
         {
             _transientTimer.Stop();
             _transientTimer = null;
+
+            // Defensive guard: never deactivate if the user is currently in Expanded mode
+            if (DisplayMode == OpenDynamic.Core.Widgets.WidgetDisplayMode.Expanded)
+            {
+                Log.Debug("ClipboardWidget transient lifespan expired while in Expanded mode; ignoring deactivation.");
+                return;
+            }
+
             Log.Debug("ClipboardWidget transient lifespan expired. Deactivating.");
             Deactivate();
         };

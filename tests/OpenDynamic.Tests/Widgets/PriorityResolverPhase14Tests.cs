@@ -195,4 +195,63 @@ public sealed class PriorityResolverPhase14Tests
         Assert.Equal(30, ActivityPriority.Media);
         Assert.Equal(10, ActivityPriority.Hardware);
     }
+
+    [Fact]
+    public void ExpandedClipboard_WithPausedTransient_IsNotDiscardedByPriorityResolver_EvenAfterInitialDuration()
+    {
+        var resolver = new PriorityResolver();
+        var startTime = DateTimeOffset.UtcNow;
+
+        // Simulate widget after OnExpand(): IsTransient cleared to false, TransientDuration set to null
+        var expandedClipboard = new MockSource
+        {
+            Id = "clipboard",
+            Priority = ActivityPriority.Clipboard, // 55
+            IsActive = true,
+            IsTransient = false,
+            LastActivatedUtc = startTime,
+            TransientDuration = null
+        };
+
+        // Evaluate 5 seconds later (past the original 2.0s transient duration)
+        var futureTime = startTime.AddSeconds(5);
+        var result = resolver.Resolve(new[] { expandedClipboard }, futureTime);
+
+        Assert.NotNull(result.Primary);
+        Assert.Equal("clipboard", result.Primary.Id);
+        Assert.Null(result.NextExpirationUtc);
+    }
+
+    [Fact]
+    public void ExpandedClipboard_WinsOver_LowerPriorityPersistentWidget_Indefinitely()
+    {
+        var resolver = new PriorityResolver();
+        var startTime = DateTimeOffset.UtcNow;
+
+        var expandedClipboard = new MockSource
+        {
+            Id = "clipboard",
+            Priority = ActivityPriority.Clipboard, // 55
+            IsActive = true,
+            IsTransient = false,
+            LastActivatedUtc = startTime
+        };
+
+        var persistentTimer = new MockSource
+        {
+            Id = "timer",
+            Priority = ActivityPriority.Timer, // 50
+            IsActive = true,
+            IsTransient = false,
+            LastActivatedUtc = startTime.AddMinutes(-2)
+        };
+
+        var futureTime = startTime.AddSeconds(30);
+        var result = resolver.Resolve(new[] { persistentTimer, expandedClipboard }, futureTime);
+
+        Assert.Equal("clipboard", result.Primary?.Id);
+        Assert.Equal("timer", result.Secondary?.Id);
+        Assert.Equal(IslandState.Split, result.SuggestedState);
+        Assert.Null(result.NextExpirationUtc);
+    }
 }

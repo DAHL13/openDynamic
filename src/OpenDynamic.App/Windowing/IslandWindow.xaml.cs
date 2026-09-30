@@ -534,10 +534,25 @@ public partial class IslandWindow : Window
             _orchestrator.RequestToggleExpand();
         };
 
+        mainCapsule.PreviewMouseMove += (s, e) =>
+        {
+            if (_hoverLeaveTimer.IsEnabled)
+            {
+                _hoverLeaveTimer.Stop();
+            }
+        };
+
         mainCapsule.MouseWheel += (s, e) =>
         {
             _hoverEnterTimer.Stop();
             _hoverLeaveTimer.Stop();
+
+            // In Expanded mode, mouse wheel is reserved for scrolling inside child views.
+            // Never adjust volume or collapse the island while expanded.
+            if (_orchestrator.StateMachine.CurrentState == IslandState.Expanded)
+            {
+                return;
+            }
 
             // When VolumeWidget is available, mouse wheel directly adjusts volume and activates volume notice
             var volumeWidget = _orchestrator.RegisteredWidgets.OfType<Widgets.Volume.VolumeWidget>().FirstOrDefault();
