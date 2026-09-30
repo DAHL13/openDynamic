@@ -1,3 +1,4 @@
+using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using OpenDynamic.App.Animation;
 using OpenDynamic.App.Infrastructure;
@@ -157,7 +158,30 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<WindowPositioner>(),
             sp.GetRequiredService<ISettingsService>(),
             () => sp.GetRequiredService<IslandWindow>(),
-            () => sp.GetRequiredService<SettingsWindow>().ShowSettings(),
+            () =>
+            {
+                void Open()
+                {
+                    try
+                    {
+                        var settingsWindow = sp.GetRequiredService<SettingsWindow>();
+                        settingsWindow.ShowSettings();
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error(ex, "Failed to resolve or display SettingsWindow.");
+                    }
+                }
+
+                if (Application.Current?.Dispatcher != null && !Application.Current.Dispatcher.CheckAccess())
+                {
+                    Application.Current.Dispatcher.Invoke(Open);
+                }
+                else
+                {
+                    Open();
+                }
+            },
             sp.GetRequiredService<ClipboardService>()));
 
         return services;

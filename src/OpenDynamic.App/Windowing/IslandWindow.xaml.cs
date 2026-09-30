@@ -664,9 +664,12 @@ public partial class IslandWindow : Window
         // Satellite bubble click in Split mode: interactive multitasking swap (Hito M4)
         satellite.MouseLeftButtonUp += (s, e) =>
         {
-            Log.Information("Satellite bubble clicked in Split mode. Swapping primary and secondary activities.");
-            _orchestrator.SwapSplitActivities();
-            e.Handled = true;
+            if (_orchestrator.StateMachine.CurrentState == IslandState.Split)
+            {
+                Log.Information("Satellite bubble clicked in Split mode. Swapping primary and secondary activities.");
+                _orchestrator.SwapSplitActivities();
+                e.Handled = true;
+            }
         };
     }
 

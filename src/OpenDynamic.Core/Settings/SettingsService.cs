@@ -180,12 +180,16 @@ public sealed class SettingsService : ISettingsService
                         loaded.IgnoredPrivacyApps ??= new List<string>();
                     }
 
+                    loaded.IgnoredPrivacyApps ??= new List<string>();
+                    loaded.IgnoredDeviceNames ??= new List<string>();
                     loaded.SchemaVersion = AppSettings.CurrentSchemaVersion;
                     CurrentSettings = loaded;
                     WriteSettingsToDisk(CurrentSettings);
                 }
                 else
                 {
+                    loaded.IgnoredPrivacyApps ??= new List<string>();
+                    loaded.IgnoredDeviceNames ??= new List<string>();
                     CurrentSettings = loaded;
                 }
 

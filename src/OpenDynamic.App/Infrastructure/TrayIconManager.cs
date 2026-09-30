@@ -157,8 +157,27 @@ public sealed class TrayIconManager : IDisposable
         settingsItem.Click += (_, _) =>
         {
             Log.Information("Abrir Ajustes requested from tray icon context menu.");
-            _openSettingsAction?.Invoke();
-            OpenSettingsRequested?.Invoke(this, EventArgs.Empty);
+            void OpenSettings()
+            {
+                try
+                {
+                    _openSettingsAction?.Invoke();
+                    OpenSettingsRequested?.Invoke(this, EventArgs.Empty);
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, "Error executing open settings action from tray icon.");
+                }
+            }
+
+            if (Application.Current?.Dispatcher != null && !Application.Current.Dispatcher.CheckAccess())
+            {
+                Application.Current.Dispatcher.Invoke(OpenSettings);
+            }
+            else
+            {
+                OpenSettings();
+            }
         };
         menu.Items.Add(settingsItem);
 

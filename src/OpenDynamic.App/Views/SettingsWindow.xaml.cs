@@ -27,19 +27,33 @@ public partial class SettingsWindow : Window
 
     /// <summary>
     /// Displays and activates the settings window.
+    /// Safely dispatches to UI thread and brings the window to the foreground.
     /// </summary>
     public void ShowSettings()
     {
-        ViewModel.RefreshMonitors();
-
-        if (WindowState == WindowState.Minimized)
+        if (Dispatcher != null && !Dispatcher.CheckAccess())
         {
-            WindowState = WindowState.Normal;
+            Dispatcher.Invoke(ShowSettings);
+            return;
         }
 
-        Show();
-        Activate();
-        Focus();
+        try
+        {
+            ViewModel.RefreshMonitors();
+
+            if (WindowState == WindowState.Minimized)
+            {
+                WindowState = WindowState.Normal;
+            }
+
+            Show();
+            Activate();
+            Focus();
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to display SettingsWindow.");
+        }
     }
 
     private void OnCloseClicked(object sender, RoutedEventArgs e)

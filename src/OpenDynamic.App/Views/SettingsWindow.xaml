@@ -857,7 +857,7 @@
                         </Border>
 
                         <!-- CARD: Indicadores de Privacidad (Micrófono y Cámara) -->
-                        <Border Style="{StaticResource CardBorder}">
+                        <Border Style="{StaticResource SettingCard}">
                             <StackPanel>
                                 <Grid Margin="0,0,0,12">
                                     <Grid.ColumnDefinitions>
@@ -865,8 +865,8 @@
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <StackPanel VerticalAlignment="Center">
-                                        <TextBlock Text="🛡️ Privacidad: Micrófono y Cámara en uso" Style="{StaticResource CardHeader}"/>
-                                        <TextBlock Text="Insignias sutiles en la muesca cuando alguna aplicación accede a la cámara o al micrófono" Style="{StaticResource CardSubtitle}"/>
+                                        <TextBlock Text="🛡️ Privacidad: Micrófono y Cámara en uso" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Insignias sutiles en la cápsula satélite cuando alguna aplicación accede a la cámara o al micrófono" Style="{StaticResource SettingDesc}"/>
                                     </StackPanel>
                                 </Grid>
 

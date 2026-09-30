@@ -28,39 +28,16 @@
             <Border.RenderTransform>
                 <TranslateTransform x:Name="CapsuleTranslate" X="0" Y="0" />
             </Border.RenderTransform>
-            <Grid>
-                <Grid x:Name="PrimaryContentContainer" ClipToBounds="True">
-                    <ContentControl x:Name="PrimaryContent"
-                                    HorizontalAlignment="Stretch"
-                                    VerticalAlignment="Stretch"
-                                    Focusable="False"
-                                    IsHitTestVisible="True" />
-                </Grid>
-
-                <!-- Subtle Persistent Privacy Sensor Indicators (Microphone Amber, Camera Green) -->
-                <StackPanel Orientation="Horizontal"
-                            HorizontalAlignment="Right"
-                            VerticalAlignment="Top"
-                            Margin="0,5,8,0"
-                            IsHitTestVisible="False">
-                    <!-- Camera Dot (Green) -->
-                    <Ellipse x:Name="CameraIndicatorDot"
-                             Width="6"
-                             Height="6"
-                             Fill="#FF34C759"
-                             Margin="0,0,4,0"
-                             Visibility="Collapsed" />
-                    <!-- Microphone Dot (Amber/Orange) -->
-                    <Ellipse x:Name="MicrophoneIndicatorDot"
-                             Width="6"
-                             Height="6"
-                             Fill="#FFFF9500"
-                             Visibility="Collapsed" />
-                </StackPanel>
+            <Grid x:Name="PrimaryContentContainer" ClipToBounds="True">
+                <ContentControl x:Name="PrimaryContent"
+                                HorizontalAlignment="Stretch"
+                                VerticalAlignment="Stretch"
+                                Focusable="False"
+                                IsHitTestVisible="True" />
             </Grid>
         </Border>
 
-        <!-- Satellite Notch (Active in Split Multitasking Mode) -->
+        <!-- Satellite Notch (Active in Split Multitasking Mode or Privacy Sensor Badges) -->
         <Border x:Name="SatelliteBorder"
                 VerticalAlignment="Top"
                 Width="36"
@@ -73,8 +50,8 @@
                 Margin="10,0,0,0"
                 Visibility="Collapsed"
                 Cursor="Hand"
-                AutomationProperties.Name="Satélite multitarea openDynamic"
-                AutomationProperties.HelpText="Haz clic para intercambiar la actividad primaria y secundaria">
+                AutomationProperties.Name="Satélite openDynamic"
+                AutomationProperties.HelpText="Satélite de estado, privacidad y multitarea">
             <Border.RenderTransform>
                 <TranslateTransform x:Name="SatelliteTranslate" X="0" Y="0" />
             </Border.RenderTransform>
@@ -84,6 +61,29 @@
                                 VerticalAlignment="Stretch"
                                 Focusable="False"
                                 IsHitTestVisible="True" />
+
+                <!-- Subtle Persistent Privacy Sensor Indicators in Satellite (Camera Green, Microphone Amber) -->
+                <StackPanel x:Name="PrivacySatellitePanel"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            IsHitTestVisible="False"
+                            Visibility="Collapsed">
+                    <!-- Camera Dot (Green #34C759, 6x6 DIP) -->
+                    <Ellipse x:Name="CameraIndicatorDot"
+                             Width="6"
+                             Height="6"
+                             Fill="#FF34C759"
+                             Margin="2,0"
+                             Visibility="Collapsed" />
+                    <!-- Microphone Dot (Amber/Orange #FFFF9500, 6x6 DIP) -->
+                    <Ellipse x:Name="MicrophoneIndicatorDot"
+                             Width="6"
+                             Height="6"
+                             Fill="#FFFF9500"
+                             Margin="2,0"
+                             Visibility="Collapsed" />
+                </StackPanel>
             </Grid>
         </Border>
     </StackPanel>

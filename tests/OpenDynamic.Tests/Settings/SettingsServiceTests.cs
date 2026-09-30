@@ -400,6 +400,31 @@ public sealed class SettingsServiceTests : IDisposable
     }
 
     [Fact]
+    public void Load_WhenSchemaVersionIs8AndIgnoredListsAreNull_InitializesEmptyCollections()
+    {
+        string filePath = Path.Combine(_testDirectory, "settings_v8_nulls.json");
+        const string v8Json = """
+        {
+            "SchemaVersion": 8,
+            "CapsuleWidth": 200.0,
+            "IgnoredPrivacyApps": null,
+            "IgnoredDeviceNames": null
+        }
+        """;
+
+        File.WriteAllText(filePath, v8Json);
+
+        using var service = new SettingsService(filePath, debounceMilliseconds: 100);
+        service.Load();
+
+        Assert.Equal(AppSettings.CurrentSchemaVersion, service.CurrentSettings.SchemaVersion);
+        Assert.NotNull(service.CurrentSettings.IgnoredPrivacyApps);
+        Assert.Empty(service.CurrentSettings.IgnoredPrivacyApps);
+        Assert.NotNull(service.CurrentSettings.IgnoredDeviceNames);
+        Assert.Empty(service.CurrentSettings.IgnoredDeviceNames);
+    }
+
+    [Fact]
     public void Load_WhenMotionModeIsConfigured_PersistsAndDeserializesCorrectly()
     {
         string filePath = Path.Combine(_testDirectory, "settings_motion.json");

@@ -22,6 +22,10 @@ public partial class IslandView : UserControl
     private const double SatelliteSpan = SatelliteGap + SatelliteDiameter; // 46 DIP
 
     private MotionProfile _currentMotionProfile = MotionProfile.Full;
+    private bool _isMicrophoneActive;
+    private bool _isCameraActive;
+    private IslandState _currentState = IslandState.Compact;
+    private CapsuleDimensions _currentDimensions = new(200, 36, 14, 1.0);
 
     public Border CapsuleBorder => MainCapsuleBorder;
     public Border SatelliteBubble => SatelliteBorder;
@@ -39,6 +43,9 @@ public partial class IslandView : UserControl
     /// </summary>
     public void ApplyDimensions(CapsuleDimensions dimensions, IslandState state)
     {
+        _currentState = state;
+        _currentDimensions = dimensions;
+
         double width = Math.Max(0.0, dimensions.Width);
         double height = Math.Max(0.0, dimensions.Height);
         double cornerRadius = Math.Max(0.0, dimensions.CornerRadius);
@@ -62,6 +69,21 @@ public partial class IslandView : UserControl
         // Leave outer Border.Clip null so BorderBrush stroke and Background render cleanly without clipping
         MainCapsuleBorder.Clip = null;
         SatelliteBorder.Clip = null;
+
+        if (state == IslandState.Hidden)
+        {
+            MainCapsuleBorder.Width = width;
+            MainCapsuleBorder.Height = height;
+            MainCapsuleBorder.CornerRadius = notchCornerRadius;
+            MainCapsuleBorder.Opacity = 0.0;
+
+            SatelliteBorder.Visibility = Visibility.Collapsed;
+            SecondaryContentContainer.Clip = null;
+            PrimaryContentContainer.Clip = null;
+            return;
+        }
+
+        bool hasActivePrivacy = _isCameraActive || _isMicrophoneActive;
 
         if (state == IslandState.Split)
         {
@@ -97,9 +119,6 @@ public partial class IslandView : UserControl
             MainCapsuleBorder.CornerRadius = notchCornerRadius;
             MainCapsuleBorder.Opacity = opacity;
 
-            SatelliteBorder.Visibility = Visibility.Collapsed;
-            SecondaryContentContainer.Clip = null;
-
             double innerWidth = Math.Max(0.0, width - 2.0);
             double innerHeight = Math.Max(0.0, height - 1.0);
             double innerRadius = Math.Max(0.0, cornerRadius - 1.0);
@@ -107,6 +126,25 @@ public partial class IslandView : UserControl
             PrimaryContentContainer.Clip = innerWidth > 0.0 && innerHeight > 0.0
                 ? CreateNotchClipGeometry(innerWidth, innerHeight, innerRadius)
                 : null;
+
+            if (hasActivePrivacy)
+            {
+                SatelliteBorder.Width = SatelliteDiameter;
+                SatelliteBorder.Height = height > 0 ? height : SatelliteDiameter;
+                SatelliteBorder.CornerRadius = notchCornerRadius;
+                SatelliteBorder.Opacity = opacity;
+                SatelliteBorder.Visibility = Visibility.Visible;
+
+                double innerSatWidth = Math.Max(0.0, SatelliteDiameter - 2.0);
+                SecondaryContentContainer.Clip = innerSatWidth > 0.0 && innerHeight > 0.0
+                    ? CreateNotchClipGeometry(innerSatWidth, innerHeight, innerRadius)
+                    : null;
+            }
+            else
+            {
+                SatelliteBorder.Visibility = Visibility.Collapsed;
+                SecondaryContentContainer.Clip = null;
+            }
         }
     }
 
@@ -164,28 +202,92 @@ public partial class IslandView : UserControl
     /// </summary>
     public void PresentViews(UserControl? primaryView, UserControl? secondaryView, IslandState state)
     {
+        _currentState = state;
         TransitionContent(PrimaryContent, primaryView);
+
+        bool hasActivePrivacy = _isCameraActive || _isMicrophoneActive;
 
         if (state == IslandState.Split && secondaryView != null)
         {
             TransitionContent(SecondaryContent, secondaryView);
-            SatelliteBorder.Visibility = Visibility.Visible;
+            SatelliteBorder.Visibility = state != IslandState.Hidden ? Visibility.Visible : Visibility.Collapsed;
+            UpdateSatellitePrivacyLayout(hasSplitView: true);
         }
         else
         {
             TransitionContent(SecondaryContent, null);
-            SatelliteBorder.Visibility = Visibility.Collapsed;
+            bool showSatellite = hasActivePrivacy && state != IslandState.Hidden;
+            SatelliteBorder.Visibility = showSatellite ? Visibility.Visible : Visibility.Collapsed;
+            UpdateSatellitePrivacyLayout(hasSplitView: false);
         }
     }
 
     /// <summary>
-    /// Updates the persistent privacy sensor indicator dots displayed on the notch.
-    /// Amber for microphone, green for camera. Superimposed subtly without moving primary widget.
+    /// Updates the persistent privacy sensor indicator dots displayed in the satellite capsule.
+    /// Amber (#FFFF9500) for microphone, green (#34C759) for camera.
+    /// When active and the island is not hidden, shows SatelliteBorder without invading the main notch.
     /// </summary>
     public void UpdatePrivacyIndicators(bool isMicrophoneActive, bool isCameraActive)
     {
+        _isMicrophoneActive = isMicrophoneActive;
+        _isCameraActive = isCameraActive;
+
         MicrophoneIndicatorDot.Visibility = isMicrophoneActive ? Visibility.Visible : Visibility.Collapsed;
         CameraIndicatorDot.Visibility = isCameraActive ? Visibility.Visible : Visibility.Collapsed;
+
+        bool hasActivePrivacy = isMicrophoneActive || isCameraActive;
+        PrivacySatellitePanel.Visibility = hasActivePrivacy ? Visibility.Visible : Visibility.Collapsed;
+
+        if (_currentState == IslandState.Hidden)
+        {
+            SatelliteBorder.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        if (_currentState == IslandState.Split && SecondaryContent.Content != null)
+        {
+            SatelliteBorder.Visibility = Visibility.Visible;
+            UpdateSatellitePrivacyLayout(hasSplitView: true);
+        }
+        else
+        {
+            SatelliteBorder.Visibility = hasActivePrivacy ? Visibility.Visible : Visibility.Collapsed;
+            if (hasActivePrivacy)
+            {
+                SatelliteBorder.Width = SatelliteDiameter;
+                double h = _currentDimensions.Height > 0 ? _currentDimensions.Height : SatelliteDiameter;
+                SatelliteBorder.Height = h;
+                double r = _currentDimensions.CornerRadius > 0 ? _currentDimensions.CornerRadius : 14.0;
+                SatelliteBorder.CornerRadius = new CornerRadius(0, 0, r, r);
+                SatelliteBorder.Opacity = _currentDimensions.Opacity;
+
+                double innerSatWidth = Math.Max(0.0, SatelliteDiameter - 2.0);
+                double innerHeight = Math.Max(0.0, h - 1.0);
+                double innerRadius = Math.Max(0.0, r - 1.0);
+                SecondaryContentContainer.Clip = innerSatWidth > 0.0 && innerHeight > 0.0
+                    ? CreateNotchClipGeometry(innerSatWidth, innerHeight, innerRadius)
+                    : null;
+            }
+            else
+            {
+                SecondaryContentContainer.Clip = null;
+            }
+            UpdateSatellitePrivacyLayout(hasSplitView: false);
+        }
+    }
+
+    private void UpdateSatellitePrivacyLayout(bool hasSplitView)
+    {
+        if (hasSplitView)
+        {
+            PrivacySatellitePanel.VerticalAlignment = VerticalAlignment.Top;
+            PrivacySatellitePanel.Margin = new Thickness(0, 3, 0, 0);
+        }
+        else
+        {
+            PrivacySatellitePanel.VerticalAlignment = VerticalAlignment.Center;
+            PrivacySatellitePanel.Margin = new Thickness(0);
+        }
     }
 
     /// <summary>
