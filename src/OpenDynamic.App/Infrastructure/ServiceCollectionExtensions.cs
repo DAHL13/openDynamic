@@ -147,7 +147,8 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<NetworkService>(),
             sp.GetRequiredService<DeviceService>(),
             sp.GetRequiredService<Core.Timer.ITimerCollection>(),
-            sp.GetRequiredService<ClipboardService>()));
+            sp.GetRequiredService<ClipboardService>(),
+            sp.GetRequiredService<PrivacyAccessMonitor>()));
         services.AddSingleton<SettingsWindow>();
 
         // System Tray Icon Manager
