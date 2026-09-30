@@ -53,7 +53,7 @@ public static class AccessibilityThemeManager
         {
             // Standard dark theme
             resources["AppCapsuleBackgroundBrush"] = new SolidColorBrush(Colors.Black);
-            resources["AppBorderBrush"] = new SolidColorBrush(Color.FromArgb(0x26, 0xFF, 0xFF, 0xFF));
+            resources["AppBorderBrush"] = new SolidColorBrush(Color.FromArgb(0x33, 0xFF, 0xFF, 0xFF));
             resources["AppNotchBorderThickness"] = new Thickness(1, 0, 1, 1);
             resources["AppTextPrimaryBrush"] = new SolidColorBrush(Color.FromRgb(0xFF, 0xFF, 0xFF));
             resources["AppTextSecondaryBrush"] = new SolidColorBrush(Color.FromRgb(0xAA, 0xAA, 0xAA));

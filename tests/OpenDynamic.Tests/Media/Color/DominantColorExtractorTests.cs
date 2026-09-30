@@ -181,6 +181,19 @@ public class AccentColorAdjusterTests
     }
 
     [Fact]
+    public void AdjustColor_MonochromaticOrAchromaticCandidate_ReturnsDefaultWhiteFallback()
+    {
+        var black = RgbColor.Black;
+        var white = RgbColor.White;
+        var gray = RgbColor.FromRgb(128, 128, 128);
+
+        Assert.Equal(RgbColor.DefaultAccent, AccentColorAdjuster.AdjustColor(black));
+        Assert.Equal(RgbColor.DefaultAccent, AccentColorAdjuster.AdjustColor(white));
+        Assert.Equal(RgbColor.DefaultAccent, AccentColorAdjuster.AdjustColor(gray));
+        Assert.Equal(new RgbColor(255, 255, 255), RgbColor.DefaultAccent);
+    }
+
+    [Fact]
     public void RgbColor_HslRoundtrip_PreservesColor()
     {
         var original = RgbColor.FromRgb(180, 60, 220);

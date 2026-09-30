@@ -69,10 +69,10 @@
                     Height="12"
                     Width="14"
                     Visibility="{Binding EqualizerVisibility}">
-            <Border Width="2" Height="6" CornerRadius="1" Background="{Binding AccentBrush, FallbackValue=#FF1ED760}" Margin="0,0,1.2,0" VerticalAlignment="Center" />
-            <Border Width="2" Height="12" CornerRadius="1" Background="{Binding AccentBrush, FallbackValue=#FF1ED760}" Margin="0,0,1.2,0" VerticalAlignment="Center" />
-            <Border Width="2" Height="8" CornerRadius="1" Background="{Binding AccentBrush, FallbackValue=#FF1ED760}" Margin="0,0,1.2,0" VerticalAlignment="Center" />
-            <Border Width="2" Height="5" CornerRadius="1" Background="{Binding AccentBrush, FallbackValue=#FF1ED760}" VerticalAlignment="Center" />
+            <Border Width="2" Height="6" CornerRadius="1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Center" />
+            <Border Width="2" Height="12" CornerRadius="1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Center" />
+            <Border Width="2" Height="8" CornerRadius="1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Center" />
+            <Border Width="2" Height="5" CornerRadius="1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" VerticalAlignment="Center" />
         </StackPanel>
     </Grid>
 </UserControl>

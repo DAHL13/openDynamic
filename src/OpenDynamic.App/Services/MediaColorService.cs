@@ -17,7 +17,7 @@ public sealed class MediaColorService
     private readonly ConcurrentDictionary<string, RgbColor> _colorCache = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
-    /// Fallback default brush (Spotify green #1ED760), frozen for application-wide safe reuse.
+    /// Fallback default brush (Standard white neutral #FFFFFF), frozen for application-wide safe reuse.
     /// </summary>
     public static readonly SolidColorBrush DefaultAccentBrush = CreateFrozenBrush(RgbColor.DefaultAccent);
 

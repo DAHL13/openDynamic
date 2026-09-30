@@ -36,6 +36,12 @@ public static class AccentColorAdjuster
         var color = candidate.Value;
         color.ToHsl(out double h, out double s, out double l);
 
+        // If candidate lacks sufficient chromatic color (monochromatic, pure black or washed-out white)
+        if (s < 0.15 || l < 0.05 || (s < 0.20 && l > 0.90))
+        {
+            return fallback ?? RgbColor.DefaultAccent;
+        }
+
         // Enforce minimum saturation for vibrant color expression
         if (s < minSaturation)
         {

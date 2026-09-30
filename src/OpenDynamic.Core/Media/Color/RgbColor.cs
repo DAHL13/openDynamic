@@ -6,7 +6,7 @@ namespace OpenDynamic.Core.Media.Color;
 /// </summary>
 public readonly record struct RgbColor(byte R, byte G, byte B, byte A = 255)
 {
-    public static readonly RgbColor DefaultAccent = new(0x1E, 0xD7, 0x60); // Vibrant Spotify / openDynamic green
+    public static readonly RgbColor DefaultAccent = new(255, 255, 255); // Standard white neutral fallback (#FFFFFF)
     public static readonly RgbColor Black = new(0, 0, 0);
     public static readonly RgbColor White = new(255, 255, 255);
 

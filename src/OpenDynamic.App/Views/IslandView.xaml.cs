@@ -253,8 +253,37 @@ public partial class IslandView : UserControl
         if (accentColor == null)
         {
             MainCapsuleBorder.BeginAnimation(Border.BorderBrushProperty, null);
-            MainCapsuleBorder.ClearValue(Border.BorderBrushProperty);
-            SatelliteBorder.ClearValue(Border.BorderBrushProperty);
+            SatelliteBorder.BeginAnimation(Border.BorderBrushProperty, null);
+
+            var defaultColor = (Application.Current?.TryFindResource("AppBorderBrush") as SolidColorBrush)?.Color
+                               ?? Color.FromArgb(0x33, 0xFF, 0xFF, 0xFF);
+
+            if (!_currentMotionProfile.AllowDecorative)
+            {
+                MainCapsuleBorder.SetResourceReference(Border.BorderBrushProperty, "AppBorderBrush");
+                SatelliteBorder.SetResourceReference(Border.BorderBrushProperty, "AppBorderBrush");
+                return;
+            }
+
+            var resetStartColor = (MainCapsuleBorder.BorderBrush as SolidColorBrush)?.Color ?? defaultColor;
+            var resetAnimBrush = new SolidColorBrush(resetStartColor);
+            MainCapsuleBorder.BorderBrush = resetAnimBrush;
+            SatelliteBorder.BorderBrush = resetAnimBrush;
+
+            var resetColorAnim = new ColorAnimation
+            {
+                To = defaultColor,
+                Duration = TimeSpan.FromMilliseconds(300),
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+            };
+
+            resetColorAnim.Completed += (_, _) =>
+            {
+                MainCapsuleBorder.SetResourceReference(Border.BorderBrushProperty, "AppBorderBrush");
+                SatelliteBorder.SetResourceReference(Border.BorderBrushProperty, "AppBorderBrush");
+            };
+
+            resetAnimBrush.BeginAnimation(SolidColorBrush.ColorProperty, resetColorAnim);
             return;
         }
 

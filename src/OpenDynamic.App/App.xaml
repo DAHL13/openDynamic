@@ -5,7 +5,7 @@
     <Application.Resources>
         <!-- Accessibility and Dynamic Theme Resources (Task 5) -->
         <SolidColorBrush x:Key="AppCapsuleBackgroundBrush" Color="#FF000000" />
-        <SolidColorBrush x:Key="AppBorderBrush" Color="#26FFFFFF" />
+        <SolidColorBrush x:Key="AppBorderBrush" Color="#33FFFFFF" />
         <Thickness x:Key="AppNotchBorderThickness">1,0,1,1</Thickness>
         <SolidColorBrush x:Key="AppTextPrimaryBrush" Color="#FFFFFFFF" />
         <SolidColorBrush x:Key="AppTextSecondaryBrush" Color="#FFAAAAAA" />

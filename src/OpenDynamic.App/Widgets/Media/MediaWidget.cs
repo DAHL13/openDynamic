@@ -88,7 +88,7 @@ public sealed class MediaWidget : IslandWidgetBase
     private readonly SwipeGestureDetector _dragGestureDetector;
 
     private SolidColorBrush _accentBrush = MediaColorService.DefaultAccentBrush;
-    private Color _accentColor = Color.FromRgb(0x1E, 0xD7, 0x60);
+    private Color _accentColor = Color.FromRgb(255, 255, 255);
 
     /// <summary>
     /// Frozen solid color brush derived dynamically from album cover artwork.
