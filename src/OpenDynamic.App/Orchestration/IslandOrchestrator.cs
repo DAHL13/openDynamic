@@ -1,10 +1,13 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.Messaging;
 using OpenDynamic.App.Animation;
+using OpenDynamic.App.Services;
 using OpenDynamic.App.Views;
 using OpenDynamic.App.Widgets;
+using OpenDynamic.App.Widgets.Media;
 using OpenDynamic.App.Widgets.Messages;
 using OpenDynamic.Core.State;
 using OpenDynamic.Core.Widgets;
@@ -33,7 +36,7 @@ public sealed class IslandOrchestrator : IDisposable
 
     private IIslandWidget? _activePrimaryWidget;
     private IIslandWidget? _activeSecondaryWidget;
-    private System.Windows.Media.Color? _currentMediaAccentColor;
+    private Color? _currentMediaAccentColor;
     private bool _isSplitSwapped;
     private string? _lastSplitPrimaryId;
     private string? _lastSplitSecondaryId;
@@ -106,7 +109,7 @@ public sealed class IslandOrchestrator : IDisposable
             _currentMediaAccentColor = msg.AccentColor;
             DispatchToUIThread(() =>
             {
-                if (_activePrimaryWidget is Widgets.Media.MediaWidget &&
+                if (_activePrimaryWidget is MediaWidget &&
                     _settings.EnableDynamicMediaColor &&
                     _stateMachine.CurrentState != IslandState.Hidden)
                 {
@@ -494,19 +497,28 @@ public sealed class IslandOrchestrator : IDisposable
         // Deliver views to IslandView
         _islandView?.PresentViews(primaryView, secondaryView, targetState);
 
+        // Clean cached accent if media playback stopped completely or session destroyed
+        bool isMediaActive;
+        lock (_widgets)
+        {
+            isMediaActive = _widgets.OfType<MediaWidget>().Any(w => w.IsActive);
+        }
+        if (!isMediaActive)
+        {
+            _currentMediaAccentColor = null;
+        }
+
         // Update dynamic accent border on the notch based on active widget
-        if (_activePrimaryWidget is Widgets.Media.MediaWidget mediaWidget &&
+        if (_activePrimaryWidget is MediaWidget mediaWidget &&
             _settings.EnableDynamicMediaColor &&
             targetState != IslandState.Hidden)
         {
-            var colorToApply = _currentMediaAccentColor;
-            if (colorToApply == null && mediaWidget.AccentColor != System.Windows.Media.Color.FromRgb(255, 255, 255))
+            if (_currentMediaAccentColor == null && mediaWidget.AccentBrush != MediaColorService.DefaultAccentBrush)
             {
-                colorToApply = mediaWidget.AccentColor;
-                _currentMediaAccentColor = colorToApply;
+                _currentMediaAccentColor = mediaWidget.AccentColor;
             }
 
-            _islandView?.ApplyAccentBorder(colorToApply);
+            _islandView?.ApplyAccentBorder(_currentMediaAccentColor);
         }
         else
         {

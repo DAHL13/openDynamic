@@ -4,10 +4,17 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              mc:Ignorable="d" 
-             Background="{x:Null}">
-    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Top">
+             Background="{x:Null}"
+             VerticalAlignment="Top"
+             Margin="0,0,0,0">
+    <StackPanel Orientation="Horizontal"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Top"
+                Margin="0,0,0,0">
         <!-- Main Island Notch Container -->
         <Border x:Name="MainCapsuleBorder"
+                VerticalAlignment="Top"
+                Margin="0,0,0,0"
                 Width="200"
                 Height="36"
                 Background="{DynamicResource AppCapsuleBackgroundBrush}"
@@ -18,6 +25,9 @@
                 Cursor="Hand"
                 AutomationProperties.Name="Muesca openDynamic"
                 AutomationProperties.HelpText="Haz clic para alternar entre modo compacto y expandido, o usa la rueda del ratón para volumen">
+            <Border.RenderTransform>
+                <TranslateTransform x:Name="CapsuleTranslate" X="0" Y="0" />
+            </Border.RenderTransform>
             <Grid x:Name="PrimaryContentContainer" ClipToBounds="True">
                 <ContentControl x:Name="PrimaryContent"
                                 HorizontalAlignment="Stretch"
@@ -29,6 +39,7 @@
 
         <!-- Satellite Notch (Active in Split Multitasking Mode) -->
         <Border x:Name="SatelliteBorder"
+                VerticalAlignment="Top"
                 Width="36"
                 Height="36"
                 Background="{DynamicResource AppCapsuleBackgroundBrush}"
@@ -41,6 +52,9 @@
                 Cursor="Hand"
                 AutomationProperties.Name="Satélite multitarea openDynamic"
                 AutomationProperties.HelpText="Haz clic para intercambiar la actividad primaria y secundaria">
+            <Border.RenderTransform>
+                <TranslateTransform x:Name="SatelliteTranslate" X="0" Y="0" />
+            </Border.RenderTransform>
             <Grid x:Name="SecondaryContentContainer" ClipToBounds="True">
                 <ContentControl x:Name="SecondaryContent"
                                 HorizontalAlignment="Stretch"

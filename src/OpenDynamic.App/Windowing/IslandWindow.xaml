@@ -13,9 +13,10 @@
         Width="640"
         Height="240"
         Title="openDynamic Island">
-    <Grid Background="{x:Null}">
+    <Grid Background="{x:Null}" VerticalAlignment="Top" Margin="0,0,0,0">
         <views:IslandView x:Name="IslandHostView"
                           HorizontalAlignment="Center"
-                          VerticalAlignment="Top" />
+                          VerticalAlignment="Top"
+                          Margin="0,0,0,0" />
     </Grid>
 </Window>

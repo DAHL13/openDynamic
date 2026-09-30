@@ -46,6 +46,19 @@ public partial class IslandView : UserControl
 
         var notchCornerRadius = new CornerRadius(0, 0, cornerRadius, cornerRadius);
 
+        // Enforce strict top bezel anchoring: vertical translation (Y) must NEVER exceed 0 DIP.
+        // Prevents spring oscillation during retraction from pushing the notch downwards and exposing the desktop background.
+        double targetY = CapsuleTranslate?.Y ?? 0.0;
+        double clampedY = Math.Min(0.0, targetY);
+        if (CapsuleTranslate != null)
+        {
+            CapsuleTranslate.Y = clampedY;
+        }
+        if (SatelliteTranslate != null)
+        {
+            SatelliteTranslate.Y = Math.Min(0.0, SatelliteTranslate.Y);
+        }
+
         // Leave outer Border.Clip null so BorderBrush stroke and Background render cleanly without clipping
         MainCapsuleBorder.Clip = null;
         SatelliteBorder.Clip = null;

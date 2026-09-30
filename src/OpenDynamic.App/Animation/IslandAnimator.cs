@@ -146,6 +146,19 @@ public sealed class IslandAnimator : IDisposable
     }
 
     /// <summary>
+    /// Restricts vertical translation (Y) so that it NEVER exceeds 0 DIP, keeping the top notch border
+    /// anchored flush to Y = 0 DIP against the monitor bezel in all frames of retraction.
+    /// Elastic bounce is strictly confined to downward expansion (into the screen).
+    /// </summary>
+    /// <param name="targetY">Unclamped vertical translation value in DIPs.</param>
+    /// <returns>A clamped Y value guaranteed to be &lt;= 0.0 DIP.</returns>
+    public static double ClampVerticalTranslation(double targetY)
+    {
+        double clampedY = Math.Min(0.0, targetY);
+        return clampedY;
+    }
+
+    /// <summary>
     /// Configures stiffness, damping, and mass across all capsule springs.
     /// </summary>
     public void SetSpringParameters(double stiffness, double damping, double mass = 1.0)
