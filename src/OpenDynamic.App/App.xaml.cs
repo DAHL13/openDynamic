@@ -72,6 +72,10 @@ public partial class App : Application
         var timerWidget = Services.GetRequiredService<Widgets.Timer.TimerWidget>();
         orchestrator.RegisterWidget(timerWidget);
 
+        // Register StopwatchWidget (Priority 45, Continuous)
+        var stopwatchWidget = Services.GetRequiredService<Widgets.Stopwatch.StopwatchWidget>();
+        orchestrator.RegisterWidget(stopwatchWidget);
+
         // Register NetworkWidget (Priority 65, Transient)
         var networkWidget = Services.GetRequiredService<Widgets.Network.NetworkWidget>();
         orchestrator.RegisterWidget(networkWidget);

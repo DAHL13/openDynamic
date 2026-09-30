@@ -85,7 +85,16 @@ public static class ServiceCollectionExtensions
         // Timer & Pomodoro Services
         services.AddSingleton<Core.Timer.TimerController>();
         services.AddSingleton<Core.Timer.ITimerController>(sp => sp.GetRequiredService<Core.Timer.TimerController>());
+        services.AddSingleton<Core.Timer.ITimerPersistenceService, Core.Timer.TimerPersistenceService>();
+        services.AddSingleton<Core.Timer.TimerCollection>();
+        services.AddSingleton<Core.Timer.ITimerCollection>(sp => sp.GetRequiredService<Core.Timer.TimerCollection>());
         services.AddSingleton<Widgets.Timer.TimerWidget>();
+
+        // Stopwatch Services (Priority 45)
+        services.AddSingleton<Core.Stopwatch.StopwatchController>();
+        services.AddSingleton<Core.Stopwatch.IStopwatchController>(sp => sp.GetRequiredService<Core.Stopwatch.StopwatchController>());
+        services.AddSingleton<TimingUiCoordinator>();
+        services.AddSingleton<Widgets.Stopwatch.StopwatchWidget>();
 
         // Network Services & Widget (Priority 65, Transient)
         services.AddSingleton<NetworkService>();
