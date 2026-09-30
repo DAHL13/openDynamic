@@ -210,8 +210,8 @@ public partial class IslandView : UserControl
         MicrophoneIndicatorDot.Visibility = _isMicrophoneActive ? Visibility.Visible : Visibility.Collapsed;
         CameraIndicatorDot.Visibility = _isCameraActive ? Visibility.Visible : Visibility.Collapsed;
 
-        // If island is hidden, collapse everything on the satellite
-        if (_currentState == IslandState.Hidden)
+        // If island is hidden and no privacy sensors are active, collapse everything on the satellite
+        if (_currentState == IslandState.Hidden && !hasActivePrivacy)
         {
             SatelliteBorder.Visibility = Visibility.Collapsed;
             SecondaryContent.Visibility = Visibility.Collapsed;
@@ -225,7 +225,7 @@ public partial class IslandView : UserControl
         SatelliteBorder.MinHeight = SatelliteDiameter;
         SatelliteBorder.MaxHeight = SatelliteDiameter;
         SatelliteBorder.CornerRadius = new CornerRadius(0, 0, 14, 14);
-        SatelliteBorder.Opacity = _currentDimensions.Opacity;
+        SatelliteBorder.Opacity = _currentState == IslandState.Hidden ? 1.0 : _currentDimensions.Opacity;
 
         if (isSplitMode)
         {

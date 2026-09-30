@@ -34,7 +34,8 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<IslandStateMachine>(),
             sp.GetRequiredService<IslandAnimator>(),
             sp.GetRequiredService<PriorityResolver>(),
-            sp.GetRequiredService<AppSettings>()));
+            sp.GetRequiredService<AppSettings>(),
+            sp.GetService<Core.Privacy.IPrivacyAccessMonitor>()));
         services.AddSingleton<IslandWindow>(sp => new IslandWindow(
             sp.GetRequiredService<WindowPositioner>(),
             sp.GetRequiredService<ForegroundWatcher>(),

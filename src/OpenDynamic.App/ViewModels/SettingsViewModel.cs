@@ -815,6 +815,7 @@ public partial class SettingsViewModel : ObservableObject
         _settingsService.SaveDebounced();
         UpdatePrivacyMonitorLifecycle();
         _getIslandWindow?.Invoke()?.ApplySettingsAndReposition();
+        _orchestrator.UpdateOrchestration();
     }
 
     partial void OnEnableCameraIndicatorChanged(bool value)
@@ -823,6 +824,7 @@ public partial class SettingsViewModel : ObservableObject
         _settingsService.SaveDebounced();
         UpdatePrivacyMonitorLifecycle();
         _getIslandWindow?.Invoke()?.ApplySettingsAndReposition();
+        _orchestrator.UpdateOrchestration();
     }
 
     partial void OnEnablePrivacyAlertsChanged(bool value)

@@ -26,6 +26,7 @@ public sealed class IslandOrchestrator : IDisposable
     private readonly IslandAnimator _animator;
     private readonly PriorityResolver _priorityResolver;
     private readonly Core.Settings.AppSettings _settings;
+    private readonly Core.Privacy.IPrivacyAccessMonitor? _privacyMonitor;
     private readonly List<IIslandWidget> _widgets = new();
     private readonly HashSet<string> _quarantinedWidgetIds = new();
 
@@ -54,6 +55,34 @@ public sealed class IslandOrchestrator : IDisposable
     public IslandAnimator Animator => _animator;
     public PriorityResolver PriorityResolver => _priorityResolver;
 
+    /// <summary>
+    /// Optional custom evaluator for privacy sensor activity, primarily used for unit testing.
+    /// </summary>
+    public Func<bool>? PrivacyInUseEvaluator { get; set; }
+
+    /// <summary>
+    /// Gets the passive privacy monitor instance, if attached.
+    /// </summary>
+    public Core.Privacy.IPrivacyAccessMonitor? PrivacyMonitor => _privacyMonitor;
+
+    /// <summary>
+    /// Indicates whether microphone or camera sensors are currently in active use
+    /// according to privacy monitoring and user settings.
+    /// </summary>
+    public bool IsPrivacySensorsInUse()
+    {
+        if (PrivacyInUseEvaluator != null)
+        {
+            return PrivacyInUseEvaluator();
+        }
+
+        if (_privacyMonitor == null) return false;
+        var state = _privacyMonitor.CurrentState;
+        bool micActive = _settings.EnableMicrophoneIndicator && state.IsMicrophoneActive;
+        bool camActive = _settings.EnableCameraIndicator && state.IsCameraActive;
+        return micActive || camActive;
+    }
+
     public IReadOnlyList<IIslandWidget> RegisteredWidgets
     {
         get
@@ -81,12 +110,19 @@ public sealed class IslandOrchestrator : IDisposable
         IslandStateMachine stateMachine,
         IslandAnimator animator,
         PriorityResolver? priorityResolver = null,
-        Core.Settings.AppSettings? settings = null)
+        Core.Settings.AppSettings? settings = null,
+        Core.Privacy.IPrivacyAccessMonitor? privacyMonitor = null)
     {
         _stateMachine = stateMachine ?? throw new ArgumentNullException(nameof(stateMachine));
         _animator = animator ?? throw new ArgumentNullException(nameof(animator));
         _priorityResolver = priorityResolver ?? new PriorityResolver();
         _settings = settings ?? new Core.Settings.AppSettings();
+        _privacyMonitor = privacyMonitor;
+
+        if (_privacyMonitor != null)
+        {
+            _privacyMonitor.StateChanged += OnPrivacyMonitorStateChanged;
+        }
 
         // Subscribe to decoupled WeakReferenceMessenger events
         WeakReferenceMessenger.Default.Register<ActivityChangedMessage>(this, (_, msg) =>
@@ -229,6 +265,11 @@ public sealed class IslandOrchestrator : IDisposable
         DispatchToUIThread(UpdateOrchestration);
     }
 
+    private void OnPrivacyMonitorStateChanged(object? sender, Core.Privacy.PrivacyAccessState e)
+    {
+        DispatchToUIThread(UpdateOrchestration);
+    }
+
     public bool IsFullscreenSuppressed => _isFullscreenSuppressed;
     private bool _isFullscreenSuppressed;
 
@@ -333,6 +374,41 @@ public sealed class IslandOrchestrator : IDisposable
     }
 
     /// <summary>
+    /// Evaluates active widget roles, user expansion, and passive privacy sensor state
+    /// to determine the target <see cref="IslandState"/>.
+    /// Guaranteed not to transition to <see cref="IslandState.Hidden"/> while privacy sensors (mic/cam)
+    /// are active, even if no primary widgets are running (unless suppressed by exclusive fullscreen).
+    /// </summary>
+    public IslandState DetermineTargetState()
+    {
+        if (_activePrimaryWidget == null)
+        {
+            _userExpanded = false;
+
+            // If microphone or camera sensors are currently in use, keep the capsule in Compact
+            // rest mode showing the satellite indicators rather than collapsing to Hidden.
+            if (IsPrivacySensorsInUse())
+            {
+                return IslandState.Compact;
+            }
+
+            return IdleState;
+        }
+
+        if (_userExpanded)
+        {
+            return IslandState.Expanded;
+        }
+
+        if (_activeSecondaryWidget != null)
+        {
+            return IslandState.Split;
+        }
+
+        return IslandState.Compact;
+    }
+
+    /// <summary>
     /// Evaluates active widget priorities, commands appropriate state transitions,
     /// schedules expiration for transient activities, and delivers views to <see cref="IslandView"/>.
     /// Guaranteed to run on the WPF UI thread.
@@ -389,29 +465,8 @@ public sealed class IslandOrchestrator : IDisposable
         }
 
 
-        // Determine destination state
-        IslandState targetState;
-        if (_activePrimaryWidget == null)
-        {
-            // No active activities: return to idle state
-            _userExpanded = false;
-            targetState = IdleState;
-        }
-        else
-        {
-            if (_userExpanded)
-            {
-                targetState = IslandState.Expanded;
-            }
-            else if (_activeSecondaryWidget != null)
-            {
-                targetState = IslandState.Split;
-            }
-            else
-            {
-                targetState = IslandState.Compact;
-            }
-        }
+        // Determine destination state (persists Compact when privacy sensors are active)
+        IslandState targetState = DetermineTargetState();
 
         // Schedule timer if an active transient alert has an expiration scheduled
         // NOTE: In Expanded mode, transient auto-close is paused so the user can interact freely.
@@ -664,9 +719,9 @@ public sealed class IslandOrchestrator : IDisposable
     /// </summary>
     public void RequestExpand()
     {
-        if (_activePrimaryWidget == null && _stateMachine.CurrentState == IslandState.Hidden)
+        if (_activePrimaryWidget == null)
         {
-            // If hidden and no widgets, temporarily reveal compact notch or do nothing
+            // Do not expand if there is no active primary widget
             return;
         }
 
@@ -807,6 +862,11 @@ public sealed class IslandOrchestrator : IDisposable
 
         _transientTimer?.Stop();
         _transientTimer = null;
+
+        if (_privacyMonitor != null)
+        {
+            _privacyMonitor.StateChanged -= OnPrivacyMonitorStateChanged;
+        }
 
         WeakReferenceMessenger.Default.UnregisterAll(this);
         _islandView?.ApplyAccentBorder(null);

@@ -171,6 +171,7 @@ public partial class IslandWindow : Window
         Dispatcher.InvokeAsync(() =>
         {
             UpdatePrivacyDots(state);
+            _orchestrator.UpdateOrchestration();
         });
     }
 
@@ -179,6 +180,18 @@ public partial class IslandWindow : Window
         bool showMic = _settings.EnableMicrophoneIndicator && state.IsMicrophoneActive;
         bool showCam = _settings.EnableCameraIndicator && state.IsCameraActive;
         IslandHostView.UpdatePrivacyIndicators(showMic, showCam);
+
+        if ((showMic || showCam) && !_orchestrator.IsFullscreenSuppressed)
+        {
+            if (IslandHostView.Visibility != Visibility.Visible)
+            {
+                IslandHostView.Visibility = Visibility.Visible;
+            }
+            if (this.Visibility != Visibility.Visible)
+            {
+                this.Visibility = Visibility.Visible;
+            }
+        }
     }
 
     /// <summary>
