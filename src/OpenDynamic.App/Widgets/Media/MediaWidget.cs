@@ -410,6 +410,7 @@ public sealed class MediaWidget : IslandWidgetBase
             {
                 AccentColor = Color.FromRgb(RgbColor.DefaultAccent.R, RgbColor.DefaultAccent.G, RgbColor.DefaultAccent.B);
                 AccentBrush = MediaColorService.DefaultAccentBrush;
+                WeakReferenceMessenger.Default.Send(new MediaAccentColorChangedMessage(null));
             });
             return;
         }
@@ -417,8 +418,10 @@ public sealed class MediaWidget : IslandWidgetBase
         var rgb = await _colorService.GetAccentColorAsync(thumbnail, trackKey);
         await _dispatcher.InvokeAsync(() =>
         {
-            AccentColor = Color.FromRgb(rgb.R, rgb.G, rgb.B);
+            var color = Color.FromRgb(rgb.R, rgb.G, rgb.B);
+            AccentColor = color;
             AccentBrush = MediaColorService.CreateFrozenBrush(rgb);
+            WeakReferenceMessenger.Default.Send(new MediaAccentColorChangedMessage(color));
         });
     }
 
@@ -561,6 +564,7 @@ public sealed class MediaWidget : IslandWidgetBase
         DurationFormatted = "0:00";
         AccentColor = Color.FromRgb(RgbColor.DefaultAccent.R, RgbColor.DefaultAccent.G, RgbColor.DefaultAccent.B);
         AccentBrush = MediaColorService.DefaultAccentBrush;
+        WeakReferenceMessenger.Default.Send(new MediaAccentColorChangedMessage(null));
 
         _wheelGestureDetector.ResetAll();
         _dragGestureDetector.ResetAll();

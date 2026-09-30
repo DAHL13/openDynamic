@@ -469,6 +469,16 @@ public sealed class IslandOrchestrator : IDisposable
         // Deliver views to IslandView
         _islandView?.PresentViews(primaryView, secondaryView, targetState);
 
+        // Update dynamic accent border on the notch based on active widget
+        if (_activePrimaryWidget is Widgets.Media.MediaWidget mediaWidget && targetState != IslandState.Hidden)
+        {
+            _islandView?.ApplyAccentBorder(mediaWidget.AccentColor);
+        }
+        else
+        {
+            _islandView?.ApplyAccentBorder(null);
+        }
+
         // Command state transition with exclusive authority
         TransitionTo(targetState);
 

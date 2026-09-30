@@ -2,6 +2,8 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using CommunityToolkit.Mvvm.Messaging;
+using OpenDynamic.App.Widgets.Messages;
 using OpenDynamic.Core.Animation;
 using OpenDynamic.Core.State;
 using Serilog;
@@ -27,6 +29,11 @@ public partial class IslandView : UserControl
     public IslandView()
     {
         InitializeComponent();
+
+        WeakReferenceMessenger.Default.Register<MediaAccentColorChangedMessage>(this, (_, msg) =>
+        {
+            Dispatcher.InvokeAsync(() => ApplyAccentBorder(msg.AccentColor));
+        });
     }
 
     /// <summary>
@@ -227,5 +234,55 @@ public partial class IslandView : UserControl
             container.BeginAnimation(OpacityProperty, crossFadeIn);
         };
         container.BeginAnimation(OpacityProperty, crossFadeOut);
+    }
+
+    private Color? _currentAccentColor;
+
+    /// <summary>
+    /// Applies a subtle dynamic accent color to the notch outline border.
+    /// In standard motion mode, animates color with a short ColorAnimation (~300ms) only when changing tracks.
+    /// In reduced motion mode, applies the color cut instantaneously.
+    /// When null, resets the border brush to the theme default.
+    /// Strictly adheres to performance budget (zero large DropShadowEffects).
+    /// </summary>
+    public void ApplyAccentBorder(Color? accentColor)
+    {
+        if (_currentAccentColor == accentColor) return;
+        _currentAccentColor = accentColor;
+
+        if (accentColor == null)
+        {
+            MainCapsuleBorder.BeginAnimation(Border.BorderBrushProperty, null);
+            MainCapsuleBorder.ClearValue(Border.BorderBrushProperty);
+            SatelliteBorder.ClearValue(Border.BorderBrushProperty);
+            return;
+        }
+
+        var targetColor = accentColor.Value;
+
+        if (!_currentMotionProfile.AllowDecorative)
+        {
+            // Reduced motion mode: instantaneous color cut
+            var frozenBrush = new SolidColorBrush(targetColor);
+            frozenBrush.Freeze();
+            MainCapsuleBorder.BorderBrush = frozenBrush;
+            SatelliteBorder.BorderBrush = frozenBrush;
+            return;
+        }
+
+        // Standard animated transition (~300ms)
+        var startColor = (MainCapsuleBorder.BorderBrush as SolidColorBrush)?.Color ?? Color.FromArgb(0x33, 0xFF, 0xFF, 0xFF);
+        var animBrush = new SolidColorBrush(startColor);
+        MainCapsuleBorder.BorderBrush = animBrush;
+        SatelliteBorder.BorderBrush = animBrush;
+
+        var colorAnim = new ColorAnimation
+        {
+            To = targetColor,
+            Duration = TimeSpan.FromMilliseconds(300),
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        };
+
+        animBrush.BeginAnimation(SolidColorBrush.ColorProperty, colorAnim);
     }
 }

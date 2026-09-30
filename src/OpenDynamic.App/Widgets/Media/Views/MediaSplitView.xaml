@@ -35,7 +35,7 @@
         <Border Width="8"
                 Height="8"
                 CornerRadius="4"
-                Background="#FF1ED760"
+                Background="{Binding AccentBrush, FallbackValue=#FF1ED760}"
                 BorderBrush="#FF000000"
                 BorderThickness="1.5"
                 HorizontalAlignment="Right"
