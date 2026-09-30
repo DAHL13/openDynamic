@@ -29,6 +29,7 @@ public partial class IslandWindow : Window
     private readonly FullscreenWatcher? _fullscreenWatcher;
     private readonly Services.NetworkService? _networkService;
     private readonly Services.DeviceService? _deviceService;
+    private readonly Services.ClipboardService? _clipboardService;
     private readonly Core.Settings.AppSettings _settings;
 
     private readonly DispatcherTimer _hoverEnterTimer;
@@ -49,7 +50,8 @@ public partial class IslandWindow : Window
         FullscreenWatcher? fullscreenWatcher = null,
         Core.Settings.AppSettings? settings = null,
         Services.NetworkService? networkService = null,
-        Services.DeviceService? deviceService = null)
+        Services.DeviceService? deviceService = null,
+        Services.ClipboardService? clipboardService = null)
     {
         _windowPositioner = windowPositioner ?? throw new ArgumentNullException(nameof(windowPositioner));
         _foregroundWatcher = foregroundWatcher ?? throw new ArgumentNullException(nameof(foregroundWatcher));
@@ -59,6 +61,7 @@ public partial class IslandWindow : Window
         _fullscreenWatcher = fullscreenWatcher;
         _networkService = networkService;
         _deviceService = deviceService;
+        _clipboardService = clipboardService;
         _settings = settings ?? new Core.Settings.AppSettings();
 
         InitializeComponent();
@@ -121,9 +124,10 @@ public partial class IslandWindow : Window
 
         _networkService?.Start();
         _deviceService?.Start(_hwnd);
+        _clipboardService?.Start(_hwnd);
 
-        Log.Information("IslandWindow initialized successfully with HWND: {Hwnd}. NetworkService={HasNetwork}, DeviceService={HasDevice}",
-            _hwnd, _networkService != null, _deviceService != null);
+        Log.Information("IslandWindow initialized successfully with HWND: {Hwnd}. NetworkService={HasNetwork}, DeviceService={HasDevice}, ClipboardService={HasClipboard}",
+            _hwnd, _networkService != null, _deviceService != null, _clipboardService != null);
     }
 
     /// <summary>
@@ -213,6 +217,11 @@ public partial class IslandWindow : Window
                 Log.Information("IslandWindow WndProc received WM_DEVICECHANGE: wParam=0x{WParam:X4}, lParam=0x{LParam:X16}",
                     wParam.ToInt32(), lParam.ToInt64());
                 _deviceService?.HandleDeviceChange(wParam, lParam);
+                break;
+
+            // React to clipboard updates via native format listener
+            case NativeMethods.WM_CLIPBOARDUPDATE:
+                _clipboardService?.HandleClipboardUpdate();
                 break;
 
             // React to horizontal mouse wheel or precision touchpad tilt/swipe
@@ -305,6 +314,7 @@ public partial class IslandWindow : Window
                 _orchestrator.SuspendForPower();
                 _networkService?.NotifySuspended();
                 _deviceService?.NotifySuspended();
+                _clipboardService?.NotifySuspended();
                 break;
 
             case NativeMethods.PBT_APMRESUMEAUTOMATIC:
@@ -319,6 +329,7 @@ public partial class IslandWindow : Window
                 _powerService?.RefreshPowerStatus(isInitial: false);
                 _networkService?.NotifyResumed();
                 _deviceService?.NotifyResumed();
+                _clipboardService?.NotifyResumed();
                 break;
 
             default:
@@ -654,6 +665,8 @@ public partial class IslandWindow : Window
             _fullscreenWatcher.FullscreenChanged -= OnFullscreenChanged;
             _fullscreenWatcher.Dispose();
         }
+
+        _clipboardService?.Stop();
 
         if (_hwndSource != null)
         {

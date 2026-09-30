@@ -42,7 +42,8 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<FullscreenWatcher>(),
             sp.GetRequiredService<AppSettings>(),
             sp.GetRequiredService<NetworkService>(),
-            sp.GetRequiredService<DeviceService>()));
+            sp.GetRequiredService<DeviceService>(),
+            sp.GetRequiredService<ClipboardService>()));
 
         // Settings Service & Persistence
         services.AddSingleton<ISettingsService>(sp =>
@@ -112,6 +113,16 @@ public static class ServiceCollectionExtensions
         // Device Services & Widget (Priority 60, Transient)
         services.AddSingleton<DeviceService>();
         services.AddSingleton<Widgets.Device.DeviceWidget>();
+
+        // Clipboard History Services (Priority 55, Strict RAM, Opt-In)
+        services.AddSingleton<Core.Clipboard.ClipboardHistoryManager>(sp =>
+        {
+            var settings = sp.GetRequiredService<AppSettings>();
+            return new Core.Clipboard.ClipboardHistoryManager(
+                capacity: settings.ClipboardHistoryCapacity,
+                expiration: TimeSpan.FromMinutes(Math.Max(1, settings.ClipboardExpirationMinutes)));
+        });
+        services.AddSingleton<ClipboardService>();
 
         // Settings Window & ViewModel
         services.AddSingleton<SettingsViewModel>(sp => new SettingsViewModel(
