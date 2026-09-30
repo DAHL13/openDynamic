@@ -5,10 +5,10 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              mc:Ignorable="d" 
              Width="330"
-             Height="165"
+             Height="220"
              Background="Transparent">
-    <!-- Balanced vertical margins with 14 DIP bottom clearance from the R:24 capsule curvature (similar to MediaExpandedView) -->
-    <Grid Margin="18,10,18,14">
+    <!-- Balanced vertical margins with clearance from the notch capsule curvature -->
+    <Grid Margin="16,8,16,12">
         <Grid.RowDefinitions>
             <!-- Mode Selector Segmented Bar -->
             <RowDefinition Height="Auto" />
@@ -16,17 +16,21 @@
             <RowDefinition Height="Auto" />
             <!-- Progress Bar -->
             <RowDefinition Height="Auto" />
-            <!-- Controls Row -->
+            <!-- Controls Row & Quick Add -->
             <RowDefinition Height="Auto" />
+            <!-- Presets Row -->
+            <RowDefinition Height="Auto" />
+            <!-- Multi-Timer Active List -->
+            <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
         <!-- Mode Selector Segmented Bar -->
-        <Border Grid.Row="0" Background="#1C1C1E" CornerRadius="8" Padding="2" HorizontalAlignment="Center" Margin="0,0,0,6">
+        <Border Grid.Row="0" Background="#1C1C1E" CornerRadius="8" Padding="2" HorizontalAlignment="Center" Margin="0,0,0,4">
             <StackPanel Orientation="Horizontal">
                 <Button Content="Normal"
                         Command="{Binding SwitchToStandardCommand}"
-                        Padding="8,3"
-                        FontSize="9.5"
+                        Padding="8,2"
+                        FontSize="9"
                         FontWeight="SemiBold"
                         Foreground="{DynamicResource AppTextPrimaryBrush}"
                         Background="{DynamicResource AppControlBackgroundBrush}"
@@ -35,8 +39,8 @@
                         AutomationProperties.Name="Modo temporizador normal" />
                 <Button Content="Pomodoro (25m)"
                         Command="{Binding SwitchToPomodoroWorkCommand}"
-                        Padding="8,3"
-                        FontSize="9.5"
+                        Padding="8,2"
+                        FontSize="9"
                         FontWeight="SemiBold"
                         Foreground="{DynamicResource AppTextPrimaryBrush}"
                         Background="Transparent"
@@ -45,8 +49,8 @@
                         AutomationProperties.Name="Modo Pomodoro trabajo 25 minutos" />
                 <Button Content="Descanso (5m)"
                         Command="{Binding SwitchToPomodoroBreakCommand}"
-                        Padding="8,3"
-                        FontSize="9.5"
+                        Padding="8,2"
+                        FontSize="9"
                         FontWeight="SemiBold"
                         Foreground="{DynamicResource AppTextPrimaryBrush}"
                         Background="Transparent"
@@ -57,27 +61,28 @@
         </Border>
 
         <!-- Big Countdown Clock -->
-        <StackPanel Grid.Row="1" HorizontalAlignment="Center" Margin="0,0,0,4">
+        <StackPanel Grid.Row="1" HorizontalAlignment="Center" Margin="0,0,0,2">
             <TextBlock Text="{Binding FormattedTime}"
-                       FontSize="34"
+                       FontSize="30"
                        FontWeight="Bold"
                        Foreground="{DynamicResource AppTextPrimaryBrush}"
                        HorizontalAlignment="Center"
                        AutomationProperties.LiveSetting="Polite"
-                       AutomationProperties.Name="Tiempo restante" />
-            <TextBlock Text="{Binding ModeDescription}"
-                       FontSize="10.5"
+                       AutomationProperties.Name="Tiempo restante principal" />
+            <TextBlock Text="{Binding CurrentTimerLabel}"
+                       FontSize="10"
+                       FontWeight="SemiBold"
                        Foreground="{DynamicResource AppTextMutedBrush}"
                        HorizontalAlignment="Center"
-                       Margin="0,1,0,0" />
+                       Margin="0,0,0,0" />
         </StackPanel>
 
         <!-- Progress Bar -->
-        <Border Grid.Row="2" Height="4" Background="{DynamicResource AppControlBackgroundBrush}" CornerRadius="2" Margin="10,0,10,8">
+        <Border Grid.Row="2" Height="3" Background="{DynamicResource AppControlBackgroundBrush}" CornerRadius="1.5" Margin="10,0,10,6">
             <ProgressBar Value="{Binding ProgressPercent}"
                          Minimum="0"
                          Maximum="100"
-                         Height="4"
+                         Height="3"
                          Foreground="{Binding StatusColorBrush}"
                          Background="Transparent"
                          BorderThickness="0"
@@ -85,7 +90,7 @@
         </Border>
 
         <!-- Controls Row -->
-        <Grid Grid.Row="3" Margin="10,0,10,0" VerticalAlignment="Center">
+        <Grid Grid.Row="3" Margin="8,0,8,4" VerticalAlignment="Center">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
@@ -96,63 +101,36 @@
             <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                 <Button Content="+1m"
                         Command="{Binding AddOneMinuteCommand}"
-                        Padding="7,3"
-                        FontSize="9.5"
+                        Padding="6,2"
+                        FontSize="9"
                         FontWeight="SemiBold"
                         Foreground="{DynamicResource AppTextPrimaryBrush}"
                         Background="{DynamicResource AppControlBackgroundBrush}"
                         BorderThickness="0"
                         Cursor="Hand"
                         Margin="0,0,4,0"
-                        AutomationProperties.Name="Añadir 1 minuto" />
+                        AutomationProperties.Name="Añadir un minuto al temporizador activo" />
                 <Button Content="+5m"
                         Command="{Binding AddFiveMinutesCommand}"
-                        Padding="7,3"
-                        FontSize="9.5"
+                        Padding="6,2"
+                        FontSize="9"
                         FontWeight="SemiBold"
                         Foreground="{DynamicResource AppTextPrimaryBrush}"
                         Background="{DynamicResource AppControlBackgroundBrush}"
                         BorderThickness="0"
                         Cursor="Hand"
-                        AutomationProperties.Name="Añadir 5 minutos" />
+                        AutomationProperties.Name="Añadir cinco minutos al temporizador activo" />
             </StackPanel>
 
-            <!-- Play / Pause Action Button (100% visible, fully circular with safe clearance) -->
+            <!-- Play/Pause Button -->
             <Button Grid.Column="1"
                     Command="{Binding TogglePlayPauseCommand}"
-                    Width="36"
-                    Height="36"
-                    Background="{Binding StatusColorBrush}"
-                    BorderThickness="0"
-                    Cursor="Hand"
-                    HorizontalAlignment="Center"
-                    AutomationProperties.Name="Iniciar o pausar temporizador">
-                <Button.Template>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" CornerRadius="18">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
-                    </ControlTemplate>
-                </Button.Template>
-                <Path Data="{Binding PlayPauseIconData}"
-                      Fill="{DynamicResource AppAccentTextBrush}"
-                      Width="14"
-                      Height="14"
-                      Stretch="Uniform"
-                      HorizontalAlignment="Center"
-                      VerticalAlignment="Center" />
-            </Button>
-
-            <!-- Reset Button -->
-            <Button Grid.Column="2"
-                    Command="{Binding ResetCommand}"
                     Width="32"
                     Height="32"
                     Background="{DynamicResource AppControlBackgroundBrush}"
                     BorderThickness="0"
                     Cursor="Hand"
-                    HorizontalAlignment="Right"
-                    AutomationProperties.Name="Reiniciar temporizador">
+                    AutomationProperties.Name="Iniciar o pausar temporizador">
                 <Button.Template>
                     <ControlTemplate TargetType="Button">
                         <Border Background="{TemplateBinding Background}" CornerRadius="16">
@@ -160,16 +138,156 @@
                         </Border>
                     </ControlTemplate>
                 </Button.Template>
-                <Path Data="M 12,4 A 8,8 0 1 0 16,10 M 16,4 V 10 H 10"
-                      Stroke="{DynamicResource AppTextPrimaryBrush}"
-                      StrokeThickness="1.5"
-                      Fill="Transparent"
-                      Width="12"
-                      Height="12"
-                      Stretch="Uniform"
-                      HorizontalAlignment="Center"
-                      VerticalAlignment="Center" />
+                <Path Data="{Binding PlayPauseIconData}"
+                      Fill="{DynamicResource AppTextPrimaryBrush}"
+                      Width="11"
+                      Height="11"
+                      Stretch="Uniform" />
             </Button>
+
+            <!-- Reset Button -->
+            <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <Button Content="Reiniciar"
+                        Command="{Binding ResetCommand}"
+                        Padding="7,2"
+                        FontSize="9"
+                        FontWeight="SemiBold"
+                        Foreground="{DynamicResource AppTextPrimaryBrush}"
+                        Background="{DynamicResource AppControlBackgroundBrush}"
+                        BorderThickness="0"
+                        Cursor="Hand"
+                        AutomationProperties.Name="Reiniciar temporizador" />
+            </StackPanel>
         </Grid>
+
+        <!-- Presets Row (1, 5, 10, 15 min) -->
+        <Border Grid.Row="4" Margin="0,2,0,4" Padding="0,2" BorderBrush="#22FFFFFF" BorderThickness="0,1,0,0">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                <TextBlock Text="Preajustes:"
+                           FontSize="9"
+                           Foreground="{DynamicResource AppTextMutedBrush}"
+                           VerticalAlignment="Center"
+                           Margin="0,0,6,0" />
+                <Button Content="1 min"
+                        Command="{Binding PresetOneMinuteCommand}"
+                        Padding="6,1"
+                        FontSize="9"
+                        FontWeight="SemiBold"
+                        Foreground="{DynamicResource AppTextPrimaryBrush}"
+                        Background="#2C2C2E"
+                        BorderThickness="0"
+                        Cursor="Hand"
+                        Margin="0,0,4,0"
+                        AutomationProperties.Name="Preajuste un minuto" />
+                <Button Content="5 min"
+                        Command="{Binding PresetFiveMinutesCommand}"
+                        Padding="6,1"
+                        FontSize="9"
+                        FontWeight="SemiBold"
+                        Foreground="{DynamicResource AppTextPrimaryBrush}"
+                        Background="#2C2C2E"
+                        BorderThickness="0"
+                        Cursor="Hand"
+                        Margin="0,0,4,0"
+                        AutomationProperties.Name="Preajuste cinco minutos" />
+                <Button Content="10 min"
+                        Command="{Binding PresetTenMinutesCommand}"
+                        Padding="6,1"
+                        FontSize="9"
+                        FontWeight="SemiBold"
+                        Foreground="{DynamicResource AppTextPrimaryBrush}"
+                        Background="#2C2C2E"
+                        BorderThickness="0"
+                        Cursor="Hand"
+                        Margin="0,0,4,0"
+                        AutomationProperties.Name="Preajuste diez minutos" />
+                <Button Content="15 min"
+                        Command="{Binding PresetFifteenMinutesCommand}"
+                        Padding="6,1"
+                        FontSize="9"
+                        FontWeight="SemiBold"
+                        Foreground="{DynamicResource AppTextPrimaryBrush}"
+                        Background="#2C2C2E"
+                        BorderThickness="0"
+                        Cursor="Hand"
+                        AutomationProperties.Name="Preajuste quince minutos" />
+            </StackPanel>
+        </Border>
+
+        <!-- Multi-Timer Active List -->
+        <Border Grid.Row="5"
+                Background="#141416"
+                CornerRadius="6"
+                Padding="6,2"
+                Margin="0,0,0,0">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <ItemsControl ItemsSource="{Binding DisplayTimers}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="2,2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Timer Label -->
+                                <TextBlock Grid.Column="0"
+                                           Text="{Binding Label}"
+                                           FontSize="9.5"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource AppTextPrimaryBrush}"
+                                           VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis" />
+
+                                <!-- Remaining Time -->
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding FormattedTime}"
+                                           FontSize="9.5"
+                                           FontWeight="Bold"
+                                           Foreground="{Binding StatusBrush}"
+                                           VerticalAlignment="Center"
+                                           Margin="8,0,8,0" />
+
+                                <!-- Individual Play/Pause Button -->
+                                <Button Grid.Column="2"
+                                        Command="{Binding TogglePlayPauseCommand}"
+                                        Width="18"
+                                        Height="18"
+                                        Background="#2C2C2E"
+                                        BorderThickness="0"
+                                        Cursor="Hand"
+                                        Margin="0,0,4,0"
+                                        AutomationProperties.Name="Pausar o reanudar temporizador">
+                                    <Path Data="{Binding PlayPauseIconData}"
+                                          Fill="{DynamicResource AppTextPrimaryBrush}"
+                                          Width="7"
+                                          Height="7"
+                                          Stretch="Uniform" />
+                                </Button>
+
+                                <!-- Individual Delete Button -->
+                                <Button Grid.Column="3"
+                                        Command="{Binding DeleteCommand}"
+                                        Width="18"
+                                        Height="18"
+                                        Background="#2C2C2E"
+                                        BorderThickness="0"
+                                        Cursor="Hand"
+                                        AutomationProperties.Name="Eliminar temporizador">
+                                    <TextBlock Text="✕"
+                                               FontSize="8.5"
+                                               FontWeight="Bold"
+                                               Foreground="{DynamicResource AppTextMutedBrush}"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center" />
+                                </Button>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Border>
     </Grid>
 </UserControl>
