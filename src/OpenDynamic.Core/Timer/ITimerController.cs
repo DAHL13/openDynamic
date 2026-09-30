@@ -7,6 +7,16 @@ namespace OpenDynamic.Core.Timer;
 public interface ITimerController
 {
     /// <summary>
+    /// Unique identifier for this timer instance.
+    /// </summary>
+    string Id { get; }
+
+    /// <summary>
+    /// Friendly user label for this timer (e.g. "Temporizador", "Pomodoro", "Pasta").
+    /// </summary>
+    string Label { get; set; }
+
+    /// <summary>
     /// Current immutable state snapshot.
     /// </summary>
     TimerSnapshot CurrentSnapshot { get; }

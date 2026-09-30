@@ -12,6 +12,8 @@ namespace OpenDynamic.Core.Timer;
 /// <param name="FormattedTime">Pre-formatted time string (<c>mm:ss</c> or <c>hh:mm:ss</c>).</param>
 /// <param name="ProgressRatio">Normalized completion ratio from 0.0 (just started) to 1.0 (completed).</param>
 /// <param name="RemainingRatio">Normalized remaining ratio from 1.0 (full) to 0.0 (expired).</param>
+/// <param name="Label">Friendly user label for this timer.</param>
+/// <param name="Id">Unique identifier of the timer.</param>
 public sealed record TimerSnapshot(
     TimeSpan RemainingTime,
     TimeSpan TotalDuration,
@@ -20,4 +22,6 @@ public sealed record TimerSnapshot(
     TimerState State,
     string FormattedTime,
     double ProgressRatio,
-    double RemainingRatio);
+    double RemainingRatio,
+    string Label = "Temporizador",
+    string Id = "");

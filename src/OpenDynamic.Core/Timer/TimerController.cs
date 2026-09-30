@@ -8,6 +8,8 @@ namespace OpenDynamic.Core.Timer;
 public sealed class TimerController : ITimerController
 {
     private readonly TimeProvider _timeProvider;
+    private readonly string _id;
+    private string _label;
     private TimeSpan _standardDuration;
     private TimeSpan _pomodoroWorkDuration;
     private TimeSpan _pomodoroBreakDuration;
@@ -17,6 +19,13 @@ public sealed class TimerController : ITimerController
     private TimeSpan _totalDuration;
     private TimeSpan _remainingTime;
     private DateTimeOffset? _targetEndTimeUtc;
+
+    public string Id => _id;
+    public string Label
+    {
+        get => _label;
+        set => _label = value ?? string.Empty;
+    }
 
     public TimerMode Mode => _mode;
     public TimerState State => _state;
@@ -33,9 +42,13 @@ public sealed class TimerController : ITimerController
         TimeProvider? timeProvider = null,
         TimeSpan? defaultStandardDuration = null,
         TimeSpan? pomodoroWorkDuration = null,
-        TimeSpan? pomodoroBreakDuration = null)
+        TimeSpan? pomodoroBreakDuration = null,
+        string? id = null,
+        string? label = null)
     {
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _id = id ?? Guid.NewGuid().ToString("N");
+        _label = label ?? "Temporizador";
         _standardDuration = defaultStandardDuration ?? TimeSpan.FromMinutes(10);
         _pomodoroWorkDuration = pomodoroWorkDuration ?? TimeSpan.FromMinutes(25);
         _pomodoroBreakDuration = pomodoroBreakDuration ?? TimeSpan.FromMinutes(5);
@@ -237,7 +250,9 @@ public sealed class TimerController : ITimerController
             _state,
             formatted,
             progressRatio,
-            remainingRatio);
+            remainingRatio,
+            _label,
+            _id);
     }
 
     /// <summary>
