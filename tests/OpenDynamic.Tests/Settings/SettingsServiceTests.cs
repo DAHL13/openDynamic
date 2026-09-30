@@ -463,6 +463,9 @@ public sealed class SettingsServiceTests : IDisposable
         Assert.Equal(original.EnableMediaWidget, cloned.EnableMediaWidget);
         Assert.Equal(original.DefaultMediaPriority, cloned.DefaultMediaPriority);
         Assert.Equal(original.MediaPauseGracePeriodSeconds, cloned.MediaPauseGracePeriodSeconds);
+        Assert.Equal(original.EnableDynamicMediaColor, cloned.EnableDynamicMediaColor);
+        Assert.Equal(original.EnableMediaGestures, cloned.EnableMediaGestures);
+        Assert.Equal(original.MediaGestureSensitivity, cloned.MediaGestureSensitivity);
         Assert.Equal(original.EnableVolumeWidget, cloned.EnableVolumeWidget);
         Assert.Equal(original.DefaultVolumePriority, cloned.DefaultVolumePriority);
         Assert.Equal(original.VolumeTransientDurationSeconds, cloned.VolumeTransientDurationSeconds);

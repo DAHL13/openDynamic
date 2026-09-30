@@ -83,7 +83,7 @@ public sealed class MediaWidget : IslandWidgetBase
         private set => SetProperty(ref _hasThumbnail, value);
     }
 
-    private readonly MediaColorService _colorService = new();
+    private readonly MediaColorService _colorService;
     private readonly SwipeGestureDetector _wheelGestureDetector;
     private readonly SwipeGestureDetector _dragGestureDetector;
 
@@ -225,12 +225,14 @@ public sealed class MediaWidget : IslandWidgetBase
     public MediaWidget(
         IMediaService mediaService,
         AppSettings? settings = null,
-        Dispatcher? dispatcher = null)
+        Dispatcher? dispatcher = null,
+        MediaColorService? colorService = null)
         : base(settings?.DefaultMediaPriority ?? ActivityPriority.Media)
     {
         _mediaService = mediaService ?? throw new ArgumentNullException(nameof(mediaService));
         _settings = settings ?? new AppSettings();
         _dispatcher = dispatcher ?? (System.Windows.Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher);
+        _colorService = colorService ?? new MediaColorService();
 
         _wheelGestureDetector = new SwipeGestureDetector(threshold: _settings.MediaGestureSensitivity > 0 ? _settings.MediaGestureSensitivity : SwipeGestureDetector.DefaultWheelThreshold);
         _dragGestureDetector = new SwipeGestureDetector(threshold: SwipeGestureDetector.DefaultDragThreshold);
@@ -267,36 +269,51 @@ public sealed class MediaWidget : IslandWidgetBase
 
     private void HookCurrentSession(IMediaSession? session)
     {
-        if (ReferenceEquals(_hookedSession, session)) return;
-
-        // Clean up previous hooked session
-        UnhookCurrentSession();
-
-        _hookedSession = session;
-
-        if (_hookedSession != null)
+        try
         {
-            _hookedSession.PlaybackInfoChanged += OnSessionPlaybackInfoChanged;
-            _hookedSession.MediaPropertiesChanged += OnSessionMediaPropertiesChanged;
-            _hookedSession.TimelinePropertiesChanged += OnSessionTimelinePropertiesChanged;
-            _hookedSession.SessionClosed += OnSessionClosed;
+            if (ReferenceEquals(_hookedSession, session)) return;
 
-            UpdateSessionState();
+            // Clean up previous hooked session
+            UnhookCurrentSession();
+
+            _hookedSession = session;
+
+            if (_hookedSession != null)
+            {
+                _hookedSession.PlaybackInfoChanged += OnSessionPlaybackInfoChanged;
+                _hookedSession.MediaPropertiesChanged += OnSessionMediaPropertiesChanged;
+                _hookedSession.TimelinePropertiesChanged += OnSessionTimelinePropertiesChanged;
+                _hookedSession.SessionClosed += OnSessionClosed;
+
+                UpdateSessionState();
+            }
+            else
+            {
+                HandleSessionTerminated();
+            }
         }
-        else
+        catch (Exception ex)
         {
-            HandleSessionTerminated();
+            Log.Error(ex, "Fault isolation: Error hooking media session in MediaWidget.");
         }
     }
 
     private void UnhookCurrentSession()
     {
-        if (_hookedSession != null)
+        try
         {
-            _hookedSession.PlaybackInfoChanged -= OnSessionPlaybackInfoChanged;
-            _hookedSession.MediaPropertiesChanged -= OnSessionMediaPropertiesChanged;
-            _hookedSession.TimelinePropertiesChanged -= OnSessionTimelinePropertiesChanged;
-            _hookedSession.SessionClosed -= OnSessionClosed;
+            if (_hookedSession != null)
+            {
+                _hookedSession.PlaybackInfoChanged -= OnSessionPlaybackInfoChanged;
+                _hookedSession.MediaPropertiesChanged -= OnSessionMediaPropertiesChanged;
+                _hookedSession.TimelinePropertiesChanged -= OnSessionTimelinePropertiesChanged;
+                _hookedSession.SessionClosed -= OnSessionClosed;
+                _hookedSession = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Debug(ex, "Error unhooking current media session.");
             _hookedSession = null;
         }
     }
@@ -323,106 +340,147 @@ public sealed class MediaWidget : IslandWidgetBase
 
     private void UpdateSessionState()
     {
-        if (_hookedSession == null)
+        try
         {
-            HandleSessionTerminated();
-            return;
-        }
-
-        var status = _hookedSession.PlaybackStatus;
-        var info = _hookedSession.PlaybackInfo;
-
-        IsPlaying = status == MediaPlaybackStatus.Playing;
-        CanPlay = info.Capabilities.CanPlay;
-        CanPause = info.Capabilities.CanPause;
-        CanSkipPrevious = info.Capabilities.CanSkipPrevious;
-        CanSkipNext = info.Capabilities.CanSkipNext;
-        CanSeek = info.Capabilities.CanSeek;
-
-        if (status == MediaPlaybackStatus.Playing)
-        {
-            // Cancel pause grace timer immediately
-            CancelPauseGraceTimer();
-
-            // Mark active
-            IsActive = true;
-
-            // Start progress extrapolation timer if in expanded mode
-            EvaluateProgressTimerState();
-        }
-        else if (status == MediaPlaybackStatus.Paused)
-        {
-            // Stop progress extrapolation timer immediately when paused
-            StopProgressTimer();
-
-            if (IsActive)
+            var session = _hookedSession;
+            if (session == null)
             {
-                // Start 10-second grace timer
-                StartPauseGraceTimer();
+                HandleSessionTerminated();
+                return;
             }
-        }
-        else if (status is MediaPlaybackStatus.Stopped or MediaPlaybackStatus.Closed)
-        {
-            HandleSessionTerminated();
-            return;
-        }
 
-        UpdateSessionProperties();
-        UpdateSessionTimeline();
+            var status = session.PlaybackStatus;
+            var info = session.PlaybackInfo;
+
+            IsPlaying = status == MediaPlaybackStatus.Playing;
+            if (info?.Capabilities != null)
+            {
+                CanPlay = info.Capabilities.CanPlay;
+                CanPause = info.Capabilities.CanPause;
+                CanSkipPrevious = info.Capabilities.CanSkipPrevious;
+                CanSkipNext = info.Capabilities.CanSkipNext;
+                CanSeek = info.Capabilities.CanSeek;
+            }
+
+            if (status == MediaPlaybackStatus.Playing)
+            {
+                // Cancel pause grace timer immediately
+                CancelPauseGraceTimer();
+
+                // Mark active
+                IsActive = true;
+
+                // Start progress extrapolation timer if in expanded mode
+                EvaluateProgressTimerState();
+            }
+            else if (status == MediaPlaybackStatus.Paused)
+            {
+                // Stop progress extrapolation timer immediately when paused
+                StopProgressTimer();
+
+                if (IsActive)
+                {
+                    // Start 10-second grace timer
+                    StartPauseGraceTimer();
+                }
+            }
+            else if (status is MediaPlaybackStatus.Stopped or MediaPlaybackStatus.Closed)
+            {
+                HandleSessionTerminated();
+                return;
+            }
+
+            UpdateSessionProperties();
+            UpdateSessionTimeline();
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Fault isolation: Error updating session state in MediaWidget.");
+        }
     }
 
     private void UpdateSessionProperties()
     {
-        if (_hookedSession == null) return;
-
-        var props = _hookedSession.Properties;
-        TrackTitle = string.IsNullOrWhiteSpace(props.Title) ? "Reproduciendo" : props.Title;
-        TrackArtist = props.Artist ?? string.Empty;
-        TrackAlbum = props.AlbumTitle ?? string.Empty;
-
-        // Retrieve frozen BitmapImage from WinRtMediaSession if available
-        if (_hookedSession is WinRtMediaSession winRtSession)
+        try
         {
-            Thumbnail = winRtSession.ThumbnailImage;
-            HasThumbnail = winRtSession.ThumbnailImage != null;
+            var session = _hookedSession;
+            if (session == null) return;
+
+            var props = session.Properties;
+            if (props == null) return;
+
+            TrackTitle = string.IsNullOrWhiteSpace(props.Title) ? "Reproduciendo" : props.Title;
+            TrackArtist = props.Artist ?? string.Empty;
+            TrackAlbum = props.AlbumTitle ?? string.Empty;
+
+            // Retrieve frozen BitmapImage from WinRtMediaSession if available
+            if (session is WinRtMediaSession winRtSession)
+            {
+                Thumbnail = winRtSession.ThumbnailImage;
+                HasThumbnail = winRtSession.ThumbnailImage != null;
+            }
+            else
+            {
+                Thumbnail = null;
+                HasThumbnail = props.HasThumbnail;
+            }
+
+            CurrentActivity = new IslandActivity(
+                Id: Id,
+                Title: TrackTitle,
+                Subtitle: TrackArtist,
+                Priority: Priority);
+
+            var trackKey = $"{TrackTitle}|{TrackArtist}";
+            _ = UpdateAccentColorAsync(Thumbnail, trackKey);
         }
-        else
+        catch (Exception ex)
         {
-            Thumbnail = null;
-            HasThumbnail = props.HasThumbnail;
+            Log.Error(ex, "Fault isolation: Error updating session properties in MediaWidget.");
         }
-
-        CurrentActivity = new IslandActivity(
-            Id: Id,
-            Title: TrackTitle,
-            Subtitle: TrackArtist,
-            Priority: Priority);
-
-        var trackKey = $"{TrackTitle}|{TrackArtist}";
-        _ = UpdateAccentColorAsync(Thumbnail, trackKey);
     }
 
     private async Task UpdateAccentColorAsync(BitmapImage? thumbnail, string trackKey)
     {
-        if (!_settings.EnableDynamicMediaColor || thumbnail == null)
+        try
         {
+            if (!_settings.EnableDynamicMediaColor || thumbnail == null)
+            {
+                await _dispatcher.InvokeAsync(() =>
+                {
+                    AccentColor = Color.FromRgb(RgbColor.DefaultAccent.R, RgbColor.DefaultAccent.G, RgbColor.DefaultAccent.B);
+                    AccentBrush = MediaColorService.DefaultAccentBrush;
+                    WeakReferenceMessenger.Default.Send(new MediaAccentColorChangedMessage(null));
+                });
+                return;
+            }
+
+            var rgb = await _colorService.GetAccentColorAsync(thumbnail, trackKey);
             await _dispatcher.InvokeAsync(() =>
             {
-                AccentColor = Color.FromRgb(RgbColor.DefaultAccent.R, RgbColor.DefaultAccent.G, RgbColor.DefaultAccent.B);
-                AccentBrush = MediaColorService.DefaultAccentBrush;
-                WeakReferenceMessenger.Default.Send(new MediaAccentColorChangedMessage(null));
+                var color = Color.FromRgb(rgb.R, rgb.G, rgb.B);
+                AccentColor = color;
+                AccentBrush = MediaColorService.CreateFrozenBrush(rgb);
+                WeakReferenceMessenger.Default.Send(new MediaAccentColorChangedMessage(color));
             });
-            return;
         }
-
-        var rgb = await _colorService.GetAccentColorAsync(thumbnail, trackKey);
-        await _dispatcher.InvokeAsync(() =>
+        catch (Exception ex)
         {
-            var color = Color.FromRgb(rgb.R, rgb.G, rgb.B);
-            AccentColor = color;
-            AccentBrush = MediaColorService.CreateFrozenBrush(rgb);
-            WeakReferenceMessenger.Default.Send(new MediaAccentColorChangedMessage(color));
-        });
+            Log.Debug(ex, "Fault isolation: Error in UpdateAccentColorAsync. Restoring fallback accent.");
+            try
+            {
+                await _dispatcher.InvokeAsync(() =>
+                {
+                    AccentColor = Color.FromRgb(RgbColor.DefaultAccent.R, RgbColor.DefaultAccent.G, RgbColor.DefaultAccent.B);
+                    AccentBrush = MediaColorService.DefaultAccentBrush;
+                    WeakReferenceMessenger.Default.Send(new MediaAccentColorChangedMessage(null));
+                });
+            }
+            catch
+            {
+                // Dispatcher shutdown
+            }
+        }
     }
 
     /// <summary>

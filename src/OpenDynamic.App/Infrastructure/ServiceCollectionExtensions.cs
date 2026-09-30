@@ -63,9 +63,14 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IAutostartService>(sp => sp.GetRequiredService<AutostartService>());
 
         // Media GSMTC Services
+        services.AddSingleton<MediaColorService>();
         services.AddSingleton<MediaService>();
         services.AddSingleton<Core.Media.IMediaService>(sp => sp.GetRequiredService<MediaService>());
-        services.AddSingleton<Widgets.Media.MediaWidget>();
+        services.AddSingleton<Widgets.Media.MediaWidget>(sp => new Widgets.Media.MediaWidget(
+            sp.GetRequiredService<Core.Media.IMediaService>(),
+            sp.GetRequiredService<AppSettings>(),
+            System.Windows.Application.Current?.Dispatcher,
+            sp.GetRequiredService<MediaColorService>()));
 
         // Audio & Volume Services
         services.AddSingleton<VolumeService>();

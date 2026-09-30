@@ -42,33 +42,47 @@ public sealed class MediaColorService
 
         try
         {
-            // Prepare 32x32 formatted bitmap and freeze it for cross-thread access
-            int origW = Math.Max(1, thumbnail.PixelWidth);
-            int origH = Math.Max(1, thumbnail.PixelHeight);
+            if (thumbnail is BitmapImage { IsDownloading: true })
+            {
+                return RgbColor.DefaultAccent;
+            }
+
+            int origW = thumbnail.PixelWidth;
+            int origH = thumbnail.PixelHeight;
+            if (origW <= 0 || origH <= 0)
+            {
+                return RgbColor.DefaultAccent;
+            }
+
+            const int sampleDim = 32;
+            const int stride = sampleDim * 4;
+            byte[] pixelBuffer = new byte[sampleDim * stride];
 
             double scaleX = 32.0 / origW;
             double scaleY = 32.0 / origH;
 
             var scaled = new TransformedBitmap(thumbnail, new ScaleTransform(scaleX, scaleY));
             var formatted = new FormatConvertedBitmap(scaled, PixelFormats.Bgra32, null, 0);
-            formatted.Freeze();
+            formatted.CopyPixels(pixelBuffer, stride, 0);
 
             var adjustedColor = await Task.Run(() =>
             {
-                const int sampleDim = 32;
-                const int stride = sampleDim * 4;
-                byte[] pixelBuffer = new byte[sampleDim * stride];
+                try
+                {
+                    var dominant = DominantColorExtractor.ExtractDominantColor(
+                        pixelBuffer,
+                        sampleDim,
+                        sampleDim,
+                        stride,
+                        targetSampleSize: sampleDim);
 
-                formatted.CopyPixels(pixelBuffer, stride, 0);
-
-                var dominant = DominantColorExtractor.ExtractDominantColor(
-                    pixelBuffer,
-                    sampleDim,
-                    sampleDim,
-                    stride,
-                    targetSampleSize: sampleDim);
-
-                return AccentColorAdjuster.AdjustColor(dominant);
+                    return AccentColorAdjuster.AdjustColor(dominant);
+                }
+                catch (Exception ex)
+                {
+                    Log.Debug(ex, "Background color extraction failed for '{TrackKey}'.", trackKey);
+                    return RgbColor.DefaultAccent;
+                }
             }).ConfigureAwait(false);
 
             _colorCache[trackKey] = adjustedColor;

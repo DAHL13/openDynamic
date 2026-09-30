@@ -160,7 +160,7 @@
                     <Border Background="#33FFFFFF" CornerRadius="2" />
                     <!-- Active Fill Track -->
                     <Border x:Name="ActiveProgressFill"
-                            Background="{Binding AccentBrush, FallbackValue={DynamicResource AppAccentBrush}}"
+                            Background="{Binding AccentBrush, FallbackValue=#FF1ED760}"
                             CornerRadius="2"
                             HorizontalAlignment="Left"
                             Width="0" />
@@ -212,7 +212,7 @@
                                     Width="40"
                                     Height="40"
                                     CornerRadius="20"
-                                    Background="{Binding AccentBrush, FallbackValue={DynamicResource AppAccentBrush}}">
+                                    Background="{Binding AccentBrush, FallbackValue=#FF1ED760}">
                                 <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <!-- Play Icon (shown when paused) -->
                                     <Path x:Name="playPath"
