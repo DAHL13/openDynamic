@@ -141,6 +141,9 @@ public sealed class VolumeWidget : IslandWidgetBase
             var duration = TimeSpan.FromSeconds(_settings.VolumeTransientDurationSeconds);
             Activate(transientDuration: duration, priorityOverride: _settings.DefaultVolumePriority);
             ResetTransientTimer(duration);
+
+            Log.Information("VolumeWidget transient activated on island: Volume={Volume:P0}, Muted={Muted}, Device='{Device}', Priority={Priority}",
+                VolumeLevel, IsMuted, DeviceName, _settings.DefaultVolumePriority);
         });
     }
 

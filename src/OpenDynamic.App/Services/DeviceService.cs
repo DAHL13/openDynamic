@@ -26,12 +26,18 @@ public sealed class DeviceService : IDisposable
     private IntPtr _hwnd = IntPtr.Zero;
     private IntPtr _usbNotificationHandle = IntPtr.Zero;
     private IntPtr _hidNotificationHandle = IntPtr.Zero;
+    private IntPtr _audioNotificationHandle = IntPtr.Zero;
     private DeviceWatcher? _bluetoothWatcher;
+    private DeviceWatcher? _audioWatcher;
     private bool _isListening;
     private bool _isDisposed;
+    private bool _isAudioEnumerationCompleted;
 
     // Cache of known Bluetooth device details by ID to track transitions and report readable names on removal
     private readonly Dictionary<string, CachedBluetoothDevice> _bluetoothDeviceCache = new(StringComparer.OrdinalIgnoreCase);
+
+    // Cache of known AudioRender endpoints by ID
+    private readonly Dictionary<string, (string Name, bool IsEnabled)> _audioDeviceCache = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// Occurs when a consolidated device connection or disconnection alert warrants dynamic island presentation.
@@ -55,7 +61,7 @@ public sealed class DeviceService : IDisposable
     }
 
     /// <summary>
-    /// Starts USB, HID, and Bluetooth watchers if device alerts are enabled.
+    /// Starts USB, HID, Bluetooth, and AudioRender watchers if device alerts are enabled.
     /// </summary>
     /// <param name="hwnd">Window handle for receiving Win32 WM_DEVICECHANGE notifications.</param>
     public void Start(IntPtr hwnd)
@@ -78,9 +84,10 @@ public sealed class DeviceService : IDisposable
 
             RegisterDeviceNotifications(hwnd);
             StartBluetoothWatcher();
+            StartAudioRenderWatcher();
 
             _isListening = true;
-            Log.Information("DeviceService started. Win32 USB/HID and WinRT Bluetooth device watchers active.");
+            Log.Information("DeviceService started. Win32 USB/HID/Audio and WinRT Bluetooth/Audio watchers active.");
         }
     }
 
@@ -91,11 +98,14 @@ public sealed class DeviceService : IDisposable
     {
         lock (_syncLock)
         {
-            if (!_isListening && _bluetoothWatcher == null && _usbNotificationHandle == IntPtr.Zero && _hidNotificationHandle == IntPtr.Zero) return;
+            if (!_isListening && _bluetoothWatcher == null && _audioWatcher == null &&
+                _usbNotificationHandle == IntPtr.Zero && _hidNotificationHandle == IntPtr.Zero && _audioNotificationHandle == IntPtr.Zero) return;
 
             UnregisterDeviceNotifications();
             StopBluetoothWatcher();
+            StopAudioRenderWatcher();
 
+            _isAudioEnumerationCompleted = false;
             _policy.NotifySuspended();
             _isListening = false;
 
@@ -163,12 +173,26 @@ public sealed class DeviceService : IDisposable
                 ref hidFilter,
                 NativeMethods.DEVICE_NOTIFY_WINDOW_HANDLE);
 
-            Log.Information("Registered Win32 device notifications: USB (Handle: {UsbHandle}), HID (Handle: {HidHandle})",
-                _usbNotificationHandle, _hidNotificationHandle);
+            // 3. Register Audio Render device interface notifications (Bluetooth/USB headphones and audio endpoints)
+            var audioFilter = new NativeMethods.DEV_BROADCAST_DEVICEINTERFACE
+            {
+                dbcc_size = Marshal.SizeOf<NativeMethods.DEV_BROADCAST_DEVICEINTERFACE>(),
+                dbcc_devicetype = NativeMethods.DBT_DEVTYP_DEVICEINTERFACE,
+                dbcc_reserved = 0,
+                dbcc_classguid = NativeMethods.GUID_DEVINTERFACE_AUDIO_RENDER
+            };
+
+            _audioNotificationHandle = NativeMethods.RegisterDeviceNotification(
+                hwnd,
+                ref audioFilter,
+                NativeMethods.DEVICE_NOTIFY_WINDOW_HANDLE);
+
+            Log.Information("Registered Win32 device notifications: USB (Handle: {UsbHandle}), HID (Handle: {HidHandle}), Audio (Handle: {AudioHandle})",
+                _usbNotificationHandle, _hidNotificationHandle, _audioNotificationHandle);
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "Failed to register Win32 USB/HID device notifications.");
+            Log.Error(ex, "Failed to register Win32 USB/HID/Audio device notifications.");
         }
     }
 
@@ -205,6 +229,23 @@ public sealed class DeviceService : IDisposable
             finally
             {
                 _hidNotificationHandle = IntPtr.Zero;
+            }
+        }
+
+        if (_audioNotificationHandle != IntPtr.Zero)
+        {
+            try
+            {
+                NativeMethods.UnregisterDeviceNotification(_audioNotificationHandle);
+                Log.Debug("Unregistered Audio Render RegisterDeviceNotification.");
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Error unregistering Audio Render device notification handle.");
+            }
+            finally
+            {
+                _audioNotificationHandle = IntPtr.Zero;
             }
         }
     }
@@ -273,7 +314,7 @@ public sealed class DeviceService : IDisposable
     {
         string friendlyName = classGuid == NativeMethods.GUID_DEVINTERFACE_HID
             ? "Periférico HID"
-            : "Dispositivo USB";
+            : (classGuid == NativeMethods.GUID_DEVINTERFACE_AUDIO_RENDER ? "Dispositivo de Audio" : "Dispositivo USB");
 
         try
         {
@@ -299,10 +340,12 @@ public sealed class DeviceService : IDisposable
             friendlyName = ExtractFriendlyNameFromDevicePath(devicePath, classGuid);
         }
 
-        var category = DeviceCategoryClassifier.Classify(friendlyName, bluetoothMajorClass: null, devicePath: devicePath);
+        var category = classGuid == NativeMethods.GUID_DEVINTERFACE_AUDIO_RENDER
+            ? DeviceCategory.Audio
+            : DeviceCategoryClassifier.Classify(friendlyName, bluetoothMajorClass: null, devicePath: devicePath);
 
         // Privacy rule: log only Category, Type, and sanitized interface GUID, NEVER device friendly names
-        Log.Information("USB/HID device event intercepted: Type={Type}, Category={Category}, InterfaceGuid={Guid}",
+        Log.Information("Hardware device event intercepted: Type={Type}, Category={Category}, InterfaceGuid={Guid}",
             eventType, category, classGuid);
 
         var devEvent = new DeviceEvent(eventType, devicePath, friendlyName, category);
@@ -313,6 +356,11 @@ public sealed class DeviceService : IDisposable
     {
         try
         {
+            if (classGuid == NativeMethods.GUID_DEVINTERFACE_AUDIO_RENDER)
+            {
+                return "Audífonos / Audio";
+            }
+
             string upper = devicePath.ToUpperInvariant();
             if (upper.Contains("MOUSE") || upper.Contains("POINT"))
             {
@@ -613,6 +661,230 @@ public sealed class DeviceService : IDisposable
         if (string.IsNullOrEmpty(id)) return "Unknown";
         return id.Length > 16 ? $"{id[..8]}...{id[^6..]}" : id;
     }
+
+    #region WinRT AudioRender DeviceWatcher
+
+    private void StartAudioRenderWatcher()
+    {
+        try
+        {
+            _audioWatcher = DeviceInformation.CreateWatcher(DeviceClass.AudioRender);
+            _audioWatcher.Added += OnAudioDeviceAdded;
+            _audioWatcher.Updated += OnAudioDeviceUpdated;
+            _audioWatcher.Removed += OnAudioDeviceRemoved;
+            _audioWatcher.EnumerationCompleted += OnAudioEnumerationCompleted;
+            _audioWatcher.Stopped += OnAudioWatcherStopped;
+
+            _audioWatcher.Start();
+            Log.Information("WinRT AudioRender DeviceWatcher started for audio rendering endpoints (Headphones/Speakers).");
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to start WinRT AudioRender DeviceWatcher.");
+            _isAudioEnumerationCompleted = true;
+        }
+    }
+
+    private void StopAudioRenderWatcher()
+    {
+        if (_audioWatcher != null)
+        {
+            try
+            {
+                _audioWatcher.Added -= OnAudioDeviceAdded;
+                _audioWatcher.Updated -= OnAudioDeviceUpdated;
+                _audioWatcher.Removed -= OnAudioDeviceRemoved;
+                _audioWatcher.EnumerationCompleted -= OnAudioEnumerationCompleted;
+                _audioWatcher.Stopped -= OnAudioWatcherStopped;
+
+                if (_audioWatcher.Status == DeviceWatcherStatus.Started ||
+                    _audioWatcher.Status == DeviceWatcherStatus.EnumerationCompleted)
+                {
+                    _audioWatcher.Stop();
+                }
+
+                _audioWatcher = null;
+                Log.Information("WinRT AudioRender DeviceWatcher stopped and disposed.");
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Error stopping AudioRender DeviceWatcher.");
+            }
+        }
+    }
+
+    private void OnAudioEnumerationCompleted(DeviceWatcher sender, object args)
+    {
+        _isAudioEnumerationCompleted = true;
+        Log.Information("AudioRender device enumeration completed (Status: {Status}). Total cached: {Count}",
+            sender.Status, _audioDeviceCache.Count);
+    }
+
+    private void OnAudioWatcherStopped(DeviceWatcher sender, object args)
+    {
+        Log.Information("AudioRender DeviceWatcher transitioned to Stopped state (Status: {Status}).", sender.Status);
+    }
+
+    private void OnAudioDeviceAdded(DeviceWatcher sender, DeviceInformation deviceInfo)
+    {
+        try
+        {
+            string name = !string.IsNullOrWhiteSpace(deviceInfo.Name) ? deviceInfo.Name : "Dispositivo de Audio";
+            bool isEnabled = deviceInfo.IsEnabled;
+
+            lock (_syncLock)
+            {
+                _audioDeviceCache[deviceInfo.Id] = (name, isEnabled);
+            }
+
+            Log.Information("AudioRender DeviceAdded: ID={DeviceId}, Enabled={IsEnabled}",
+                SanitizeId(deviceInfo.Id), isEnabled);
+
+            // If initial enumeration is still in progress, seed policy without alerting
+            if (!_isAudioEnumerationCompleted)
+            {
+                if (isEnabled && IsBluetoothOrWirelessAudio(name, deviceInfo.Id))
+                {
+                    var devEvent = new DeviceEvent(DeviceEventType.Connected, deviceInfo.Id, name, DeviceCategory.Audio);
+                    _policy.ProcessDeviceEvent(devEvent);
+                }
+                return;
+            }
+
+            // Live addition after enumeration
+            if (isEnabled && IsBluetoothOrWirelessAudio(name, deviceInfo.Id))
+            {
+                Log.Information("AudioRender live device connected: Category=Audio (Headphones), ID={DeviceId}",
+                    SanitizeId(deviceInfo.Id));
+                var devEvent = new DeviceEvent(DeviceEventType.Connected, deviceInfo.Id, name, DeviceCategory.Audio);
+                _policy.ProcessDeviceEvent(devEvent);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Error processing AudioRender DeviceAdded event.");
+        }
+    }
+
+    private void OnAudioDeviceUpdated(DeviceWatcher sender, DeviceInformationUpdate update)
+    {
+        try
+        {
+            Log.Information("AudioRender DeviceUpdated: ID={DeviceId}, UpdatedPropCount={Count}",
+                SanitizeId(update.Id), update.Properties.Count);
+
+            string name = "Dispositivo de Audio";
+            bool wasEnabled = false;
+
+            lock (_syncLock)
+            {
+                if (_audioDeviceCache.TryGetValue(update.Id, out var cached))
+                {
+                    name = cached.Name;
+                    wasEnabled = cached.IsEnabled;
+                }
+            }
+
+            bool? isEnabled = null;
+            if (update.Properties.TryGetValue("System.Devices.InterfaceEnabled", out var enabledObj) && enabledObj != null)
+            {
+                isEnabled = Convert.ToBoolean(enabledObj);
+            }
+
+            if (update.Properties.TryGetValue("System.Devices.AudioDevice.DeviceState", out var stateObj) && stateObj != null)
+            {
+                int state = Convert.ToInt32(stateObj);
+                if (state == 1) // Active
+                {
+                    isEnabled = true;
+                }
+                else if (state is 2 or 4 or 8)
+                {
+                    isEnabled = false;
+                }
+            }
+
+            if (isEnabled.HasValue)
+            {
+                lock (_syncLock)
+                {
+                    _audioDeviceCache[update.Id] = (name, isEnabled.Value);
+                }
+
+                if (wasEnabled == isEnabled.Value)
+                {
+                    return; // Connection state unchanged
+                }
+
+                var eventType = isEnabled.Value ? DeviceEventType.Connected : DeviceEventType.Disconnected;
+
+                if (IsBluetoothOrWirelessAudio(name, update.Id))
+                {
+                    Log.Information("AudioRender device connection transition: Event={EventType}, Category=Audio (Headphones), ID={DeviceId}",
+                        eventType, SanitizeId(update.Id));
+                    var devEvent = new DeviceEvent(eventType, update.Id, name, DeviceCategory.Audio);
+                    _policy.ProcessDeviceEvent(devEvent);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Error processing AudioRender DeviceUpdated event.");
+        }
+    }
+
+    private void OnAudioDeviceRemoved(DeviceWatcher sender, DeviceInformationUpdate update)
+    {
+        try
+        {
+            string name = "Dispositivo de Audio";
+            lock (_syncLock)
+            {
+                if (_audioDeviceCache.TryGetValue(update.Id, out var cached))
+                {
+                    name = cached.Name;
+                    _audioDeviceCache.Remove(update.Id);
+                }
+            }
+
+            Log.Information("AudioRender DeviceRemoved: ID={DeviceId}", SanitizeId(update.Id));
+
+            if (IsBluetoothOrWirelessAudio(name, update.Id))
+            {
+                var devEvent = new DeviceEvent(DeviceEventType.Disconnected, update.Id, name, DeviceCategory.Audio);
+                _policy.ProcessDeviceEvent(devEvent);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Error processing AudioRender DeviceRemoved event.");
+        }
+    }
+
+    private static bool IsBluetoothOrWirelessAudio(string name, string id)
+    {
+        string upper = string.Concat(name, " ", id).ToUpperInvariant();
+        return upper.Contains("BTHENUM") ||
+               upper.Contains("BLUETOOTH") ||
+               upper.Contains("BTHHFENUM") ||
+               upper.Contains("WIRELESS") ||
+               upper.Contains("HEADPHONE") ||
+               upper.Contains("HEADSET") ||
+               upper.Contains("EARBUDS") ||
+               upper.Contains("EARBUD") ||
+               upper.Contains("EARPHONE") ||
+               upper.Contains("AIRPODS") ||
+               upper.Contains("BUDS") ||
+               upper.Contains("AURICULAR") ||
+               upper.Contains("AURICULARES") ||
+               upper.Contains("WH-1000") ||
+               upper.Contains("WF-1000") ||
+               upper.Contains("BOSE") ||
+               upper.Contains("JBL") ||
+               DeviceCategoryClassifier.Classify(name) == DeviceCategory.Audio;
+    }
+
+    #endregion
 
     #endregion
 

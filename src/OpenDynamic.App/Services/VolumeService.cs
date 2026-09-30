@@ -185,30 +185,37 @@ public sealed class VolumeService : IVolumeController, IMMNotificationClient, ID
                 }
             }
 
-            if (_deviceEnumerator == null)
-            {
-                return;
-            }
-
-            // Retrieve default multimedia audio rendering device
+            // Retrieve default multimedia audio rendering device safely with a fresh enumerator
+            using var enumerator = new MMDeviceEnumerator();
+            MMDevice? device = null;
             try
             {
-                _currentDevice = _deviceEnumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+                device = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
             }
             catch
             {
                 // Fallback to Console role if Multimedia role is unavailable
-                _currentDevice = _deviceEnumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Console);
+                try
+                {
+                    device = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Console);
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(ex, "Could not acquire default audio endpoint (Console fallback).");
+                }
             }
 
-            if (_currentDevice != null)
+            if (device != null)
             {
-                _endpointVolume = _currentDevice.AudioEndpointVolume;
+                _currentDevice = device;
+                _endpointVolume = device.AudioEndpointVolume;
                 if (_endpointVolume != null)
                 {
                     _endpointVolume.OnVolumeNotification += OnVolumeNotificationHandler;
                     _volume = VolumeCalculator.Normalize(_endpointVolume.MasterVolumeLevelScalar);
                     _isMuted = _endpointVolume.Mute;
+                    Log.Information("Hooked default audio endpoint: '{DeviceName}' (Initial Volume: {Volume:P0}, Muted: {Muted})",
+                        device.FriendlyName, _volume, _isMuted);
                 }
             }
         }
@@ -231,7 +238,7 @@ public sealed class VolumeService : IVolumeController, IMMNotificationClient, ID
             newMute = _isMuted;
         }
 
-        Log.Debug("AudioEndpointVolume notification received: Volume={Volume:P0}, Muted={Muted}", newVolume, newMute);
+        Log.Information("AudioEndpointVolume notification received: Volume={Volume:P0}, Muted={Muted}", newVolume, newMute);
         VolumeChanged?.Invoke(this, new VolumeChangedEventArgs(newVolume, newMute));
     }
 
@@ -327,35 +334,54 @@ public sealed class VolumeService : IVolumeController, IMMNotificationClient, ID
 
         Log.Information("IMMNotificationClient: Default audio endpoint changed (DeviceId: {DeviceId}, Role: {Role}). Re-hooking.", defaultDeviceId, role);
 
-        float currentVol;
-        bool isMuted;
-
-        lock (_syncLock)
+        _ = Task.Run(() =>
         {
-            HookDefaultDevice_NoLock();
-            currentVol = _volume;
-            isMuted = _isMuted;
-        }
+            float currentVol;
+            bool isMuted;
 
-        VolumeChanged?.Invoke(this, new VolumeChangedEventArgs(currentVol, isMuted));
+            lock (_syncLock)
+            {
+                HookDefaultDevice_NoLock();
+                currentVol = _volume;
+                isMuted = _isMuted;
+            }
+
+            VolumeChanged?.Invoke(this, new VolumeChangedEventArgs(currentVol, isMuted));
+        });
+
         return 0;
     }
 
     public int OnDeviceStateChanged(string deviceId, int newState)
     {
-        Log.Debug("IMMNotificationClient: OnDeviceStateChanged (DeviceId: {DeviceId}, State: {State})", deviceId, newState);
+        Log.Information("IMMNotificationClient: OnDeviceStateChanged (DeviceId: {DeviceId}, State: {State})", deviceId, newState);
+        // If an audio device became active or disabled, re-evaluate default device
+        _ = Task.Run(() =>
+        {
+            lock (_syncLock)
+            {
+                HookDefaultDevice_NoLock();
+            }
+        });
         return 0;
     }
 
     public int OnDeviceAdded(string pwstrDeviceId)
     {
-        Log.Debug("IMMNotificationClient: OnDeviceAdded (DeviceId: {DeviceId})", pwstrDeviceId);
+        Log.Information("IMMNotificationClient: OnDeviceAdded (DeviceId: {DeviceId})", pwstrDeviceId);
         return 0;
     }
 
     public int OnDeviceRemoved(string pwstrDeviceId)
     {
-        Log.Debug("IMMNotificationClient: OnDeviceRemoved (DeviceId: {DeviceId})", pwstrDeviceId);
+        Log.Information("IMMNotificationClient: OnDeviceRemoved (DeviceId: {DeviceId})", pwstrDeviceId);
+        _ = Task.Run(() =>
+        {
+            lock (_syncLock)
+            {
+                HookDefaultDevice_NoLock();
+            }
+        });
         return 0;
     }
 

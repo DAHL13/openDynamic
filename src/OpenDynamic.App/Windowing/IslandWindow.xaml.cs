@@ -511,8 +511,9 @@ public partial class IslandWindow : Window
             _hoverEnterTimer.Stop();
             _hoverLeaveTimer.Stop();
 
-            // When in volume mode, mouse wheel directly adjusts volume and resets grace timer
-            if (_orchestrator.ActivePrimaryWidget is Widgets.Volume.VolumeWidget volumeWidget)
+            // When VolumeWidget is available, mouse wheel directly adjusts volume and activates volume notice
+            var volumeWidget = _orchestrator.RegisteredWidgets.OfType<Widgets.Volume.VolumeWidget>().FirstOrDefault();
+            if (volumeWidget != null && _settings.EnableVolumeWidget)
             {
                 volumeWidget.AdjustVolume(e.Delta);
                 e.Handled = true;

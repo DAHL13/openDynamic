@@ -324,6 +324,7 @@ public static class NativeMethods
 
     public static readonly Guid GUID_DEVINTERFACE_USB_DEVICE = new("A5DCBF10-6530-11D2-901F-00C04FB951ED");
     public static readonly Guid GUID_DEVINTERFACE_HID = new("4D1E55B2-F16F-11CF-88CB-001111000030");
+    public static readonly Guid GUID_DEVINTERFACE_AUDIO_RENDER = new("E6327CAD-DCEC-4949-AE8A-991E976A79D2");
 
     [StructLayout(LayoutKind.Sequential)]
     public struct DEV_BROADCAST_HDR
