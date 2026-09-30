@@ -78,6 +78,10 @@ La estrategia de aseguramiento de calidad de **openDynamic** se sustenta en tres
 | **MAN-18** | Accesibilidad | **Conmutación Forzada de Modo de Movimiento** | En Ajustes > *Atajos y Sistema*, cambiar a *Reducidas* y luego a *Completas*. Validar la física y la actualización reactiva del texto de diagnóstico. | [ ] | |
 | **MAN-19** | Accesibilidad | **Modo de Alto Contraste de Windows** | Activar el tema de Alto Contraste (*Alt Izq + Shift Izq + Impr Pant* o desde Accesibilidad). Confirmar que la muesca adquiere borde visible de 1 DIP, fondo negro sólido y textos del sistema. | [ ] | |
 | **MAN-20** | Accesibilidad | **Lectura con Narrador de Windows (`UI Automation`)** | Iniciar Narrador (`Win + Ctrl + Enter`). Interactuar con la cápsula, controles multimedia y sliders. Verificar dicción de `Name`, `HelpText` y avisos en vivo. | [ ] | |
+| **MAN-23** | Privacidad | **Indicador de Cámara en Uso (ConsentStore)** | Abrir la app *Cámara* de Windows. Verificar la aparición del punto verde en el notch y el aviso transitorio "Cámara en uso: Cámara de Windows". Al cerrar la app, verificar aviso de liberación y desaparición del punto verde. | [ ] | |
+| **MAN-24** | Privacidad | **Indicador de Micrófono en Uso (ConsentStore)** | Iniciar una grabación de audio con *Grabadora de voz*, Discord o Teams. Verificar el punto naranja/ámbar en el notch y el aviso transitorio "Micrófono en uso: <app>". Al detener la grabación, verificar liberación. | [ ] | |
+| **MAN-25** | Privacidad | **Respeto a la Visibilidad de la Isla Oculta** | Ocultar la cápsula con `Win+Ctrl+I` o entrando a pantalla completa. Iniciar uso de cámara o micrófono. Confirmar que la cápsula NO se fuerza a aparecer. | [ ] | |
+| **MAN-26** | Privacidad | **Liberación Limpia de Hilos y Handles (0% CPU)** | Desactivar los interruptores de privacidad en Ajustes o cerrar la app. Verificar en el Administrador de Tareas que no quedan subprocesos huérfanos ni consumo residual de CPU. | [ ] | |
 
 ---
 

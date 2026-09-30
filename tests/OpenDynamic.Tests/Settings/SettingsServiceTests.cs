@@ -365,6 +365,41 @@ public sealed class SettingsServiceTests : IDisposable
     }
 
     [Fact]
+    public void Load_WhenSchemaVersionIs7_MigratesToSchemaVersion8_SetsDefaultPrivacySettings()
+    {
+        string filePath = Path.Combine(_testDirectory, "settings_v7.json");
+        // Schema version 7 (Phase 14 with Clipboard but without Privacy indicators)
+        const string v7Json = """
+        {
+            "SchemaVersion": 7,
+            "EnableClipboardWidget": true,
+            "CapsuleWidth": 215.0
+        }
+        """;
+
+        File.WriteAllText(filePath, v7Json);
+
+        using var service = new SettingsService(filePath, debounceMilliseconds: 100);
+        service.Load();
+
+        Assert.Equal(AppSettings.CurrentSchemaVersion, service.CurrentSettings.SchemaVersion);
+        Assert.Equal(215.0, service.CurrentSettings.CapsuleWidth);
+        Assert.True(service.CurrentSettings.EnableClipboardWidget);
+        Assert.True(service.CurrentSettings.EnableMicrophoneIndicator);
+        Assert.True(service.CurrentSettings.EnableCameraIndicator);
+        Assert.True(service.CurrentSettings.EnablePrivacyAlerts);
+        Assert.Equal(85, service.CurrentSettings.DefaultPrivacyPriority);
+        Assert.Equal(3.0, service.CurrentSettings.PrivacyTransientDurationSeconds);
+        Assert.NotNull(service.CurrentSettings.IgnoredPrivacyApps);
+        Assert.Empty(service.CurrentSettings.IgnoredPrivacyApps);
+
+        string reloadedJson = File.ReadAllText(filePath);
+        Assert.Contains($"\"SchemaVersion\": {AppSettings.CurrentSchemaVersion}", reloadedJson);
+        Assert.Contains("\"EnableMicrophoneIndicator\": true", reloadedJson);
+        Assert.Contains("\"EnableCameraIndicator\": true", reloadedJson);
+    }
+
+    [Fact]
     public void Load_WhenMotionModeIsConfigured_PersistsAndDeserializesCorrectly()
     {
         string filePath = Path.Combine(_testDirectory, "settings_motion.json");
@@ -486,7 +521,13 @@ public sealed class SettingsServiceTests : IDisposable
             ClipboardTransientDurationSeconds = 2.5,
             ShowClipboardPreview = false,
             ClipboardHistoryCapacity = 7,
-            ClipboardExpirationMinutes = 15
+            ClipboardExpirationMinutes = 15,
+            EnableMicrophoneIndicator = true,
+            EnableCameraIndicator = true,
+            EnablePrivacyAlerts = false,
+            DefaultPrivacyPriority = 85,
+            PrivacyTransientDurationSeconds = 4.0,
+            IgnoredPrivacyApps = new List<string> { "TestApp" }
         };
 
         var cloned = original.Clone();
@@ -522,6 +563,13 @@ public sealed class SettingsServiceTests : IDisposable
         Assert.Equal(original.ShowClipboardPreview, cloned.ShowClipboardPreview);
         Assert.Equal(original.ClipboardHistoryCapacity, cloned.ClipboardHistoryCapacity);
         Assert.Equal(original.ClipboardExpirationMinutes, cloned.ClipboardExpirationMinutes);
+        Assert.Equal(original.EnableMicrophoneIndicator, cloned.EnableMicrophoneIndicator);
+        Assert.Equal(original.EnableCameraIndicator, cloned.EnableCameraIndicator);
+        Assert.Equal(original.EnablePrivacyAlerts, cloned.EnablePrivacyAlerts);
+        Assert.Equal(original.DefaultPrivacyPriority, cloned.DefaultPrivacyPriority);
+        Assert.Equal(original.PrivacyTransientDurationSeconds, cloned.PrivacyTransientDurationSeconds);
+        Assert.Single(cloned.IgnoredPrivacyApps);
+        Assert.Equal("TestApp", cloned.IgnoredPrivacyApps[0]);
 
         var destination = new AppSettings();
         destination.CopyFrom(original);
@@ -532,5 +580,11 @@ public sealed class SettingsServiceTests : IDisposable
         Assert.Equal(original.MotionMode, destination.MotionMode);
         Assert.Equal(original.EnableClipboardWidget, destination.EnableClipboardWidget);
         Assert.Equal(original.ClipboardHistoryCapacity, destination.ClipboardHistoryCapacity);
+        Assert.Equal(original.EnableMicrophoneIndicator, destination.EnableMicrophoneIndicator);
+        Assert.Equal(original.EnableCameraIndicator, destination.EnableCameraIndicator);
+        Assert.Equal(original.EnablePrivacyAlerts, destination.EnablePrivacyAlerts);
+        Assert.Equal(original.DefaultPrivacyPriority, destination.DefaultPrivacyPriority);
+        Assert.Single(destination.IgnoredPrivacyApps);
+        Assert.Equal("TestApp", destination.IgnoredPrivacyApps[0]);
     }
 }

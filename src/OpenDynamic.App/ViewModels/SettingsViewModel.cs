@@ -64,6 +64,7 @@ public partial class SettingsViewModel : ObservableObject
     private readonly DeviceService? _deviceService;
     private readonly ITimerCollection? _timerCollection;
     private readonly ClipboardService? _clipboardService;
+    private readonly Services.PrivacyAccessMonitor? _privacyMonitor;
 
     private readonly AppSettings _settings;
 
@@ -243,6 +244,31 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private int _clipboardExpirationMinutes;
 
+    // Privacy Sensor Indicators (Phase 15 - Microphone and Camera)
+    [ObservableProperty]
+    private bool _enableMicrophoneIndicator;
+
+    [ObservableProperty]
+    private bool _enableCameraIndicator;
+
+    [ObservableProperty]
+    private bool _enablePrivacyAlerts;
+
+    [ObservableProperty]
+    private int _defaultPrivacyPriority;
+
+    [ObservableProperty]
+    private double _privacyTransientDurationSeconds;
+
+    [ObservableProperty]
+    private ObservableCollection<string> _ignoredPrivacyApps = new();
+
+    [ObservableProperty]
+    private string _newIgnoredPrivacyApp = string.Empty;
+
+    [ObservableProperty]
+    private string? _selectedIgnoredPrivacyApp;
+
     // Motion and Animations (Phase 10)
     [ObservableProperty]
     private MotionMode _motionMode;
@@ -282,7 +308,8 @@ public partial class SettingsViewModel : ObservableObject
         NetworkService? networkService = null,
         DeviceService? deviceService = null,
         ITimerCollection? timerCollection = null,
-        ClipboardService? clipboardService = null)
+        ClipboardService? clipboardService = null,
+        Services.PrivacyAccessMonitor? privacyMonitor = null)
     {
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _orchestrator = orchestrator ?? throw new ArgumentNullException(nameof(orchestrator));
@@ -294,6 +321,7 @@ public partial class SettingsViewModel : ObservableObject
         _deviceService = deviceService;
         _timerCollection = timerCollection;
         _clipboardService = clipboardService;
+        _privacyMonitor = privacyMonitor;
 
         _settings = _settingsService.CurrentSettings;
 
@@ -361,6 +389,13 @@ public partial class SettingsViewModel : ObservableObject
         _showClipboardPreview = _settings.ShowClipboardPreview;
         _clipboardHistoryCapacity = _settings.ClipboardHistoryCapacity;
         _clipboardExpirationMinutes = _settings.ClipboardExpirationMinutes;
+
+        _enableMicrophoneIndicator = _settings.EnableMicrophoneIndicator;
+        _enableCameraIndicator = _settings.EnableCameraIndicator;
+        _enablePrivacyAlerts = _settings.EnablePrivacyAlerts;
+        _defaultPrivacyPriority = _settings.DefaultPrivacyPriority;
+        _privacyTransientDurationSeconds = _settings.PrivacyTransientDurationSeconds;
+        _ignoredPrivacyApps = new ObservableCollection<string>(_settings.IgnoredPrivacyApps ?? Enumerable.Empty<string>());
 
         _hideOnFullscreen = _settings.HideOnFullscreen;
         _startWithWindows = _autostartService.IsEnabled();
@@ -774,6 +809,88 @@ public partial class SettingsViewModel : ObservableObject
         _clipboardService?.ClearHistory();
     }
 
+    partial void OnEnableMicrophoneIndicatorChanged(bool value)
+    {
+        _settings.EnableMicrophoneIndicator = value;
+        _settingsService.SaveDebounced();
+        UpdatePrivacyMonitorLifecycle();
+        _getIslandWindow?.Invoke()?.ApplySettingsAndReposition();
+    }
+
+    partial void OnEnableCameraIndicatorChanged(bool value)
+    {
+        _settings.EnableCameraIndicator = value;
+        _settingsService.SaveDebounced();
+        UpdatePrivacyMonitorLifecycle();
+        _getIslandWindow?.Invoke()?.ApplySettingsAndReposition();
+    }
+
+    partial void OnEnablePrivacyAlertsChanged(bool value)
+    {
+        _settings.EnablePrivacyAlerts = value;
+        _settingsService.SaveDebounced();
+        UpdatePrivacyMonitorLifecycle();
+    }
+
+    partial void OnDefaultPrivacyPriorityChanged(int value)
+    {
+        _settings.DefaultPrivacyPriority = value;
+        _settingsService.SaveDebounced();
+    }
+
+    partial void OnPrivacyTransientDurationSecondsChanged(double value)
+    {
+        _settings.PrivacyTransientDurationSeconds = value;
+        _settingsService.SaveDebounced();
+    }
+
+    private void UpdatePrivacyMonitorLifecycle()
+    {
+        if (_privacyMonitor == null) return;
+        bool anyEnabled = _settings.EnableMicrophoneIndicator || _settings.EnableCameraIndicator || _settings.EnablePrivacyAlerts;
+        if (anyEnabled)
+        {
+            _privacyMonitor.Start();
+        }
+        else
+        {
+            _privacyMonitor.Stop();
+        }
+    }
+
+    [RelayCommand]
+    public void AddIgnoredPrivacyApp()
+    {
+        if (string.IsNullOrWhiteSpace(NewIgnoredPrivacyApp)) return;
+
+        string trimmed = NewIgnoredPrivacyApp.Trim();
+        if (!IgnoredPrivacyApps.Any(a => string.Equals(a, trimmed, StringComparison.OrdinalIgnoreCase)))
+        {
+            IgnoredPrivacyApps.Add(trimmed);
+            _settings.IgnoredPrivacyApps = IgnoredPrivacyApps.ToList();
+            _settingsService.SaveDebounced();
+            _privacyMonitor?.Aggregator.UpdateIgnoredApps(_settings.IgnoredPrivacyApps);
+        }
+
+        NewIgnoredPrivacyApp = string.Empty;
+    }
+
+    [RelayCommand]
+    public void RemoveIgnoredPrivacyApp(string? appName)
+    {
+        string? target = appName ?? SelectedIgnoredPrivacyApp;
+        if (string.IsNullOrWhiteSpace(target)) return;
+
+        var existing = IgnoredPrivacyApps.FirstOrDefault(a => string.Equals(a, target, StringComparison.OrdinalIgnoreCase));
+        if (existing != null)
+        {
+            IgnoredPrivacyApps.Remove(existing);
+            _settings.IgnoredPrivacyApps = IgnoredPrivacyApps.ToList();
+            _settingsService.SaveDebounced();
+            _privacyMonitor?.Aggregator.UpdateIgnoredApps(_settings.IgnoredPrivacyApps);
+        }
+    }
+
     partial void OnHideOnFullscreenChanged(bool value)
     {
         _settings.HideOnFullscreen = value;
@@ -929,6 +1046,27 @@ public partial class SettingsViewModel : ObservableObject
             IgnoredDeviceNames.Add(d);
         }
         _deviceService?.UpdateIgnoredDevices();
+
+        EnableClipboardWidget = _settings.EnableClipboardWidget;
+        DefaultClipboardPriority = _settings.DefaultClipboardPriority;
+        ClipboardTransientDurationSeconds = _settings.ClipboardTransientDurationSeconds;
+        ShowClipboardPreview = _settings.ShowClipboardPreview;
+        ClipboardHistoryCapacity = _settings.ClipboardHistoryCapacity;
+        ClipboardExpirationMinutes = _settings.ClipboardExpirationMinutes;
+
+        EnableMicrophoneIndicator = _settings.EnableMicrophoneIndicator;
+        EnableCameraIndicator = _settings.EnableCameraIndicator;
+        EnablePrivacyAlerts = _settings.EnablePrivacyAlerts;
+        DefaultPrivacyPriority = _settings.DefaultPrivacyPriority;
+        PrivacyTransientDurationSeconds = _settings.PrivacyTransientDurationSeconds;
+
+        IgnoredPrivacyApps.Clear();
+        foreach (var a in _settings.IgnoredPrivacyApps)
+        {
+            IgnoredPrivacyApps.Add(a);
+        }
+        _privacyMonitor?.Aggregator.UpdateIgnoredApps(_settings.IgnoredPrivacyApps);
+        UpdatePrivacyMonitorLifecycle();
 
         HideOnFullscreen = _settings.HideOnFullscreen;
         StartWithWindows = _settings.StartWithWindows;

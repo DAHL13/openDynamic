@@ -43,7 +43,8 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<AppSettings>(),
             sp.GetRequiredService<NetworkService>(),
             sp.GetRequiredService<DeviceService>(),
-            sp.GetRequiredService<ClipboardService>()));
+            sp.GetRequiredService<ClipboardService>(),
+            sp.GetRequiredService<PrivacyAccessMonitor>()));
 
         // Settings Service & Persistence
         services.AddSingleton<ISettingsService>(sp =>
@@ -125,6 +126,16 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ClipboardService>();
         services.AddSingleton<Widgets.Clipboard.ClipboardWidget>();
 
+        // Privacy Sensor Services (Priority 85, Passive ConsentStore Monitor, Zero Polling)
+        services.AddSingleton<Core.Privacy.IPrivacyAccessAggregator>(sp =>
+        {
+            var settings = sp.GetRequiredService<AppSettings>();
+            return new Core.Privacy.PrivacyAccessAggregator(settings.IgnoredPrivacyApps);
+        });
+        services.AddSingleton<PrivacyAccessMonitor>();
+        services.AddSingleton<Core.Privacy.IPrivacyAccessMonitor>(sp => sp.GetRequiredService<PrivacyAccessMonitor>());
+        services.AddSingleton<Widgets.Privacy.PrivacyWidget>();
+
         // Settings Window & ViewModel
         services.AddSingleton<SettingsViewModel>(sp => new SettingsViewModel(
             sp.GetRequiredService<ISettingsService>(),
@@ -136,7 +147,8 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<NetworkService>(),
             sp.GetRequiredService<DeviceService>(),
             sp.GetRequiredService<Core.Timer.ITimerCollection>(),
-            sp.GetRequiredService<ClipboardService>()));
+            sp.GetRequiredService<ClipboardService>(),
+            sp.GetRequiredService<PrivacyAccessMonitor>()));
         services.AddSingleton<SettingsWindow>();
 
         // System Tray Icon Manager

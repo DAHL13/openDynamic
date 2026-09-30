@@ -571,3 +571,53 @@
      - `SettingsService.Load()` efectúa la migración automática para esquemas `< 7`, inicializando `EnableClipboardWidget = false` (opt-in estricto), `DefaultClipboardPriority = 55`, `ClipboardTransientDurationSeconds = 2.0`, `ShowClipboardPreview = true`, `ClipboardHistoryCapacity = 5` y `ClipboardExpirationMinutes = 10`.
      - Nueva tarjeta en la pestaña "Widgets y Prioridades" de `SettingsWindow.xaml` con interruptores, deslizadores y botón de borrado inmediato.
      - Submenú en el icono de la bandeja del sistema (`TrayIconManager`) con opciones para pausar/reanudar el monitoreo y vaciar el historial en memoria.
+
+---
+
+## ADR-023: Detección Pasiva de Acceso a Micrófono y Cámara vía Windows ConsentStore (RegNotifyChangeKeyValue) e Insignias Integradas en el Notch (Fase 15)
+
+- **Estado:** Aceptado
+- **Fecha:** 2026-09-30
+- **Contexto:**
+  La ampliación v1.1 (Fase 15) incorpora un indicador visual de privacidad para informar al usuario cuando una aplicación de escritorio o paquete MSIX/UWP inicia o cesa el uso de los sensores físicos de audio (micrófono) y video (cámara/webcam). Dado el impacto en la privacidad, estabilidad y rendimiento del sistema operativo:
+  - openDynamic jamás debe abrir ni capturar dispositivos físicos.
+  - La monitorización debe realizarse con cero consumo de CPU en reposo (Regla de Oro 1: cero polling).
+  - La lógica debe estar puramente aislada en Core (Regla de Oro 5).
+  - El diseño visual debe integrarse de forma sutil en la muesca (Notch UI) sin desplazar destructivamente el widget activo.
+
+- **Decisiones Técnicas:**
+
+  1. **Naturaleza Informativa Pasiva y Privacidad Absoluta (Reglas de Oro 10 y 11):**
+     - **No es una Herramienta de Seguridad ni un Antivirus:** Esta funcionalidad es una comodidad informativa basada en estructuras internas y claves no documentadas de Windows (`CapabilityAccessManager\ConsentStore`). No garantiza detección de software malicioso o rootkits de bajo nivel.
+     - **Prohibición Estricta de Captura Física:** Queda terminantemente prohibido el uso de APIs de captura como `MediaCapture`, `DirectShow`, o interfaces de grabación WASAPI. openDynamic solo realiza lecturas pasivas del registro de Windows.
+     - **Rutas de Registro:**
+       * `HKCU\Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone`
+       * `HKCU\Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\webcam`
+     - **Degradación Elegante:** Si las claves del registro no existen en el sistema o presentan fallos de lectura, la monitorización se desactiva de forma pacífica registrando una advertencia estructurada en Serilog sin abortar la aplicación.
+
+  2. **Escucha Reactiva Nativa sin Sondeo (Regla de Oro 1: Cero Polling):**
+     - `PrivacyAccessMonitor` en `OpenDynamic.App.Services`: Registra reactivamente eventos de kernel Win32 mediante `RegNotifyChangeKeyValue` con `bWatchSubtree = true` y filtros `ChangeName | ChangeLastSet`.
+     - Hilo de Fondo Dedicado (`PrivacyConsentStoreWatcher`): Permanece 100% suspendido en el kernel de Windows a través de `WaitHandle.WaitAny` esperando señales de `_micEvent`, `_camEvent` o el evento de parada `_stopEvent`. Cero consumo de ciclos de CPU en reposo.
+     - Al cerrar la app o desactivar los interruptores en Ajustes, se señaliza `_stopEvent`, se espera la finalización del hilo (`Join` seguro) y se liberan todos los handles del registro y del kernel (`AutoResetEvent`, `ManualResetEvent`, `SafeRegistryHandle`). Cero hilos ni handles huérfanos.
+
+  3. **Lógica Pura y Aislamiento en Core (Regla de Oro 5):**
+     - Se implementan `PrivacyResourceType`, `PrivacyAccessEntry`, `PrivacyAccessState`, `PrivacyAccessChange` y `PrivacyAccessAggregator` en `OpenDynamic.Core.Privacy` sin dependencias de Windows ni WPF.
+     - **Evaluación FILETIME de 64 bits:** Una aplicación se determina activamente en uso si y solo si:
+       `LastUsedTimeStart > 0 && (LastUsedTimeStop == 0 || LastUsedTimeStart > LastUsedTimeStop)`.
+     - `PrivacyConsentStoreParser`: Decodifica rutas ejecutables codificadas con `#` a `\`, extrae nombres amigables de ejecutables y formatea identificadores de paquetes conocidos ("Cámara de Windows", "Grabadora de voz", etc.).
+     - **Lista de Exclusión (`IgnoredPrivacyApps`):** Permite al usuario descartar aplicaciones de sistema o procesos en segundo plano. Excluye automáticamente `openDynamic`.
+     - Inyección de `TimeProvider` para pruebas unitarias deterministas.
+
+  4. **Identidad Visual Notch e Insignias Sutiles Persistentes (Regla de Oro 8):**
+     - **Punto de Estado Superpuesto:** Mientras haya recursos activos, se muestra un punto sutil en la esquina superior del notch (verde `#34C759` para cámara, naranja/ámbar `#FFFF9500` para micrófono).
+     - **Convivencia No Destructiva:** Los indicadores se sitúan como superposición decorativa dentro de `IslandView`, sin desplazar ni contraer el widget primario activo (Música, Temporizador, etc.).
+     - **Respeto a la Visibilidad:** Si la isla está oculta por el usuario o suspendida por pantalla completa, las insignias no fuerzan la aparición de la muesca.
+
+  5. **Aviso Transitorio (`PrivacyWidget`):**
+     - Widget transitorio asignado a `ActivityPriority.Privacy = 85` (jerarquía: `TimerAlert 100 > Battery 90 > Privacy 85 > Volume 80 > Network 65 > Device 60 > Clipboard 55 > Timer 50 > Stopwatch 45 > Media 30 > Hardware 10`).
+     - Duración predeterminada de 3.0 segundos. Informa: "Micrófono en uso: <app>", "Cámara en uso: <app>", "Micrófono/Cámara liberado".
+
+  6. **Ajustes y Migración de Esquema v8 (Regla de Oro 9):**
+     - Se incrementa `CurrentSchemaVersion = 8` en `AppSettings.cs`.
+     - `SettingsService.Load()` migra transparentemente versiones anteriores inicializando `EnableMicrophoneIndicator = true`, `EnableCameraIndicator = true`, `EnablePrivacyAlerts = true`, `DefaultPrivacyPriority = 85`, `PrivacyTransientDurationSeconds = 3.0` e `IgnoredPrivacyApps = []`.
+     - Nueva tarjeta en la pestaña "Widgets y Prioridades" de `SettingsWindow.xaml` con interruptores independientes, deslizadores de prioridad/duración y gestión de apps ignoradas.

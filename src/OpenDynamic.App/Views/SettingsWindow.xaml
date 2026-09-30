@@ -855,6 +855,142 @@
                                         AutomationProperties.Name="Borrar historial del portapapeles ahora"/>
                             </StackPanel>
                         </Border>
+
+                        <!-- CARD: Indicadores de Privacidad (Micrófono y Cámara) -->
+                        <Border Style="{StaticResource CardBorder}">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="🛡️ Privacidad: Micrófono y Cámara en uso" Style="{StaticResource CardHeader}"/>
+                                        <TextBlock Text="Insignias sutiles en la muesca cuando alguna aplicación accede a la cámara o al micrófono" Style="{StaticResource CardSubtitle}"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <!-- Nota de comodidad informativa pasiva -->
+                                <Border Background="#10FFFFFF" CornerRadius="6" Padding="10,8" Margin="0,0,0,14">
+                                    <TextBlock Text="ℹ️ Comodidad informativa pasiva basada en el registro de Windows ConsentStore. No captura dispositivos ni reemplaza un antivirus de seguridad."
+                                               FontSize="11" Foreground="#9CA3AF" TextWrapping="Wrap"/>
+                                </Border>
+
+                                <!-- Interruptor Indicador de Micrófono -->
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Indicador de Micrófono en Uso" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Muestra un punto ámbar/naranja sutil en la muesca cuando el micrófono está en uso" Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <CheckBox Grid.Column="1" IsChecked="{Binding EnableMicrophoneIndicator}" VerticalAlignment="Center" AutomationProperties.Name="Indicador de micrófono"/>
+                                </Grid>
+
+                                <!-- Interruptor Indicador de Cámara -->
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Indicador de Cámara en Uso" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Muestra un punto verde sutil en la muesca cuando la cámara está en uso" Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <CheckBox Grid.Column="1" IsChecked="{Binding EnableCameraIndicator}" VerticalAlignment="Center" AutomationProperties.Name="Indicador de cámara"/>
+                                </Grid>
+
+                                <!-- Interruptor Avisos Transitorios -->
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Avisos Transitorios en la Muesca" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Muestra un aviso breve al iniciar o liberar el uso de micrófono o cámara" Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <CheckBox Grid.Column="1" IsChecked="{Binding EnablePrivacyAlerts}" VerticalAlignment="Center" AutomationProperties.Name="Avisos transitorios de privacidad"/>
+                                </Grid>
+
+                                <!-- Prioridad del aviso -->
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Prioridad del Widget de Privacidad" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Nivel de prioridad cuando se muestra un aviso (por defecto 85, superior al volumen 80)" Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="1" Text="{Binding DefaultPrivacyPriority}" Style="{StaticResource ValueBadge}"/>
+                                </Grid>
+                                <Slider Minimum="50" Maximum="100" SmallChange="1" LargeChange="5"
+                                        IsSnapToTickEnabled="True" TickFrequency="1"
+                                        Value="{Binding DefaultPrivacyPriority}"
+                                        IsEnabled="{Binding EnablePrivacyAlerts}"
+                                        Margin="0,0,0,14" AutomationProperties.Name="Prioridad del widget de privacidad"/>
+
+                                <!-- Duración del aviso -->
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Duración del Aviso Transitorio" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Tiempo en segundos que permanece visible el aviso (por defecto 3.0 s)" Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="1" Text="{Binding PrivacyTransientDurationSeconds, StringFormat='{}{0:F1} s'}" Style="{StaticResource ValueBadge}"/>
+                                </Grid>
+                                <Slider Minimum="1.0" Maximum="8.0" SmallChange="0.5" LargeChange="1.0"
+                                        IsSnapToTickEnabled="True" TickFrequency="0.5"
+                                        Value="{Binding PrivacyTransientDurationSeconds}"
+                                        IsEnabled="{Binding EnablePrivacyAlerts}"
+                                        Margin="0,0,0,14" AutomationProperties.Name="Duración del aviso de privacidad"/>
+
+                                <!-- Aplicaciones Ignoradas -->
+                                <TextBlock Text="Aplicaciones Ignoradas" Style="{StaticResource SettingTitle}" Margin="0,0,0,4"/>
+                                <TextBlock Text="Procesos o apps que no activarán el indicador ni los avisos (ej. servicios de sistema o segundo plano)" Style="{StaticResource SettingDesc}" Margin="0,0,0,8"/>
+
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="8"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox Text="{Binding NewIgnoredPrivacyApp, UpdateSourceTrigger=PropertyChanged}"
+                                             Height="32" Padding="8,6" Background="#111827" Foreground="White" BorderBrush="#374151" BorderThickness="1"
+                                             VerticalContentAlignment="Center" AutomationProperties.Name="Nueva aplicación ignorada"/>
+                                    <Button Grid.Column="2" Content="Añadir"
+                                            Command="{Binding AddIgnoredPrivacyAppCommand}"
+                                            Height="32" Padding="14,0" Background="#252A36" Foreground="#60A5FA" BorderBrush="#374151" BorderThickness="1"
+                                            AutomationProperties.Name="Añadir aplicación ignorada"/>
+                                </Grid>
+
+                                <ListBox ItemsSource="{Binding IgnoredPrivacyApps}"
+                                         SelectedItem="{Binding SelectedIgnoredPrivacyApp}"
+                                         MaxHeight="120" Background="#111827" Foreground="White" BorderBrush="#374151" BorderThickness="1" Margin="0,0,0,8">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="4,2">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{Binding}" Foreground="White" VerticalAlignment="Center"/>
+                                                <Button Grid.Column="1" Content="✕"
+                                                        Command="{Binding DataContext.RemoveIgnoredPrivacyAppCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                                        CommandParameter="{Binding}"
+                                                        Background="Transparent" Foreground="#F87171" BorderThickness="0" Padding="6,2" Cursor="Hand"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>

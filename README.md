@@ -67,6 +67,7 @@ openDynamic adopta una estética de **muesca rectangular superior (Notch)** pega
 | **Fase 12** | **Cronómetro de precisión y múltiples temporizadores con preajustes y cola de alertas (v1.1)** | **Completada** |
 | **Fase 13** | **Color de carátula dinámico y gestos táctiles/ratón en el widget multimedia (v1.1)** | **Completada** |
 | **Fase 14** | **Portapapeles reciente y seguro en memoria RAM (Opt-in, privacidad, 0% leak) (v1.1)** | **Completada** |
+| **Fase 15** | **Indicador de micrófono y cámara en uso (ConsentStore pasivo, cero polling, notch UI) (v1.1)** | **Completada** |
 
 ---
 
@@ -143,8 +144,8 @@ En estricto cumplimiento de la **Regla de Oro 1** (0% CPU en reposo y consumo m�
 ## Documentación Técnica
 
 - **[Arquitectura y Guía para Desarrolladores (`docs/arquitectura.md`)](./docs/arquitectura.md):** Diagramas conceptuales de capas (Core vs. App), flujo del `IslandOrchestrator`, ciclo de vida de la FSM y la **Guía de 10 pasos** para crear e integrar nuevos widgets desde cero.
-- **[Registro de Decisiones de Arquitectura (`DECISIONS.md`)](./DECISIONS.md):** Registro histórico y justificación de las 22 decisiones técnicas (ADR-001 a ADR-022).
-- **[Matriz de Validación y Pruebas (`docs/pruebas.md`)](./docs/pruebas.md):** 329 pruebas unitarias automatizadas y casos de prueba manual de sistema (DPI, multimonitor, suspensión, pantalla completa, accesibilidad, portapapeles).
+- **[Registro de Decisiones de Arquitectura (`DECISIONS.md`)](./DECISIONS.md):** Registro histórico y justificación de las 23 decisiones técnicas (ADR-001 a ADR-023).
+- **[Matriz de Validación y Pruebas (`docs/pruebas.md`)](./docs/pruebas.md):** 355 pruebas unitarias automatizadas y casos de prueba manual de sistema (DPI, multimonitor, suspensión, pantalla completa, accesibilidad, portapapeles, privacidad de cámara/micrófono).
 
 ---
 
@@ -158,7 +159,7 @@ En estricto cumplimiento de la **Regla de Oro 1** (0% CPU en reposo y consumo m�
 - **Multimedia:** WinRT `Windows.Media.Control` (GSMTC) con extrapolación continua y miniaturas congeladas
 - **Bandeja del Sistema (Tray):** `H.NotifyIcon.Wpf` (cero WinForms)
 - **Atajos Globales:** Win32 `RegisterHotKey` / `UnregisterHotKey` mediante WndProc
-- **Configuración y Persistencia:** `System.Text.Json` en `%AppData%\openDynamic\settings.json` (esquema v7 con migración automática y debounce de 500ms)
+- **Configuración y Persistencia:** `System.Text.Json` en `%AppData%\openDynamic\settings.json` (esquema v8 con migración automática y debounce de 500ms)
 - **Registro de Eventos (Logging):** `Serilog` y `Serilog.Sinks.File` en `%LocalAppData%\openDynamic\logs`
 - **Pruebas Unitarias:** `xUnit`
 - **Instalador:** Inno Setup 6 (distribución ReadyToRun)

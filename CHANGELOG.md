@@ -3,6 +3,33 @@
 Todas las modificaciones notables en este proyecto serán documentadas en este archivo.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y cumple con [SemVer](https://semver.org/).
 
+## [1.1.0-dev] - 2026-09-30 (Fase 15: Indicador de Micrófono y Cámara en Uso)
+
+### Añadido
+- **Modelos y Agregador Puro en Core (`OpenDynamic.Core.Privacy`):**
+  - Modelos inmutables `PrivacyResourceType` (`Microphone`, `Camera`), `PrivacyAccessEntry`, `PrivacyAccessState` y `PrivacyAccessChange` con evaluación estricta de marcas FILETIME de 64 bits (`LastUsedTimeStart > 0 && (LastUsedTimeStop == 0 || LastUsedTimeStart > LastUsedTimeStop)`), 100% desacoplados de Windows y de la interfaz (Regla de Oro 5).
+  - `PrivacyAccessAggregator`: Agregador determinista con inyección de `TimeProvider` para pruebas unitarias sin pausas reales, cálculo de transiciones (`Started`, `Stopped`) y soporte para lista de exclusión configurable (`IgnoredPrivacyApps`). Exclusión automática de la propia app (`openDynamic`).
+  - `PrivacyConsentStoreParser`: Decodificación de rutas ejecutables `#` a `\`, extracción limpia de nombres de procesos y formateo amigable de identificadores de paquetes conocidos ("Cámara de Windows", "Grabadora de voz", etc.).
+- **Monitor Reactivo Nativo en App (`OpenDynamic.App.Services.PrivacyAccessMonitor`):**
+  - Lectura pasiva y segura del registro de Windows (`HKCU\Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone` y `...\webcam`).
+  - **Cero Captura Física (Reglas de Oro 10 y 11):** Prohibición estricta de abrir o inicializar dispositivos de audio/video (sin MediaCapture, DirectShow, WASAPI de captura). openDynamic opera 100% como lector pasivo del registro.
+  - **Cero Polling (Regla de Oro 1):** Hilo de fondo dedicado (`PrivacyConsentStoreWatcher`) con `RegNotifyChangeKeyValue` (`bWatchSubtree = true`, `ChangeName | ChangeLastSet`) y eventos de kernel (`AutoResetEvent` / `ManualResetEvent`). El hilo permanece dormido en `WaitHandle.WaitAny` y no consume ciclos de CPU en reposo.
+  - Liberación limpia y garantizada de hilos y handles al apagar la aplicación o desactivar la monitorización.
+  - Degradación elegante: si las claves no existen o fallan, la función se desactiva pacíficamente registrando una advertencia estructurada.
+- **Insignias Persistentes en la Muesca (Notch UI):**
+  - Insignia sutil integrada en la esquina superior del notch (verde `#34C759` para cámara, ámbar/naranja `#FFFF9500` para micrófono).
+  - Convivencia no destructiva: los indicadores flotan por encima del notch sin desplazar ni achicar el contenido del widget primario activo (Música, Temporizador, etc.).
+  - Respeto a la visibilidad: si la isla está oculta por el usuario o en pantalla completa, las insignias no fuerzan la aparición de la muesca.
+- **Aviso Transitorio (`OpenDynamic.App.Widgets.Privacy`):**
+  - `PrivacyWidget`: Widget transitorio asignado a prioridad 85 (`ActivityPriority.Privacy = 85`), superior a volumen (80) e inferior a batería (90), con duración de 3.0 s.
+  - Vistas `PrivacyCompactView`, `PrivacyExpandedView` y `PrivacySplitView`.
+- **Ajustes y Migración de Esquema v8 (`AppSettings`):**
+  - Incremento a `CurrentSchemaVersion = 8` en `AppSettings.cs` con migración retrocompatible en `SettingsService.Load()`.
+  - Interruptores independientes en Ajustes para el indicador de micrófono, el de cámara y avisos transitorios, con deslizadores de prioridad y duración.
+  - Gestión interactiva de lista de aplicaciones ignoradas (`IgnoredPrivacyApps`).
+- **Pruebas Automatizadas:**
+  - Nuevas suites de pruebas: `PrivacyAccessAggregatorTests`, `PrivacyConsentStoreParserTests` y prueba de migración v8 en `SettingsServiceTests`. 355 pruebas en verde.
+
 ## [1.1.0-dev] - 2026-09-30 (Fase 14: Portapapeles Reciente y Seguro)
 
 ### Añadido

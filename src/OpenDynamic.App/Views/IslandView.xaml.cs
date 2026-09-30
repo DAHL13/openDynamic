@@ -179,6 +179,16 @@ public partial class IslandView : UserControl
     }
 
     /// <summary>
+    /// Updates the persistent privacy sensor indicator dots displayed on the notch.
+    /// Amber for microphone, green for camera. Superimposed subtly without moving primary widget.
+    /// </summary>
+    public void UpdatePrivacyIndicators(bool isMicrophoneActive, bool isCameraActive)
+    {
+        MicrophoneIndicatorDot.Visibility = isMicrophoneActive ? Visibility.Visible : Visibility.Collapsed;
+        CameraIndicatorDot.Visibility = isCameraActive ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>
     /// Updates the motion profile used for cross-fade transitions and visual dynamics.
     /// </summary>
     public void UpdateMotionProfile(MotionProfile profile)
