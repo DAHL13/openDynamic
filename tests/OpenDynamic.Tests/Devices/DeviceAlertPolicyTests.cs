@@ -15,9 +15,13 @@ public sealed class DeviceAlertPolicyTests
     [InlineData("Keychron K2 Pro", DeviceCategory.Keyboard)]
     [InlineData("Logitech MX Keys Wireless Keyboard", DeviceCategory.Keyboard)]
     [InlineData("Teclado Español USB", DeviceCategory.Keyboard)]
+    [InlineData("Standard PS/2 Keyboard", DeviceCategory.Keyboard)]
     [InlineData("Logitech MX Master 3S", DeviceCategory.Mouse)]
     [InlineData("Razer DeathAdder V3 Mouse", DeviceCategory.Mouse)]
     [InlineData("Magic Trackpad", DeviceCategory.Mouse)]
+    [InlineData("HID-compliant mouse", DeviceCategory.Mouse)]
+    [InlineData("Ratón compatible con HID", DeviceCategory.Mouse)]
+    [InlineData("USB Optical Mouse", DeviceCategory.Mouse)]
     [InlineData("SanDisk Ultra USB 3.0 Flash Drive", DeviceCategory.Storage)]
     [InlineData("Kingston DataTraveler 64GB", DeviceCategory.Storage)]
     [InlineData("Cruzer Blade USB Device", DeviceCategory.Storage)]
@@ -30,6 +34,57 @@ public sealed class DeviceAlertPolicyTests
     {
         var category = DeviceCategoryClassifier.Classify(input);
         Assert.Equal(expected, category);
+    }
+
+    [Fact]
+    public void DeviceCategoryClassifier_BluetoothClassAndPathOverrides_WorkCorrectly()
+    {
+        // Bluetooth CoD Major Class 4 = Audio/Video
+        Assert.Equal(DeviceCategory.Audio, DeviceCategoryClassifier.Classify("Generic Bluetooth Device", bluetoothMajorClass: 4));
+
+        // Bluetooth CoD Major Class 5 = Peripheral fallback
+        Assert.Equal(DeviceCategory.Mouse, DeviceCategoryClassifier.Classify(null, bluetoothMajorClass: 5));
+
+        // Classification from Device Path
+        Assert.Equal(DeviceCategory.Mouse, DeviceCategoryClassifier.Classify("HID", bluetoothMajorClass: null, devicePath: "\\\\?\\HID#VID_046D&PID_C077&MI_00#...#{4D1E55B2-F16F-11CF-88CB-001111000030}#hid_device_system_mouse"));
+        Assert.Equal(DeviceCategory.Keyboard, DeviceCategoryClassifier.Classify("HID", bluetoothMajorClass: null, devicePath: "\\\\?\\HID#VID_046D&PID_C31C&MI_00#...#{4D1E55B2-F16F-11CF-88CB-001111000030}#kbd"));
+    }
+
+    [Fact]
+    public void BluetoothDevice_Updated_ConnectionTransitions_EmitAlertsCorrectly()
+    {
+        var clock = new FakeTimeProvider();
+        using var policy = new DeviceAlertPolicy(clock, coalesceDuration: TimeSpan.FromMilliseconds(500));
+
+        var alerts = new List<DeviceEvent>();
+        policy.AlertTriggered += (_, ev) => alerts.Add(ev);
+
+        string btId = "BTHENUM\\DEV_94DB56A1B2C3";
+
+        // 1. Initial enumeration reports paired device as Disconnected (off)
+        policy.ProcessDeviceEvent(new DeviceEvent(DeviceEventType.Disconnected, btId, "Sony WH-1000XM4", DeviceCategory.Audio));
+        clock.Advance(TimeSpan.FromSeconds(1));
+        Assert.Empty(alerts);
+
+        // Enumeration completes
+        policy.NotifyEnumerationCompleted();
+
+        // 2. User turns ON Bluetooth headphones -> DeviceWatcher.Updated reports Connected
+        policy.ProcessDeviceEvent(new DeviceEvent(DeviceEventType.Connected, btId, "Sony WH-1000XM4", DeviceCategory.Audio, BatteryPercent: 90));
+        clock.Advance(TimeSpan.FromMilliseconds(600));
+
+        Assert.Single(alerts);
+        Assert.Equal(DeviceEventType.Connected, alerts[0].Type);
+        Assert.Equal("Sony WH-1000XM4", alerts[0].DeviceName);
+        Assert.Equal(90, alerts[0].BatteryPercent);
+
+        // 3. User turns OFF Bluetooth headphones -> DeviceWatcher.Updated reports Disconnected
+        clock.Advance(TimeSpan.FromSeconds(4)); // Advance past cooldown
+        policy.ProcessDeviceEvent(new DeviceEvent(DeviceEventType.Disconnected, btId, "Sony WH-1000XM4", DeviceCategory.Audio));
+        clock.Advance(TimeSpan.FromMilliseconds(600));
+
+        Assert.Equal(2, alerts.Count);
+        Assert.Equal(DeviceEventType.Disconnected, alerts[1].Type);
     }
 
     [Fact]

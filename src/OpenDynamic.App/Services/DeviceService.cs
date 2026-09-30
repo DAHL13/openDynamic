@@ -10,24 +10,28 @@ namespace OpenDynamic.App.Services;
 
 /// <summary>
 /// Monitors peripheral USB and Bluetooth device connections and disconnections.
-/// Listens to Win32 WM_DEVICECHANGE via RegisterDeviceNotification and WinRT DeviceWatcher.
+/// Listens to Win32 WM_DEVICECHANGE via RegisterDeviceNotification (USB + HID interfaces)
+/// and WinRT DeviceWatcher with IsConnected, MajorDeviceClass, and BatteryLevel property updates.
 /// Adheres strictly to Golden Rule 1 (0% CPU at rest), Golden Rule 11 (complete watcher disposal on disable),
 /// and the v1.1 Privacy Rule (device friendly names never emitted to logs, only category and event count).
 /// </summary>
 public sealed class DeviceService : IDisposable
 {
+    private record CachedBluetoothDevice(string Name, DeviceCategory Category, bool? IsConnected, uint? MajorClass, int? BatteryPercent);
+
     private readonly object _syncLock = new();
     private readonly AppSettings _settings;
     private readonly DeviceAlertPolicy _policy;
 
     private IntPtr _hwnd = IntPtr.Zero;
     private IntPtr _usbNotificationHandle = IntPtr.Zero;
+    private IntPtr _hidNotificationHandle = IntPtr.Zero;
     private DeviceWatcher? _bluetoothWatcher;
     private bool _isListening;
     private bool _isDisposed;
 
-    // Cache of known Bluetooth device friendly names by ID to report readable names on removal
-    private readonly Dictionary<string, (string Name, DeviceCategory Category)> _bluetoothDeviceCache = new(StringComparer.OrdinalIgnoreCase);
+    // Cache of known Bluetooth device details by ID to track transitions and report readable names on removal
+    private readonly Dictionary<string, CachedBluetoothDevice> _bluetoothDeviceCache = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// Occurs when a consolidated device connection or disconnection alert warrants dynamic island presentation.
@@ -51,7 +55,7 @@ public sealed class DeviceService : IDisposable
     }
 
     /// <summary>
-    /// Starts USB and Bluetooth watchers if device alerts are enabled.
+    /// Starts USB, HID, and Bluetooth watchers if device alerts are enabled.
     /// </summary>
     /// <param name="hwnd">Window handle for receiving Win32 WM_DEVICECHANGE notifications.</param>
     public void Start(IntPtr hwnd)
@@ -72,11 +76,11 @@ public sealed class DeviceService : IDisposable
             // Sync configured ignored devices
             _policy.SetIgnoredDevices(_settings.IgnoredDeviceNames);
 
-            RegisterUsbNotifications(hwnd);
+            RegisterDeviceNotifications(hwnd);
             StartBluetoothWatcher();
 
             _isListening = true;
-            Log.Information("DeviceService started. USB and Bluetooth device watchers active.");
+            Log.Information("DeviceService started. Win32 USB/HID and WinRT Bluetooth device watchers active.");
         }
     }
 
@@ -87,9 +91,9 @@ public sealed class DeviceService : IDisposable
     {
         lock (_syncLock)
         {
-            if (!_isListening && _bluetoothWatcher == null && _usbNotificationHandle == IntPtr.Zero) return;
+            if (!_isListening && _bluetoothWatcher == null && _usbNotificationHandle == IntPtr.Zero && _hidNotificationHandle == IntPtr.Zero) return;
 
-            UnregisterUsbNotifications();
+            UnregisterDeviceNotifications();
             StopBluetoothWatcher();
 
             _policy.NotifySuspended();
@@ -123,48 +127,84 @@ public sealed class DeviceService : IDisposable
         _policy.SetIgnoredDevices(_settings.IgnoredDeviceNames);
     }
 
-    #region Win32 USB Notifications (WM_DEVICECHANGE)
+    #region Win32 USB & HID Notifications (WM_DEVICECHANGE)
 
-    private void RegisterUsbNotifications(IntPtr hwnd)
+    private void RegisterDeviceNotifications(IntPtr hwnd)
     {
         if (hwnd == IntPtr.Zero) return;
 
         try
         {
-            var dbi = new NativeMethods.DEV_BROADCAST_DEVICEINTERFACE
+            // 1. Register USB device interface notifications (storage, hubs, serial, etc.)
+            var usbFilter = new NativeMethods.DEV_BROADCAST_DEVICEINTERFACE
             {
                 dbcc_size = Marshal.SizeOf<NativeMethods.DEV_BROADCAST_DEVICEINTERFACE>(),
                 dbcc_devicetype = NativeMethods.DBT_DEVTYP_DEVICEINTERFACE,
                 dbcc_reserved = 0,
-                dbcc_classguid = Guid.Empty
+                dbcc_classguid = NativeMethods.GUID_DEVINTERFACE_USB_DEVICE
             };
 
             _usbNotificationHandle = NativeMethods.RegisterDeviceNotification(
                 hwnd,
-                ref dbi,
-                NativeMethods.DEVICE_NOTIFY_WINDOW_HANDLE | NativeMethods.DEVICE_NOTIFY_ALL_INTERFACE_CLASSES);
+                ref usbFilter,
+                NativeMethods.DEVICE_NOTIFY_WINDOW_HANDLE);
 
-            Log.Debug("Registered USB RegisterDeviceNotification for HWND: {Hwnd}", hwnd);
+            // 2. Register HID device interface notifications (mice, keyboards, game controllers)
+            var hidFilter = new NativeMethods.DEV_BROADCAST_DEVICEINTERFACE
+            {
+                dbcc_size = Marshal.SizeOf<NativeMethods.DEV_BROADCAST_DEVICEINTERFACE>(),
+                dbcc_devicetype = NativeMethods.DBT_DEVTYP_DEVICEINTERFACE,
+                dbcc_reserved = 0,
+                dbcc_classguid = NativeMethods.GUID_DEVINTERFACE_HID
+            };
+
+            _hidNotificationHandle = NativeMethods.RegisterDeviceNotification(
+                hwnd,
+                ref hidFilter,
+                NativeMethods.DEVICE_NOTIFY_WINDOW_HANDLE);
+
+            Log.Information("Registered Win32 device notifications: USB (Handle: {UsbHandle}), HID (Handle: {HidHandle})",
+                _usbNotificationHandle, _hidNotificationHandle);
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "Failed to register USB device notifications.");
+            Log.Error(ex, "Failed to register Win32 USB/HID device notifications.");
         }
     }
 
-    private void UnregisterUsbNotifications()
+    private void UnregisterDeviceNotifications()
     {
         if (_usbNotificationHandle != IntPtr.Zero)
         {
             try
             {
                 NativeMethods.UnregisterDeviceNotification(_usbNotificationHandle);
-                _usbNotificationHandle = IntPtr.Zero;
                 Log.Debug("Unregistered USB RegisterDeviceNotification.");
             }
             catch (Exception ex)
             {
                 Log.Warning(ex, "Error unregistering USB device notification handle.");
+            }
+            finally
+            {
+                _usbNotificationHandle = IntPtr.Zero;
+            }
+        }
+
+        if (_hidNotificationHandle != IntPtr.Zero)
+        {
+            try
+            {
+                NativeMethods.UnregisterDeviceNotification(_hidNotificationHandle);
+                Log.Debug("Unregistered HID RegisterDeviceNotification.");
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Error unregistering HID device notification handle.");
+            }
+            finally
+            {
+                _hidNotificationHandle = IntPtr.Zero;
             }
         }
     }
@@ -201,10 +241,15 @@ public sealed class DeviceService : IDisposable
                 ? DeviceEventType.Connected
                 : DeviceEventType.Disconnected;
 
+            Guid classGuid = dbi.dbcc_classguid;
+
+            Log.Debug("WM_DEVICECHANGE received: Code=0x{EventCode:X4}, ClassGuid={Guid}",
+                eventCode, classGuid);
+
             // Resolve friendly name asynchronously via WinRT DeviceInformation
             _ = Task.Run(async () =>
             {
-                await ProcessUsbDeviceEventAsync(devicePath, eventType);
+                await ProcessUsbDeviceEventAsync(devicePath, eventType, classGuid);
             });
         }
         catch (Exception ex)
@@ -213,10 +258,11 @@ public sealed class DeviceService : IDisposable
         }
     }
 
-    private async Task ProcessUsbDeviceEventAsync(string devicePath, DeviceEventType eventType)
+    private async Task ProcessUsbDeviceEventAsync(string devicePath, DeviceEventType eventType, Guid classGuid)
     {
-        string friendlyName = "Dispositivo USB";
-        DeviceCategory category = DeviceCategory.Other;
+        string friendlyName = classGuid == NativeMethods.GUID_DEVINTERFACE_HID
+            ? "Periférico HID"
+            : "Dispositivo USB";
 
         try
         {
@@ -227,43 +273,44 @@ public sealed class DeviceService : IDisposable
             }
             else
             {
-                friendlyName = ExtractFriendlyNameFromDevicePath(devicePath);
+                friendlyName = ExtractFriendlyNameFromDevicePath(devicePath, classGuid);
             }
         }
         catch
         {
-            friendlyName = ExtractFriendlyNameFromDevicePath(devicePath);
+            friendlyName = ExtractFriendlyNameFromDevicePath(devicePath, classGuid);
         }
 
-        category = DeviceCategoryClassifier.Classify(friendlyName);
+        var category = DeviceCategoryClassifier.Classify(friendlyName, bluetoothMajorClass: null, devicePath: devicePath);
 
-        // Privacy rule: log only Category and Type, NEVER device friendly names
-        Log.Debug("USB device event intercepted: Type={Type}, Category={Category}",
-            eventType, category);
+        // Privacy rule: log only Category, Type, and sanitized interface GUID, NEVER device friendly names
+        Log.Information("USB/HID device event intercepted: Type={Type}, Category={Category}, InterfaceGuid={Guid}",
+            eventType, category, classGuid);
 
         var devEvent = new DeviceEvent(eventType, devicePath, friendlyName, category);
         _policy.ProcessDeviceEvent(devEvent);
     }
 
-    private static string ExtractFriendlyNameFromDevicePath(string devicePath)
+    private static string ExtractFriendlyNameFromDevicePath(string devicePath, Guid classGuid)
     {
-        // Example devicePath: \\?\USB#VID_0781&PID_5581#0101...#{a5dcbf10-6530-11d2-901f-00c04fb951ed}
         try
         {
-            var parts = devicePath.Split('#');
-            if (parts.Length >= 2)
+            string upper = devicePath.ToUpperInvariant();
+            if (upper.Contains("MOUSE") || upper.Contains("POINT"))
             {
-                string hardwareId = parts[1];
-                if (devicePath.Contains("STORAGE", StringComparison.OrdinalIgnoreCase) ||
-                    hardwareId.Contains("STOR", StringComparison.OrdinalIgnoreCase))
-                {
-                    return "Almacenamiento USB";
-                }
-                if (devicePath.Contains("HID", StringComparison.OrdinalIgnoreCase))
-                {
-                    return "Periférico HID";
-                }
-                return "Dispositivo USB";
+                return "Ratón USB";
+            }
+            if (upper.Contains("KBD") || upper.Contains("KEYBOARD"))
+            {
+                return "Teclado USB";
+            }
+            if (upper.Contains("STORAGE") || upper.Contains("STOR") || upper.Contains("DISK"))
+            {
+                return "Almacenamiento USB";
+            }
+            if (classGuid == NativeMethods.GUID_DEVINTERFACE_HID)
+            {
+                return "Periférico HID";
             }
         }
         catch
@@ -286,7 +333,12 @@ public sealed class DeviceService : IDisposable
             string aqs = BluetoothDevice.GetDeviceSelector();
             _bluetoothWatcher = DeviceInformation.CreateWatcher(
                 aqs,
-                new[] { "System.Devices.Aep.IsConnected", "System.Devices.BatteryLevel" },
+                new[]
+                {
+                    "System.Devices.Aep.IsConnected",
+                    "System.Devices.Aep.Bluetooth.Cod.MajorDeviceClass",
+                    "System.Devices.BatteryLevel"
+                },
                 DeviceInformationKind.AssociationEndpoint);
 
             _bluetoothWatcher.Added += OnBluetoothDeviceAdded;
@@ -296,7 +348,7 @@ public sealed class DeviceService : IDisposable
             _bluetoothWatcher.Stopped += OnBluetoothWatcherStopped;
 
             _bluetoothWatcher.Start();
-            Log.Debug("WinRT Bluetooth DeviceWatcher started.");
+            Log.Information("WinRT Bluetooth DeviceWatcher started with properties: IsConnected, MajorDeviceClass, BatteryLevel.");
         }
         catch (Exception ex)
         {
@@ -344,20 +396,23 @@ public sealed class DeviceService : IDisposable
         {
             bool isConnected = false;
             if (deviceInfo.Properties.TryGetValue("System.Devices.Aep.IsConnected", out var isConnectedVal) &&
-                isConnectedVal is bool b)
+                isConnectedVal != null)
             {
-                isConnected = b;
+                isConnected = Convert.ToBoolean(isConnectedVal);
             }
 
             string name = !string.IsNullOrWhiteSpace(deviceInfo.Name) ? deviceInfo.Name : "Dispositivo Bluetooth";
-            var category = DeviceCategoryClassifier.Classify(name);
+            uint? majorClass = TryExtractMajorDeviceClass(deviceInfo.Properties);
+            var category = DeviceCategoryClassifier.Classify(name, majorClass);
+            int? batteryPercent = TryExtractBattery(deviceInfo.Properties);
 
             lock (_syncLock)
             {
-                _bluetoothDeviceCache[deviceInfo.Id] = (name, category);
+                _bluetoothDeviceCache[deviceInfo.Id] = new CachedBluetoothDevice(name, category, isConnected, majorClass, batteryPercent);
             }
 
-            int? batteryPercent = TryExtractBattery(deviceInfo.Properties);
+            Log.Debug("Bluetooth DeviceAdded: ID={DeviceId}, Connected={IsConnected}, Category={Category}, MajorClass={MajorClass}, HasBattery={HasBattery}",
+                SanitizeId(deviceInfo.Id), isConnected, category, majorClass, batteryPercent.HasValue);
 
             // Feed to policy: if pre-enumeration, it will quietly seed inventory without alerting
             var eventType = isConnected ? DeviceEventType.Connected : DeviceEventType.Disconnected;
@@ -374,27 +429,74 @@ public sealed class DeviceService : IDisposable
     {
         try
         {
-            if (update.Properties.TryGetValue("System.Devices.Aep.IsConnected", out var isConnectedVal) &&
-                isConnectedVal is bool isConnected)
-            {
-                string name = "Dispositivo Bluetooth";
-                DeviceCategory category = DeviceCategory.Other;
+            Log.Debug("Bluetooth DeviceUpdated: ID={DeviceId}, UpdatedPropCount={Count}",
+                SanitizeId(update.Id), update.Properties.Count);
 
-                lock (_syncLock)
+            // Inspect if System.Devices.Aep.IsConnected changed
+            if (!update.Properties.TryGetValue("System.Devices.Aep.IsConnected", out var isConnectedVal) ||
+                isConnectedVal == null)
+            {
+                // IsConnected did not change in this update; might be a battery level update
+                if (update.Properties.ContainsKey("System.Devices.BatteryLevel"))
                 {
-                    if (_bluetoothDeviceCache.TryGetValue(update.Id, out var cached))
+                    int? newBattery = TryExtractBattery(update.Properties);
+                    lock (_syncLock)
                     {
-                        name = cached.Name;
-                        category = cached.Category;
+                        if (_bluetoothDeviceCache.TryGetValue(update.Id, out var existing))
+                        {
+                            _bluetoothDeviceCache[update.Id] = existing with { BatteryPercent = newBattery };
+                        }
                     }
                 }
-
-                int? batteryPercent = TryExtractBattery(update.Properties);
-
-                var eventType = isConnected ? DeviceEventType.Connected : DeviceEventType.Disconnected;
-                var devEvent = new DeviceEvent(eventType, update.Id, name, category, batteryPercent);
-                _policy.ProcessDeviceEvent(devEvent);
+                return;
             }
+
+            bool isConnected = Convert.ToBoolean(isConnectedVal);
+
+            string name = "Dispositivo Bluetooth";
+            DeviceCategory category = DeviceCategory.Other;
+            bool? previousConnectionState = null;
+            uint? majorClass = null;
+            int? batteryPercent = TryExtractBattery(update.Properties);
+
+            lock (_syncLock)
+            {
+                if (_bluetoothDeviceCache.TryGetValue(update.Id, out var cached))
+                {
+                    name = cached.Name;
+                    category = cached.Category;
+                    previousConnectionState = cached.IsConnected;
+                    majorClass = cached.MajorClass;
+                    if (!batteryPercent.HasValue) batteryPercent = cached.BatteryPercent;
+
+                    // Update cache entry with new state
+                    _bluetoothDeviceCache[update.Id] = cached with { IsConnected = isConnected, BatteryPercent = batteryPercent };
+                }
+                else
+                {
+                    // Newly observed device during update
+                    majorClass = TryExtractMajorDeviceClass(update.Properties);
+                    category = DeviceCategoryClassifier.Classify(name, majorClass);
+                    _bluetoothDeviceCache[update.Id] = new CachedBluetoothDevice(name, category, isConnected, majorClass, batteryPercent);
+                }
+            }
+
+            // Check if connection state actually changed
+            if (previousConnectionState.HasValue && previousConnectionState.Value == isConnected)
+            {
+                Log.Debug("Bluetooth device connection state unchanged ({IsConnected}) for ID={DeviceId}; ignoring redundant update.",
+                    isConnected, SanitizeId(update.Id));
+                return;
+            }
+
+            var eventType = isConnected ? DeviceEventType.Connected : DeviceEventType.Disconnected;
+
+            // Privacy rule compliant: log Category, EventType, and Battery status, NEVER friendly names
+            Log.Information("Bluetooth device connection transition: Category={Category}, Event={EventType}, HasBattery={HasBattery}, ID={DeviceId}",
+                category, eventType, batteryPercent.HasValue, SanitizeId(update.Id));
+
+            var devEvent = new DeviceEvent(eventType, update.Id, name, category, batteryPercent);
+            _policy.ProcessDeviceEvent(devEvent);
         }
         catch (Exception ex)
         {
@@ -419,6 +521,9 @@ public sealed class DeviceService : IDisposable
                 }
             }
 
+            Log.Information("Bluetooth device removed/unpaired: ID={DeviceId}, Category={Category}",
+                SanitizeId(update.Id), category);
+
             var devEvent = new DeviceEvent(DeviceEventType.Disconnected, update.Id, name, category);
             _policy.ProcessDeviceEvent(devEvent);
         }
@@ -433,14 +538,33 @@ public sealed class DeviceService : IDisposable
         Log.Debug("Bluetooth DeviceWatcher transitioned to Stopped state.");
     }
 
+    private static uint? TryExtractMajorDeviceClass(IReadOnlyDictionary<string, object> properties)
+    {
+        try
+        {
+            if (properties.TryGetValue("System.Devices.Aep.Bluetooth.Cod.MajorDeviceClass", out var val) && val != null)
+            {
+                return Convert.ToUInt32(val);
+            }
+        }
+        catch
+        {
+            // Omit class if not convertable
+        }
+        return null;
+    }
+
     private static int? TryExtractBattery(IReadOnlyDictionary<string, object> properties)
     {
         try
         {
             if (properties.TryGetValue("System.Devices.BatteryLevel", out var batVal) && batVal != null)
             {
-                if (batVal is byte b && b <= 100) return b;
-                if (batVal is int i && i is >= 0 and <= 100) return i;
+                int level = Convert.ToInt32(batVal);
+                if (level >= 0 && level <= 100)
+                {
+                    return level;
+                }
             }
         }
         catch
@@ -448,6 +572,12 @@ public sealed class DeviceService : IDisposable
             // Omit battery if not reliably readable
         }
         return null;
+    }
+
+    private static string SanitizeId(string? id)
+    {
+        if (string.IsNullOrEmpty(id)) return "Unknown";
+        return id.Length > 16 ? $"{id[..8]}...{id[^6..]}" : id;
     }
 
     #endregion

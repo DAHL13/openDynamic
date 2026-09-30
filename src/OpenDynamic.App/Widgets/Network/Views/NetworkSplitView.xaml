@@ -13,69 +13,71 @@
                 CornerRadius="14"
                 ClipToBounds="True"
                 Background="#26FFFFFF">
-            <Grid HorizontalAlignment="Center" VerticalAlignment="Center" Width="16" Height="16">
-                <!-- Wi-Fi Icon -->
-                <Path Data="M12 4C7.31 4 3.07 5.9 0 8.98L12 21 24 8.98C20.93 5.9 16.69 4 12 4zm0 3.5c3.78 0 7.22 1.48 9.77 3.9L12 18.25 2.23 11.4C4.78 8.98 8.22 7.5 12 7.5z"
-                      Fill="#FF38BDF8"
-                      Stretch="Uniform"
-                      Width="14"
-                      Height="12">
-                    <Path.Style>
-                        <Style TargetType="Path">
-                            <Setter Property="Visibility" Value="Collapsed" />
-                            <Style.Triggers>
-                                <MultiDataTrigger>
-                                    <MultiDataTrigger.Conditions>
-                                        <Condition Binding="{Binding IsConnected}" Value="True" />
-                                        <Condition Binding="{Binding IsWiFi}" Value="True" />
-                                    </MultiDataTrigger.Conditions>
-                                    <Setter Property="Visibility" Value="Visible" />
-                                </MultiDataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Path.Style>
-                </Path>
+            <Viewbox HorizontalAlignment="Center" VerticalAlignment="Center" Width="16" Height="16" Stretch="Uniform">
+                <Grid Width="24" Height="24">
+                    <!-- Wi-Fi Icon -->
+                    <Path Data="M12 4C7.31 4 3.07 5.9 0 8.98L12 21 24 8.98C20.93 5.9 16.69 4 12 4zm0 3.5c3.78 0 7.22 1.48 9.77 3.9L12 18.25 2.23 11.4C4.78 8.98 8.22 7.5 12 7.5z"
+                          Fill="#FF38BDF8"
+                          Stretch="Uniform"
+                          Width="24"
+                          Height="24">
+                        <Path.Style>
+                            <Style TargetType="Path">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding IsConnected}" Value="True" />
+                                            <Condition Binding="{Binding IsWiFi}" Value="True" />
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </MultiDataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Path.Style>
+                    </Path>
 
-                <!-- Ethernet Icon -->
-                <Path Data="M4 6h16v10H4V6zm2 2v6h12V8H6zm5 9h2v3h-2v-3z"
-                      Fill="#FF38BDF8"
-                      Stretch="Uniform"
-                      Width="14"
-                      Height="12">
-                    <Path.Style>
-                        <Style TargetType="Path">
-                            <Setter Property="Visibility" Value="Collapsed" />
-                            <Style.Triggers>
-                                <MultiDataTrigger>
-                                    <MultiDataTrigger.Conditions>
-                                        <Condition Binding="{Binding IsConnected}" Value="True" />
-                                        <Condition Binding="{Binding IsEthernet}" Value="True" />
-                                    </MultiDataTrigger.Conditions>
-                                    <Setter Property="Visibility" Value="Visible" />
-                                </MultiDataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Path.Style>
-                </Path>
+                    <!-- Ethernet Icon -->
+                    <Path Data="M4 6h16v10H4V6zm2 2v6h12V8H6zm5 9h2v3h-2v-3z"
+                          Fill="#FF38BDF8"
+                          Stretch="Uniform"
+                          Width="24"
+                          Height="24">
+                        <Path.Style>
+                            <Style TargetType="Path">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding IsConnected}" Value="True" />
+                                            <Condition Binding="{Binding IsEthernet}" Value="True" />
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </MultiDataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Path.Style>
+                    </Path>
 
-                <!-- Disconnected Icon -->
-                <Path Data="M2.28 3L1 4.28l3.11 3.11C2.5 8.35 1.15 9.61 0 11.08L12 23.1l4.9-4.9 4.82 4.82 1.28-1.28L2.28 3zM12 4C7.31 4 3.07 5.9 0 8.98l2.67 2.68C4.54 9.17 8.08 7.7 12 7.7c2.3 0 4.47.53 6.39 1.48l2.25-2.25C18.15 4.97 15.22 4 12 4z"
-                      Fill="#FFEF4444"
-                      Stretch="Uniform"
-                      Width="14"
-                      Height="12">
-                    <Path.Style>
-                        <Style TargetType="Path">
-                            <Setter Property="Visibility" Value="Collapsed" />
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsConnected}" Value="False">
-                                    <Setter Property="Visibility" Value="Visible" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Path.Style>
-                </Path>
-            </Grid>
+                    <!-- Disconnected Icon -->
+                    <Path Data="M21 11l2-2c-3.73-3.73-8.87-5.15-13.7-4.31l2.58 2.58c3.3-.02 6.61 1.22 9.12 3.73m-2 2a9.9 9.9 0 0 0-3.72-2.33l3.02 3.02zM9 17l3 3l3-3a4.237 4.237 0 0 0-6 0M3.41 1.64L2 3.05L5.05 6.1C3.59 6.83 2.22 7.79 1 9l2 2c1.23-1.23 2.65-2.16 4.17-2.78l2.24 2.24A9.8 9.8 0 0 0 5 13l2 2a7 7 0 0 1 4.89-2.06l7.08 7.08l1.41-1.41z"
+                          Fill="#FFEF4444"
+                          Stretch="Uniform"
+                          Width="24"
+                          Height="24">
+                        <Path.Style>
+                            <Style TargetType="Path">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsConnected}" Value="False">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Path.Style>
+                    </Path>
+                </Grid>
+            </Viewbox>
         </Border>
     </Grid>
 </UserControl>
