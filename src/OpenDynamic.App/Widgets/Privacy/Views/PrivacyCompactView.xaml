@@ -1,0 +1,91 @@
+<UserControl x:Class="OpenDynamic.App.Widgets.Privacy.Views.PrivacyCompactView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             mc:Ignorable="d" 
+             Height="36"
+             Background="Transparent">
+    <Grid Margin="12,0,12,0" VerticalAlignment="Center">
+        <Grid.ColumnDefinitions>
+            <!-- Resource Icon -->
+            <ColumnDefinition Width="Auto" />
+            <!-- Text Content -->
+            <ColumnDefinition Width="*" />
+            <!-- Status Dot -->
+            <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Icon: Microphone (Orange) or Camera (Green) -->
+        <Viewbox Grid.Column="0" Margin="0,0,8,0" VerticalAlignment="Center" Width="18" Height="18" Stretch="Uniform">
+            <Grid Width="24" Height="24">
+                <!-- Microphone Icon -->
+                <Path Data="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5-3c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"
+                      Fill="#FFFF9500"
+                      Stretch="Uniform"
+                      Width="20"
+                      Height="20">
+                    <Path.Style>
+                        <Style TargetType="Path">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsMicrophone}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Path.Style>
+                </Path>
+
+                <!-- Camera / Webcam Icon -->
+                <Path Data="M12 9c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3zm0 4.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm7-7.5h-3.17L14.4 4.14C14.03 3.44 13.06 3 12.27 3h-2.54c-.79 0-1.76.44-2.13 1.14L6.17 6H3c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H3V8h3.88l1.64-3.14c.12-.23.49-.36.75-.36h2.54c.26 0 .63.13.75.36L14.12 8H19v10z"
+                      Fill="#FF34C759"
+                      Stretch="Uniform"
+                      Width="20"
+                      Height="20">
+                    <Path.Style>
+                        <Style TargetType="Path">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsCamera}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Path.Style>
+                </Path>
+            </Grid>
+        </Viewbox>
+
+        <!-- Descriptive Text -->
+        <TextBlock Grid.Column="1"
+                   Text="{Binding Title}"
+                   Foreground="#FFFFFFFF"
+                   FontSize="12"
+                   FontWeight="SemiBold"
+                   VerticalAlignment="Center"
+                   HorizontalAlignment="Left"
+                   TextTrimming="CharacterEllipsis"
+                   Margin="0,0,6,0" />
+
+        <!-- Status Dot Badge -->
+        <Ellipse Grid.Column="2"
+                 Width="7"
+                 Height="7"
+                 VerticalAlignment="Center">
+            <Ellipse.Style>
+                <Style TargetType="Ellipse">
+                    <Setter Property="Fill" Value="#FFFF9500" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsCamera}" Value="True">
+                            <Setter Property="Fill" Value="#FF34C759" />
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding IsStarted}" Value="False">
+                            <Setter Property="Fill" Value="#66FFFFFF" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Ellipse.Style>
+        </Ellipse>
+    </Grid>
+</UserControl>

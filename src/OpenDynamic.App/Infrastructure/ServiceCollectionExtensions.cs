@@ -125,6 +125,16 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ClipboardService>();
         services.AddSingleton<Widgets.Clipboard.ClipboardWidget>();
 
+        // Privacy Sensor Services (Priority 85, Passive ConsentStore Monitor, Zero Polling)
+        services.AddSingleton<Core.Privacy.IPrivacyAccessAggregator>(sp =>
+        {
+            var settings = sp.GetRequiredService<AppSettings>();
+            return new Core.Privacy.PrivacyAccessAggregator(settings.IgnoredPrivacyApps);
+        });
+        services.AddSingleton<PrivacyAccessMonitor>();
+        services.AddSingleton<Core.Privacy.IPrivacyAccessMonitor>(sp => sp.GetRequiredService<PrivacyAccessMonitor>());
+        services.AddSingleton<Widgets.Privacy.PrivacyWidget>();
+
         // Settings Window & ViewModel
         services.AddSingleton<SettingsViewModel>(sp => new SettingsViewModel(
             sp.GetRequiredService<ISettingsService>(),

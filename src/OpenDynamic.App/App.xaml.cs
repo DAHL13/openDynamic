@@ -88,6 +88,13 @@ public partial class App : Application
         var clipboardWidget = Services.GetRequiredService<Widgets.Clipboard.ClipboardWidget>();
         orchestrator.RegisterWidget(clipboardWidget);
 
+        // Register PrivacyWidget (Priority 85, Transient) & Start PrivacyAccessMonitor
+        var privacyMonitor = Services.GetRequiredService<Services.PrivacyAccessMonitor>();
+        privacyMonitor.Start();
+
+        var privacyWidget = Services.GetRequiredService<Widgets.Privacy.PrivacyWidget>();
+        orchestrator.RegisterWidget(privacyWidget);
+
         // Initialize System Tray Icon Manager (H.NotifyIcon.Wpf) stored in class field to prevent GC collection
         _trayIconManager = Services.GetRequiredService<TrayIconManager>();
         _trayIconManager.Initialize();
