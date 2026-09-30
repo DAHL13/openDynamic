@@ -30,7 +30,15 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IslandAnimator>();
         services.AddSingleton<PriorityResolver>();
         services.AddSingleton<IslandOrchestrator>();
-        services.AddSingleton<IslandWindow>();
+        services.AddSingleton<IslandWindow>(sp => new IslandWindow(
+            sp.GetRequiredService<WindowPositioner>(),
+            sp.GetRequiredService<ForegroundWatcher>(),
+            sp.GetRequiredService<IslandOrchestrator>(),
+            sp.GetRequiredService<PowerService>(),
+            sp.GetRequiredService<FullscreenWatcher>(),
+            sp.GetRequiredService<AppSettings>(),
+            sp.GetRequiredService<NetworkService>(),
+            sp.GetRequiredService<DeviceService>()));
 
         // Settings Service & Persistence
         services.AddSingleton<ISettingsService>(sp =>

@@ -122,7 +122,8 @@ public partial class IslandWindow : Window
         _networkService?.Start();
         _deviceService?.Start(_hwnd);
 
-        Log.Information("IslandWindow initialized successfully with HWND: {Hwnd}", _hwnd);
+        Log.Information("IslandWindow initialized successfully with HWND: {Hwnd}. NetworkService={HasNetwork}, DeviceService={HasDevice}",
+            _hwnd, _networkService != null, _deviceService != null);
     }
 
     /// <summary>
@@ -209,6 +210,8 @@ public partial class IslandWindow : Window
 
             // React to USB device arrival and removal
             case NativeMethods.WM_DEVICECHANGE:
+                Log.Information("IslandWindow WndProc received WM_DEVICECHANGE: wParam=0x{WParam:X4}, lParam=0x{LParam:X16}",
+                    wParam.ToInt32(), lParam.ToInt64());
                 _deviceService?.HandleDeviceChange(wParam, lParam);
                 break;
         }

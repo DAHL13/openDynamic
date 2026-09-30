@@ -214,9 +214,12 @@ public sealed class DeviceService : IDisposable
     /// </summary>
     public void HandleDeviceChange(IntPtr wParam, IntPtr lParam)
     {
+        int eventCode = wParam.ToInt32();
+        Log.Information("DeviceService processing WM_DEVICECHANGE: wParam=0x{EventCode:X4}, lParam=0x{LParam:X16}, IsListening={IsListening}",
+            eventCode, lParam.ToInt64(), _isListening);
+
         if (!_isListening || lParam == IntPtr.Zero) return;
 
-        int eventCode = wParam.ToInt32();
         if (eventCode != NativeMethods.DBT_DEVICEARRIVAL && eventCode != NativeMethods.DBT_DEVICEREMOVECOMPLETE)
         {
             return;
@@ -227,13 +230,23 @@ public sealed class DeviceService : IDisposable
             var hdr = Marshal.PtrToStructure<NativeMethods.DEV_BROADCAST_HDR>(lParam);
             if (hdr.dbch_devicetype != NativeMethods.DBT_DEVTYP_DEVICEINTERFACE)
             {
+                Log.Debug("WM_DEVICECHANGE ignored non-interface devicetype: 0x{Type:X4}", hdr.dbch_devicetype);
                 return;
             }
 
-            var dbi = Marshal.PtrToStructure<NativeMethods.DEV_BROADCAST_DEVICEINTERFACE>(lParam);
-            string? devicePath = dbi.dbcc_name;
+            // Safely read dbcc_classguid at offset 12 on x64
+            Guid classGuid = Marshal.PtrToStructure<Guid>(IntPtr.Add(lParam, 12));
+
+            // Safely read null-terminated Unicode dbcc_name string starting at offset 28 on x64
+            string? devicePath = null;
+            if (hdr.dbch_size > 28)
+            {
+                devicePath = Marshal.PtrToStringUni(IntPtr.Add(lParam, 28));
+            }
+
             if (string.IsNullOrWhiteSpace(devicePath))
             {
+                Log.Warning("WM_DEVICECHANGE received DBT_DEVTYP_DEVICEINTERFACE with empty device path.");
                 return;
             }
 
@@ -241,10 +254,8 @@ public sealed class DeviceService : IDisposable
                 ? DeviceEventType.Connected
                 : DeviceEventType.Disconnected;
 
-            Guid classGuid = dbi.dbcc_classguid;
-
-            Log.Debug("WM_DEVICECHANGE received: Code=0x{EventCode:X4}, ClassGuid={Guid}",
-                eventCode, classGuid);
+            Log.Information("WM_DEVICECHANGE parsed: EventType={EventType}, ClassGuid={Guid}",
+                eventType, classGuid);
 
             // Resolve friendly name asynchronously via WinRT DeviceInformation
             _ = Task.Run(async () =>
@@ -266,6 +277,12 @@ public sealed class DeviceService : IDisposable
 
         try
         {
+            if (eventType == DeviceEventType.Connected)
+            {
+                // Brief pause to allow Windows driver stack to publish the device name
+                await Task.Delay(100);
+            }
+
             var devInfo = await DeviceInformation.CreateFromIdAsync(devicePath);
             if (devInfo != null && !string.IsNullOrWhiteSpace(devInfo.Name))
             {
@@ -276,8 +293,9 @@ public sealed class DeviceService : IDisposable
                 friendlyName = ExtractFriendlyNameFromDevicePath(devicePath, classGuid);
             }
         }
-        catch
+        catch (Exception ex)
         {
+            Log.Debug(ex, "Could not resolve friendly name via WinRT for device path, falling back to path heuristics.");
             friendlyName = ExtractFriendlyNameFromDevicePath(devicePath, classGuid);
         }
 
@@ -329,8 +347,8 @@ public sealed class DeviceService : IDisposable
     {
         try
         {
-            // AQS filter for Bluetooth Association Endpoints
-            string aqs = BluetoothDevice.GetDeviceSelector();
+            // AQS filter for Bluetooth Association Endpoints (Protocol ID: {e0cbf06c-cdb8-4d60-bb43-dd344be4706f})
+            string aqs = "System.Devices.Aep.ProtocolId:=\"{e0cbf06c-cdb8-4d60-bb43-dd344be4706f}\"";
             _bluetoothWatcher = DeviceInformation.CreateWatcher(
                 aqs,
                 new[]
@@ -348,11 +366,22 @@ public sealed class DeviceService : IDisposable
             _bluetoothWatcher.Stopped += OnBluetoothWatcherStopped;
 
             _bluetoothWatcher.Start();
-            Log.Information("WinRT Bluetooth DeviceWatcher started with properties: IsConnected, MajorDeviceClass, BatteryLevel.");
+            Log.Information("WinRT Bluetooth DeviceWatcher started for Bluetooth AEP (ProtocolId: {{e0cbf06c-cdb8-4d60-bb43-dd344be4706f}}). Status: {Status}", _bluetoothWatcher.Status);
+
+            // Safety fallback timer to complete enumeration baseline even if Bluetooth enumeration delays or is unavailable
+            _ = Task.Delay(5000).ContinueWith(_ =>
+            {
+                if (!_policy.IsEnumerationCompleted)
+                {
+                    Log.Information("DeviceService fallback timer elapsed: completing initial enumeration baseline.");
+                    _policy.NotifyEnumerationCompleted();
+                }
+            }, TaskScheduler.Default);
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Failed to start WinRT Bluetooth DeviceWatcher.");
+            _policy.NotifyEnumerationCompleted();
         }
     }
 
@@ -375,7 +404,7 @@ public sealed class DeviceService : IDisposable
                 }
 
                 _bluetoothWatcher = null;
-                Log.Debug("WinRT Bluetooth DeviceWatcher stopped and disposed.");
+                Log.Information("WinRT Bluetooth DeviceWatcher stopped and disposed.");
             }
             catch (Exception ex)
             {
@@ -387,7 +416,8 @@ public sealed class DeviceService : IDisposable
     private void OnBluetoothEnumerationCompleted(DeviceWatcher sender, object args)
     {
         _policy.NotifyEnumerationCompleted();
-        Log.Information("Bluetooth device enumeration completed. Initial connected devices cached; live alerts active.");
+        Log.Information("Bluetooth device enumeration completed (Status: {Status}). Initial connected devices cached; live alerts active. Total cached: {Count}",
+            sender.Status, _bluetoothDeviceCache.Count);
     }
 
     private void OnBluetoothDeviceAdded(DeviceWatcher sender, DeviceInformation deviceInfo)
@@ -411,7 +441,7 @@ public sealed class DeviceService : IDisposable
                 _bluetoothDeviceCache[deviceInfo.Id] = new CachedBluetoothDevice(name, category, isConnected, majorClass, batteryPercent);
             }
 
-            Log.Debug("Bluetooth DeviceAdded: ID={DeviceId}, Connected={IsConnected}, Category={Category}, MajorClass={MajorClass}, HasBattery={HasBattery}",
+            Log.Information("Bluetooth DeviceAdded: ID={DeviceId}, Connected={IsConnected}, Category={Category}, MajorClass={MajorClass}, HasBattery={HasBattery}",
                 SanitizeId(deviceInfo.Id), isConnected, category, majorClass, batteryPercent.HasValue);
 
             // Feed to policy: if pre-enumeration, it will quietly seed inventory without alerting
@@ -429,7 +459,7 @@ public sealed class DeviceService : IDisposable
     {
         try
         {
-            Log.Debug("Bluetooth DeviceUpdated: ID={DeviceId}, UpdatedPropCount={Count}",
+            Log.Information("Bluetooth DeviceUpdated: ID={DeviceId}, UpdatedPropCount={Count}",
                 SanitizeId(update.Id), update.Properties.Count);
 
             // Inspect if System.Devices.Aep.IsConnected changed
@@ -535,7 +565,11 @@ public sealed class DeviceService : IDisposable
 
     private void OnBluetoothWatcherStopped(DeviceWatcher sender, object args)
     {
-        Log.Debug("Bluetooth DeviceWatcher transitioned to Stopped state.");
+        Log.Information("Bluetooth DeviceWatcher transitioned to Stopped state (Status: {Status}).", sender.Status);
+        if (sender.Status is DeviceWatcherStatus.Stopped or DeviceWatcherStatus.Aborted)
+        {
+            _policy.NotifyEnumerationCompleted();
+        }
     }
 
     private static uint? TryExtractMajorDeviceClass(IReadOnlyDictionary<string, object> properties)

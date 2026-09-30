@@ -333,7 +333,7 @@ public static class NativeMethods
         public int dbch_reserved;
     }
 
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     public struct DEV_BROADCAST_DEVICEINTERFACE
     {
         public int dbcc_size;
@@ -344,7 +344,7 @@ public static class NativeMethods
         public string dbcc_name;
     }
 
-    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+    [DllImport("user32.dll", EntryPoint = "RegisterDeviceNotificationW", SetLastError = true, CharSet = CharSet.Unicode)]
     public static extern IntPtr RegisterDeviceNotification(
         IntPtr hRecipient,
         ref DEV_BROADCAST_DEVICEINTERFACE notificationFilter,
