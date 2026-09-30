@@ -16,8 +16,9 @@ public sealed class AppSettings
     /// Version 5 introduces Stopwatch widget settings, priority (45), and configurable timer presets.
     /// Version 6 introduces Dynamic Album Art Color and Horizontal Media Gestures with sensitivity.
     /// Version 7 introduces Opt-In In-Memory Clipboard History, transient notices, preview toggle, capacity and expiration settings.
+    /// Version 8 introduces Microphone & Camera indicators, privacy transient alerts, priority (85), and ignored privacy apps.
     /// </summary>
-    public const int CurrentSchemaVersion = 7;
+    public const int CurrentSchemaVersion = 8;
 
     /// <summary>
     /// Configuration schema version. Defaults to <see cref="CurrentSchemaVersion"/>.
@@ -374,6 +375,45 @@ public sealed class AppSettings
 
     #endregion
 
+    #region Privacy Indicator Settings
+
+    /// <summary>
+    /// Flag to enable or disable the microphone in-use indicator badge on the notch.
+    /// Default is true.
+    /// </summary>
+    public bool EnableMicrophoneIndicator { get; set; } = true;
+
+    /// <summary>
+    /// Flag to enable or disable the camera in-use indicator badge on the notch.
+    /// Default is true.
+    /// </summary>
+    public bool EnableCameraIndicator { get; set; } = true;
+
+    /// <summary>
+    /// Flag to enable or disable transient toast alerts when microphone or camera access begins or ceases.
+    /// Default is true.
+    /// </summary>
+    public bool EnablePrivacyAlerts { get; set; } = true;
+
+    /// <summary>
+    /// Default priority value for privacy transient alerts.
+    /// Default is 85.
+    /// </summary>
+    public int DefaultPrivacyPriority { get; set; } = 85;
+
+    /// <summary>
+    /// Lifespan in seconds for privacy transient notices.
+    /// Default is 3.0 seconds.
+    /// </summary>
+    public double PrivacyTransientDurationSeconds { get; set; } = 3.0;
+
+    /// <summary>
+    /// List of friendly application names, process names, or package family names ignored from privacy alerts and indicators.
+    /// </summary>
+    public List<string> IgnoredPrivacyApps { get; set; } = new();
+
+    #endregion
+
     #region Hotkeys and Autostart
 
     /// <summary>
@@ -456,7 +496,13 @@ public sealed class AppSettings
             ClipboardTransientDurationSeconds = this.ClipboardTransientDurationSeconds,
             ShowClipboardPreview = this.ShowClipboardPreview,
             ClipboardHistoryCapacity = this.ClipboardHistoryCapacity,
-            ClipboardExpirationMinutes = this.ClipboardExpirationMinutes
+            ClipboardExpirationMinutes = this.ClipboardExpirationMinutes,
+            EnableMicrophoneIndicator = this.EnableMicrophoneIndicator,
+            EnableCameraIndicator = this.EnableCameraIndicator,
+            EnablePrivacyAlerts = this.EnablePrivacyAlerts,
+            DefaultPrivacyPriority = this.DefaultPrivacyPriority,
+            PrivacyTransientDurationSeconds = this.PrivacyTransientDurationSeconds,
+            IgnoredPrivacyApps = new List<string>(this.IgnoredPrivacyApps)
         };
     }
 
@@ -521,5 +567,11 @@ public sealed class AppSettings
         ShowClipboardPreview = other.ShowClipboardPreview;
         ClipboardHistoryCapacity = other.ClipboardHistoryCapacity;
         ClipboardExpirationMinutes = other.ClipboardExpirationMinutes;
+        EnableMicrophoneIndicator = other.EnableMicrophoneIndicator;
+        EnableCameraIndicator = other.EnableCameraIndicator;
+        EnablePrivacyAlerts = other.EnablePrivacyAlerts;
+        DefaultPrivacyPriority = other.DefaultPrivacyPriority;
+        PrivacyTransientDurationSeconds = other.PrivacyTransientDurationSeconds;
+        IgnoredPrivacyApps = new List<string>(other.IgnoredPrivacyApps ?? Enumerable.Empty<string>());
     }
 }

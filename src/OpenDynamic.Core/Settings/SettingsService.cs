@@ -169,6 +169,17 @@ public sealed class SettingsService : ISettingsService
                         loaded.ClipboardExpirationMinutes = 10;
                     }
 
+                    if (loaded.SchemaVersion < 8)
+                    {
+                        // Migration v7 -> v8: Introduce Microphone & Camera indicators, privacy transient alerts, priority (85), and ignored privacy apps.
+                        loaded.EnableMicrophoneIndicator = true;
+                        loaded.EnableCameraIndicator = true;
+                        loaded.EnablePrivacyAlerts = true;
+                        loaded.DefaultPrivacyPriority = 85;
+                        loaded.PrivacyTransientDurationSeconds = 3.0;
+                        loaded.IgnoredPrivacyApps ??= new List<string>();
+                    }
+
                     loaded.SchemaVersion = AppSettings.CurrentSchemaVersion;
                     CurrentSettings = loaded;
                     WriteSettingsToDisk(CurrentSettings);
