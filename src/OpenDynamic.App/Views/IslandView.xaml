@@ -28,12 +28,35 @@
             <Border.RenderTransform>
                 <TranslateTransform x:Name="CapsuleTranslate" X="0" Y="0" />
             </Border.RenderTransform>
-            <Grid x:Name="PrimaryContentContainer" ClipToBounds="True">
-                <ContentControl x:Name="PrimaryContent"
-                                HorizontalAlignment="Stretch"
-                                VerticalAlignment="Stretch"
-                                Focusable="False"
-                                IsHitTestVisible="True" />
+            <Grid>
+                <Grid x:Name="PrimaryContentContainer" ClipToBounds="True">
+                    <ContentControl x:Name="PrimaryContent"
+                                    HorizontalAlignment="Stretch"
+                                    VerticalAlignment="Stretch"
+                                    Focusable="False"
+                                    IsHitTestVisible="True" />
+                </Grid>
+
+                <!-- Subtle Persistent Privacy Sensor Indicators (Microphone Amber, Camera Green) -->
+                <StackPanel Orientation="Horizontal"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Top"
+                            Margin="0,5,8,0"
+                            IsHitTestVisible="False">
+                    <!-- Camera Dot (Green) -->
+                    <Ellipse x:Name="CameraIndicatorDot"
+                             Width="6"
+                             Height="6"
+                             Fill="#FF34C759"
+                             Margin="0,0,4,0"
+                             Visibility="Collapsed" />
+                    <!-- Microphone Dot (Amber/Orange) -->
+                    <Ellipse x:Name="MicrophoneIndicatorDot"
+                             Width="6"
+                             Height="6"
+                             Fill="#FFFF9500"
+                             Visibility="Collapsed" />
+                </StackPanel>
             </Grid>
         </Border>
 

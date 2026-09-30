@@ -30,6 +30,7 @@ public partial class IslandWindow : Window
     private readonly Services.NetworkService? _networkService;
     private readonly Services.DeviceService? _deviceService;
     private readonly Services.ClipboardService? _clipboardService;
+    private readonly Services.PrivacyAccessMonitor? _privacyMonitor;
     private readonly Core.Settings.AppSettings _settings;
 
     private readonly DispatcherTimer _hoverEnterTimer;
@@ -51,7 +52,8 @@ public partial class IslandWindow : Window
         Core.Settings.AppSettings? settings = null,
         Services.NetworkService? networkService = null,
         Services.DeviceService? deviceService = null,
-        Services.ClipboardService? clipboardService = null)
+        Services.ClipboardService? clipboardService = null,
+        Services.PrivacyAccessMonitor? privacyMonitor = null)
     {
         _windowPositioner = windowPositioner ?? throw new ArgumentNullException(nameof(windowPositioner));
         _foregroundWatcher = foregroundWatcher ?? throw new ArgumentNullException(nameof(foregroundWatcher));
@@ -62,6 +64,7 @@ public partial class IslandWindow : Window
         _networkService = networkService;
         _deviceService = deviceService;
         _clipboardService = clipboardService;
+        _privacyMonitor = privacyMonitor;
         _settings = settings ?? new Core.Settings.AppSettings();
 
         InitializeComponent();
@@ -88,6 +91,12 @@ public partial class IslandWindow : Window
 
         // Apply initial layout dimensions
         IslandHostView.ApplyDimensions(_animator.CurrentDimensions, _animator.StateMachine.CurrentState);
+
+        if (_privacyMonitor != null)
+        {
+            _privacyMonitor.StateChanged += OnPrivacyStateChanged;
+            UpdatePrivacyDots(_privacyMonitor.CurrentState);
+        }
     }
 
     public IslandWindow() : this(
@@ -153,6 +162,23 @@ public partial class IslandWindow : Window
             _windowPositioner.PositionWindow(_hwnd);
             _windowPositioner.ReassertTopmost(_hwnd);
         }
+
+        UpdatePrivacyDots(_privacyMonitor?.CurrentState ?? Core.Privacy.PrivacyAccessState.Empty);
+    }
+
+    private void OnPrivacyStateChanged(object? sender, Core.Privacy.PrivacyAccessState state)
+    {
+        Dispatcher.InvokeAsync(() =>
+        {
+            UpdatePrivacyDots(state);
+        });
+    }
+
+    private void UpdatePrivacyDots(Core.Privacy.PrivacyAccessState state)
+    {
+        bool showMic = _settings.EnableMicrophoneIndicator && state.IsMicrophoneActive;
+        bool showCam = _settings.EnableCameraIndicator && state.IsCameraActive;
+        IslandHostView.UpdatePrivacyIndicators(showMic, showCam);
     }
 
     /// <summary>
@@ -722,6 +748,11 @@ public partial class IslandWindow : Window
         }
 
         _clipboardService?.Stop();
+
+        if (_privacyMonitor != null)
+        {
+            _privacyMonitor.StateChanged -= OnPrivacyStateChanged;
+        }
 
         if (_hwndSource != null)
         {

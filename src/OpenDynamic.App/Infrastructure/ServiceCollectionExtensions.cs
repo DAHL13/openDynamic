@@ -43,7 +43,8 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<AppSettings>(),
             sp.GetRequiredService<NetworkService>(),
             sp.GetRequiredService<DeviceService>(),
-            sp.GetRequiredService<ClipboardService>()));
+            sp.GetRequiredService<ClipboardService>(),
+            sp.GetRequiredService<PrivacyAccessMonitor>()));
 
         // Settings Service & Persistence
         services.AddSingleton<ISettingsService>(sp =>
