@@ -484,5 +484,40 @@
      - Se incrementa `CurrentSchemaVersion = 5` en `AppSettings.cs`.
      - Se incorporan `EnableStopwatchWidget` (default: `true`), `DefaultStopwatchPriority` (default: `45`) y `TimerPresetsMinutes` (default: `[1, 5, 10, 15]`).
      - `SettingsService.Load()` efectúa la migración automática de esquemas anteriores (< 5) sin pérdida de datos del usuario, validado por pruebas unitarias automatizadas.
+---
 
+## ADR-021: Color Dinámico de Carátula y Gestos Horizontales en Multimedia (Fase 13)
 
+- **Estado:** Aceptado
+- **Fecha:** 2026-09-29
+- **Contexto:**
+  Para la ampliación v1.1 (Fase 13), openDynamic dinamiza visualmente la reproducción de música extrayendo el color de acento dominante de la portada del álbum para teñir armoniosamente elementos interactivos y el borde del notch, además de habilitar gestos horizontales (rueda horizontal de ratón, touchpad de dos dedos y arrastre táctil) para saltar de canción con un rebote elástico. Se exige estricta pureza en Core (Regla de oro 5), rendimiento eficiente con 0% de CPU en reposo (Regla de oro 1), seguridad de memoria y ausencia de bloqueos de GPU (Regla de oro 11), y convivencia armónica con los gestos verticales preexistentes.
+
+- **Decisiones Técnicas:**
+
+  1. **Aislamiento de Algoritmos Puros en Core (Regla de Oro 5):**
+     - Se implementan `RgbColor`, `DominantColorExtractor` y `AccentColorAdjuster` en `OpenDynamic.Core.Media.Color` libres de dependencias de `System.Drawing`, Win32 o WPF.
+     - `DominantColorExtractor`: Muestrea el mapa de píxeles BGRA sobre una cuadrícula reducida (32x32 = 1024 píxeles), clasifica en 16 cubetas angulares de matiz (Hue, 22.5° cada una), descarta de manera rigurosa casi negros ($L < 0.15$ o $RGB < 35$), casi blancos ($L > 0.88$ o $RGB > 225$) y grises desaturados ($S < 0.18$ o $\Delta < 25$), y pondera la cubeta ganadora combinando saturación cuadrática y luminosidad balanceada ($S^2 \cdot (1 - |L - 0.5|)$).
+     - `AccentColorAdjuster`: Recibe el color dominante y garantiza legibilidad y viveza sobre el fondo negro azabache (`#000000`) del notch, forzando saturación mínima ($S \ge 0.50$), luminosidad acotada ($0.45 \le L \le 0.80$) y recurriendo al acento institucional (`#1ED760`) si la portada es monocromática, negra o nula.
+     - `SwipeGestureDetector`: Máquina de estados pura en `OpenDynamic.Core.Media.Gestures` con `TimeProvider` inyectable. Acumula deltas horizontales con umbral configurable y aplica un período de enfriamiento (*cooldown*) estricto de 400 ms que absorbe la inercia del touchpad y previene saltos dobles accidentales de pista.
+
+  2. **Rendimiento Gráfico, Caché y Subprocesos (Reglas de Oro 1 y 11):**
+     - `MediaColorService` en `OpenDynamic.App.Services`: Ejecuta el remuestreo a 32x32 y la extracción de color fuera del hilo de interfaz (`Task.Run`).
+     - Almacena en memoria una caché ligera por pista (`ConcurrentDictionary<string, RgbColor>` con clave `"Título|Artista"`). Queda taxativamente prohibido retener referencias a instancias de bitmaps antiguos o buffers de píxeles pesados.
+     - Generación de `SolidColorBrush` congelados (`brush.Freeze()`): Todo pincel entregado a la UI se congela inmediatamente, permitiendo su compartición segura entre hilos y eliminando fugas de memoria en WPF.
+     - **Prohibición de DropShadowEffect pesados:** Para preservar la tasa de refresco y evitar costosos pases de rasterización por GPU, se descarta el uso de efectos de desenfoque y sombras profundas. El acento en el notch se aplica mediante un trazo sutil en el borde perimetral (`BorderBrush`), animado con `ColorAnimation` corta (~300 ms) solo al cambiar de canción, e instantáneo en modo de movimiento reducido.
+
+  3. **Convivencia de Gestos Horizontales con la Rueda Vertical:**
+     - La rueda vertical existente (`WM_MOUSEWHEEL` en `CapsuleBorder.MouseWheel`) mantiene su función exclusiva: ajustar el volumen del sistema cuando `VolumeWidget` está activo o contraer/expandir/ocultar la cápsula.
+     - La rueda horizontal y el deslizamiento con dos dedos en touchpads de precisión generan el mensaje Win32 nativo `WM_MOUSEHWHEEL` (`0x020E`), interceptado en el procedimiento de ventana `IslandWindow.WndProc`.
+     - `WM_MOUSEHWHEEL` actúa **únicamente si el puntero se encuentra dentro de los límites visuales de la cápsula** (`IsPointerOverNotch()`), la actividad primaria es multimedia (`MediaWidget`) y la sesión GSMTC activa posee la capacidad requerida (`CanSkipNext` / `CanSkipPrevious`).
+     - Arrastre táctil/ratón: Se incorpora arrastre con botón izquierdo sobre la cabecera (carátula y títulos) de `MediaExpandedView` con umbral mínimo ~40 DIPs. La zona de la barra de progreso (seek bar) se encuentra aislada en su propia fila y mantiene su comportamiento continuo de salto temporal sin colisión de gestos.
+
+  4. **Retroalimentación Visual y Accesibilidad (`MotionMode`):**
+     - Al dispararse un gesto o durante el arrastre, la carátula experimenta un desplazamiento amortiguado con resorte (`ElasticEase` con oscilación controlada) hacia la izquierda (-18 DIPs) en avance o hacia la derecha (+18 DIPs) en retroceso.
+     - En conformidad con la Fase 10, cuando `MotionMode.Reduced` o `SystemParameters.ClientAreaAnimation == false` está activo, se suprimen todas las animaciones de resorte y el cambio de pista o color se realiza de forma directa e instantánea (desplazamiento 0 DIP).
+
+  5. **Migración de Configuración a Schema v6 (Regla de Oro 9):**
+     - Se incrementa `CurrentSchemaVersion = 6` en `AppSettings.cs`.
+     - Se añaden `EnableDynamicMediaColor` (default: `true`), `EnableMediaGestures` (default: `true`) y `MediaGestureSensitivity` (default: `120.0`).
+     - `SettingsService.Load()` actualiza transparentemente configuraciones previas (< 6) y se proveen controles accesibles con `AutomationProperties` en la pestaña de Multimedia de `SettingsWindow`.

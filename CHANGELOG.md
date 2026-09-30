@@ -3,6 +3,41 @@
 Todas las modificaciones notables en este proyecto serán documentadas en este archivo.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y cumple con [SemVer](https://semver.org/).
 
+## [1.1.0-dev] - 2026-09-29 (Fase 13: Color de Carátula y Gestos en la Música)
+
+### Añadido
+- **Extracción Algorítmica Pura de Color en Core (`OpenDynamic.Core.Media.Color`):**
+  - Estructura pura e inmutable `RgbColor` con conversión bidireccional HSL y cálculo de matiz, saturación y luminosidad sin dependencias de Windows ni WPF (Regla de Oro 5).
+  - `DominantColorExtractor`: Muestreo en cuadrícula de baja resolución (32x32 = 1024 píxeles), agrupación en 16 cubetas angulares de Hue (22.5°), ponderación por saturación cuadrática y eliminación estricta de casi negros, casi blancos y grises neutros.
+  - `AccentColorAdjuster`: Ajusta el color candidato forzando saturación mínima ($S \ge 0.50$) y acotando luminosidad ($0.45 \le L \le 0.80$) para asegurar máxima legibilidad y contraste contra el fondo negro de la muesca. Retorna `#1ED760` como fallback si la portada carece de color dominante válido.
+- **Detector de Gestos Horizontales en Core (`OpenDynamic.Core.Media.Gestures`):**
+  - `SwipeGestureDetector`: Máquina de estados pura con `TimeProvider` inyectable para pruebas deterministas.
+  - Acumula deltas horizontales y absorbe la inercia del touchpad con una ventana de enfriamiento (*cooldown*) de 400 ms para eliminar saltos accidentales dobles de canción.
+  - Métodos semánticos `ProcessWheelDelta` y `ProcessDragDelta` con umbral configurable y restablecimiento determinista.
+- **Servicio de Color de Miniatura Asíncrono en App (`OpenDynamic.App.Services.MediaColorService`):**
+  - Ejecución en segundo plano (`Task.Run`) a partir de la miniatura congelada (`BitmapImage.Freeze()`).
+  - Caché en memoria por pista (`ConcurrentDictionary<string, RgbColor>` con clave `"Título|Artista"`) sin retener referencias a bitmaps antiguos para prevenir fugas de memoria.
+  - Generación de `SolidColorBrush` congelados (`brush.Freeze()`) para consumo seguro y eficiente en subprocesos de interfaz.
+- **Integración Visual del Acento en la Muesca (`OpenDynamic.App`):**
+  - Aplicación del color de acento de carátula en:
+    * Barras del ecualizador oscilante en `MediaCompactView`.
+    * Barra interactiva de progreso y botón de reproducción en `MediaExpandedView`.
+    * Insignia indicadora de reproducción del satélite en `MediaSplitView`.
+    * Tinte sutil en el borde perimetral (`BorderBrush`) de la muesca en `IslandView` animado con `ColorAnimation` corta (~300 ms) al cambiar de pista.
+  - Prohibición estricta de efectos `DropShadowEffect` de gran radio, protegiendo el rasterizado por GPU y manteniendo ~0% CPU en reposo.
+  - Respeto total al modo de accesibilidad `MotionMode.Reduced`: supresión de animaciones lentas y cambio instantáneo del color.
+- **Gestos Horizontales de Salto de Pista:**
+  - Soporte de rueda horizontal y deslizamiento con dos dedos (`WM_MOUSEHWHEEL`, `0x020E`) en el `WndProc` de `IslandWindow`, activo únicamente cuando el cursor está sobre la cápsula multimedia y el reproductor soporta `CanSkipNext / CanSkipPrevious`.
+  - Arrastre táctil y con botón izquierdo sobre la cabecera (carátula y títulos) en `MediaExpandedView` con umbral mínimo ~40 DIPs, aislado completamente de la barra de progreso (seek bar).
+  - Retroalimentación táctil y visual con desplazamiento elástico de la carátula (`ElasticEase`), omitido limpiamente en modo reducido.
+- **Ajustes y Migración de Configuración (Schema v6):**
+  - Incremento a `CurrentSchemaVersion = 6` en `AppSettings.cs` con propiedades `EnableDynamicMediaColor`, `EnableMediaGestures` y `MediaGestureSensitivity`.
+  - Migración retrocompatible en `SettingsService.Load()` para esquemas `< 6`.
+  - Nuevas tarjetas de configuración en `SettingsWindow` con interruptores y control de sensibilidad accesibles vía UI Automation.
+- **Pruebas Automatizadas:**
+  - Nuevas suites: `DominantColorExtractorTests`, `SwipeGestureDetectorTests`, y migración Schema v6 en `SettingsServiceTests`. 305 pruebas unitarias en verde.
+
+
 ## [1.1.0-dev] - 2026-09-29 (Fase 12: Cronómetro y Varios Temporizadores)
 
 ### Añadido

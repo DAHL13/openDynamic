@@ -65,6 +65,7 @@ openDynamic adopta una estética de **muesca rectangular superior (Notch)** pega
 | **Fase 10** | **Accesibilidad integral, perfiles de movimiento, alto contraste y UI Automation (v1.1)** | **Completada** |
 | **Fase 11** | **Red (Wi-Fi/Ethernet) y dispositivos periféricos USB/Bluetooth reactivos (v1.1)** | **Completada** |
 | **Fase 12** | **Cronómetro de precisión y múltiples temporizadores con preajustes y cola de alertas (v1.1)** | **Completada** |
+| **Fase 13** | **Color de carátula dinámico y gestos táctiles/ratón en el widget multimedia (v1.1)** | **Completada** |
 
 ---
 
@@ -114,6 +115,8 @@ openDynamic está diseñado desde sus cimientos cumpliendo con las directrices d
 |---|---|---|
 | **Mostrar / Ocultar Notch** | `Win + Ctrl + I` | Atajo global configurable mediante la API nativa `RegisterHotKey` (sin hooks globales). |
 | **Control Rápido de Volumen** | **Rueda del ratón** sobre el Notch | Gira la rueda hacia arriba/abajo sobre la muesca para ajustar el volumen maestro. |
+| **Pista Anterior / Siguiente (Rueda)** | **Rueda inclinable / Touchpad horizontal** (`WM_MOUSEHWHEEL`) | Desplazamiento horizontal sobre la cápsula de música con cooldown de 400ms para evitar doble salto. |
+| **Pista Anterior / Siguiente (Arrastre)** | **Arrastre horizontal** sobre cabecera en modo expandido | Desliza con el ratón o táctil a izquierda/derecha con amortiguación y retorno de resorte visual. |
 | **Expandir Actividad** | **Clic izquierdo** o **Hover** (>250ms) | Despliega los controles completos e información extendida (400x160 DIP). |
 | **Colapsar Actividad** | **Clic fuera** o **Hover leave** (>350ms) | Regresa fluidamente al tamaño compacto o split mediante animación de resortes. |
 | **Intercambiar en Modo Split** | **Clic en la burbuja satélite** | Intercambia inmediatamente la actividad principal y la secundaria. |
@@ -139,8 +142,8 @@ En estricto cumplimiento de la **Regla de Oro 1** (0% CPU en reposo y consumo m�
 ## Documentación Técnica
 
 - **[Arquitectura y Guía para Desarrolladores (`docs/arquitectura.md`)](./docs/arquitectura.md):** Diagramas conceptuales de capas (Core vs. App), flujo del `IslandOrchestrator`, ciclo de vida de la FSM y la **Guía de 10 pasos** para crear e integrar nuevos widgets desde cero.
-- **[Registro de Decisiones de Arquitectura (`DECISIONS.md`)](./DECISIONS.md):** Registro histórico y justificación de las 19 decisiones técnicas (ADR-001 a ADR-019).
-- **[Matriz de Validación y Pruebas (`docs/pruebas.md`)](./docs/pruebas.md):** 248 pruebas unitarias automatizadas y casos de prueba manual de sistema (DPI, multimonitor, suspensión, pantalla completa, accesibilidad).
+- **[Registro de Decisiones de Arquitectura (`DECISIONS.md`)](./DECISIONS.md):** Registro histórico y justificación de las 21 decisiones técnicas (ADR-001 a ADR-021).
+- **[Matriz de Validación y Pruebas (`docs/pruebas.md`)](./docs/pruebas.md):** 305 pruebas unitarias automatizadas y casos de prueba manual de sistema (DPI, multimonitor, suspensión, pantalla completa, accesibilidad).
 
 ---
 
@@ -154,7 +157,7 @@ En estricto cumplimiento de la **Regla de Oro 1** (0% CPU en reposo y consumo m�
 - **Multimedia:** WinRT `Windows.Media.Control` (GSMTC) con extrapolación continua y miniaturas congeladas
 - **Bandeja del Sistema (Tray):** `H.NotifyIcon.Wpf` (cero WinForms)
 - **Atajos Globales:** Win32 `RegisterHotKey` / `UnregisterHotKey` mediante WndProc
-- **Configuración y Persistencia:** `System.Text.Json` en `%AppData%\openDynamic\settings.json` (esquema v3 y debounce de 500ms)
+- **Configuración y Persistencia:** `System.Text.Json` en `%AppData%\openDynamic\settings.json` (esquema v6 con migración automática y debounce de 500ms)
 - **Registro de Eventos (Logging):** `Serilog` y `Serilog.Sinks.File` en `%LocalAppData%\openDynamic\logs`
 - **Pruebas Unitarias:** `xUnit`
 - **Instalador:** Inno Setup 6 (distribución ReadyToRun)
