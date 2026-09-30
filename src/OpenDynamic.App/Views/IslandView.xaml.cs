@@ -24,6 +24,7 @@ public partial class IslandView : UserControl
     private MotionProfile _currentMotionProfile = MotionProfile.Full;
     private bool _isMicrophoneActive;
     private bool _isCameraActive;
+    private bool _hasSecondarySplitView;
     private IslandState _currentState = IslandState.Compact;
     private CapsuleDimensions _currentDimensions = new(200, 36, 14, 1.0);
 
@@ -77,75 +78,36 @@ public partial class IslandView : UserControl
             MainCapsuleBorder.CornerRadius = notchCornerRadius;
             MainCapsuleBorder.Opacity = 0.0;
 
-            SatelliteBorder.Visibility = Visibility.Collapsed;
-            SecondaryContentContainer.Clip = null;
             PrimaryContentContainer.Clip = null;
+            UpdateSatelliteLayout();
             return;
         }
-
-        bool hasActivePrivacy = _isCameraActive || _isMicrophoneActive;
 
         if (state == IslandState.Split)
         {
             // Split layout: main notch width adjusted so total span matches layout target
             double mainWidth = Math.Max(0.0, width - SatelliteSpan);
             MainCapsuleBorder.Width = mainWidth;
-            MainCapsuleBorder.Height = height;
-            MainCapsuleBorder.CornerRadius = notchCornerRadius;
-            MainCapsuleBorder.Opacity = opacity;
-
-            SatelliteBorder.Visibility = Visibility.Visible;
-            SatelliteBorder.Opacity = opacity;
-            SatelliteBorder.CornerRadius = notchCornerRadius;
-
-            // Clip inner child containers to prevent widget content from overflowing rounded bottom corners
-            double innerMainWidth = Math.Max(0.0, mainWidth - 2.0);
-            double innerHeight = Math.Max(0.0, height - 1.0);
-            double innerRadius = Math.Max(0.0, cornerRadius - 1.0);
-
-            PrimaryContentContainer.Clip = innerMainWidth > 0.0 && innerHeight > 0.0
-                ? CreateNotchClipGeometry(innerMainWidth, innerHeight, innerRadius)
-                : null;
-
-            double innerSatWidth = Math.Max(0.0, SatelliteDiameter - 2.0);
-            SecondaryContentContainer.Clip = innerSatWidth > 0.0 && innerHeight > 0.0
-                ? CreateNotchClipGeometry(innerSatWidth, innerHeight, innerRadius)
-                : null;
         }
         else
         {
             MainCapsuleBorder.Width = width;
-            MainCapsuleBorder.Height = height;
-            MainCapsuleBorder.CornerRadius = notchCornerRadius;
-            MainCapsuleBorder.Opacity = opacity;
-
-            double innerWidth = Math.Max(0.0, width - 2.0);
-            double innerHeight = Math.Max(0.0, height - 1.0);
-            double innerRadius = Math.Max(0.0, cornerRadius - 1.0);
-
-            PrimaryContentContainer.Clip = innerWidth > 0.0 && innerHeight > 0.0
-                ? CreateNotchClipGeometry(innerWidth, innerHeight, innerRadius)
-                : null;
-
-            if (hasActivePrivacy)
-            {
-                SatelliteBorder.Width = SatelliteDiameter;
-                SatelliteBorder.Height = height > 0 ? height : SatelliteDiameter;
-                SatelliteBorder.CornerRadius = notchCornerRadius;
-                SatelliteBorder.Opacity = opacity;
-                SatelliteBorder.Visibility = Visibility.Visible;
-
-                double innerSatWidth = Math.Max(0.0, SatelliteDiameter - 2.0);
-                SecondaryContentContainer.Clip = innerSatWidth > 0.0 && innerHeight > 0.0
-                    ? CreateNotchClipGeometry(innerSatWidth, innerHeight, innerRadius)
-                    : null;
-            }
-            else
-            {
-                SatelliteBorder.Visibility = Visibility.Collapsed;
-                SecondaryContentContainer.Clip = null;
-            }
         }
+
+        MainCapsuleBorder.Height = height;
+        MainCapsuleBorder.CornerRadius = notchCornerRadius;
+        MainCapsuleBorder.Opacity = opacity;
+
+        // Clip inner child containers to prevent widget content from overflowing rounded bottom corners
+        double innerMainWidth = Math.Max(0.0, MainCapsuleBorder.Width - 2.0);
+        double innerHeight = Math.Max(0.0, height - 1.0);
+        double innerRadius = Math.Max(0.0, cornerRadius - 1.0);
+
+        PrimaryContentContainer.Clip = innerMainWidth > 0.0 && innerHeight > 0.0
+            ? CreateNotchClipGeometry(innerMainWidth, innerHeight, innerRadius)
+            : null;
+
+        UpdateSatelliteLayout();
     }
 
     /// <summary>
@@ -203,90 +165,115 @@ public partial class IslandView : UserControl
     public void PresentViews(UserControl? primaryView, UserControl? secondaryView, IslandState state)
     {
         _currentState = state;
+        _hasSecondarySplitView = state == IslandState.Split && secondaryView != null;
+
         TransitionContent(PrimaryContent, primaryView);
 
-        bool hasActivePrivacy = _isCameraActive || _isMicrophoneActive;
-
-        if (state == IslandState.Split && secondaryView != null)
+        if (_hasSecondarySplitView)
         {
             TransitionContent(SecondaryContent, secondaryView);
-            SatelliteBorder.Visibility = state != IslandState.Hidden ? Visibility.Visible : Visibility.Collapsed;
-            UpdateSatellitePrivacyLayout(hasSplitView: true);
         }
         else
         {
             TransitionContent(SecondaryContent, null);
-            bool showSatellite = hasActivePrivacy && state != IslandState.Hidden;
-            SatelliteBorder.Visibility = showSatellite ? Visibility.Visible : Visibility.Collapsed;
-            UpdateSatellitePrivacyLayout(hasSplitView: false);
         }
+
+        UpdateSatelliteLayout();
     }
 
     /// <summary>
     /// Updates the persistent privacy sensor indicator dots displayed in the satellite capsule.
     /// Amber (#FFFF9500) for microphone, green (#34C759) for camera.
-    /// When active and the island is not hidden, shows SatelliteBorder without invading the main notch.
+    /// When active and the island is not hidden, shows SatelliteBorder strictly locked to 36 DIP height.
     /// </summary>
     public void UpdatePrivacyIndicators(bool isMicrophoneActive, bool isCameraActive)
     {
         _isMicrophoneActive = isMicrophoneActive;
         _isCameraActive = isCameraActive;
 
-        MicrophoneIndicatorDot.Visibility = isMicrophoneActive ? Visibility.Visible : Visibility.Collapsed;
-        CameraIndicatorDot.Visibility = isCameraActive ? Visibility.Visible : Visibility.Collapsed;
+        UpdateSatelliteLayout();
+    }
 
-        bool hasActivePrivacy = isMicrophoneActive || isCameraActive;
-        PrivacySatellitePanel.Visibility = hasActivePrivacy ? Visibility.Visible : Visibility.Collapsed;
+    /// <summary>
+    /// Updates the satellite capsule layout, dimensions, and child presentation.
+    /// Satellite height is strictly locked at 36 DIP (SatelliteDiameter), completely decoupled
+    /// from the main notch animations (Expanded ~160 DIP, Compact 36 DIP).
+    /// In Split mode with privacy indicators active, dynamically widens to 56 DIP to place dots
+    /// to the right of the secondary widget (CPU/Timer) with zero overlap.
+    /// </summary>
+    private void UpdateSatelliteLayout()
+    {
+        bool hasActivePrivacy = _isCameraActive || _isMicrophoneActive;
+        bool isSplitMode = _currentState == IslandState.Split && _hasSecondarySplitView;
 
+        // Deterministic dot visibility
+        MicrophoneIndicatorDot.Visibility = _isMicrophoneActive ? Visibility.Visible : Visibility.Collapsed;
+        CameraIndicatorDot.Visibility = _isCameraActive ? Visibility.Visible : Visibility.Collapsed;
+
+        // If island is hidden, collapse everything on the satellite
         if (_currentState == IslandState.Hidden)
         {
             SatelliteBorder.Visibility = Visibility.Collapsed;
+            SecondaryContent.Visibility = Visibility.Collapsed;
+            PrivacySatellitePanel.Visibility = Visibility.Collapsed;
+            SecondaryContentContainer.Clip = null;
             return;
         }
 
-        if (_currentState == IslandState.Split && SecondaryContent.Content != null)
+        // Strictly lock satellite height and corner radius (0,0,14,14) - NEVER inherit from main notch!
+        SatelliteBorder.Height = SatelliteDiameter;
+        SatelliteBorder.MinHeight = SatelliteDiameter;
+        SatelliteBorder.MaxHeight = SatelliteDiameter;
+        SatelliteBorder.CornerRadius = new CornerRadius(0, 0, 14, 14);
+        SatelliteBorder.Opacity = _currentDimensions.Opacity;
+
+        if (isSplitMode)
         {
-            SatelliteBorder.Visibility = Visibility.Visible;
-            UpdateSatellitePrivacyLayout(hasSplitView: true);
-        }
-        else
-        {
-            SatelliteBorder.Visibility = hasActivePrivacy ? Visibility.Visible : Visibility.Collapsed;
+            SecondaryContent.Visibility = Visibility.Visible;
+
             if (hasActivePrivacy)
             {
-                SatelliteBorder.Width = SatelliteDiameter;
-                double h = _currentDimensions.Height > 0 ? _currentDimensions.Height : SatelliteDiameter;
-                SatelliteBorder.Height = h;
-                double r = _currentDimensions.CornerRadius > 0 ? _currentDimensions.CornerRadius : 14.0;
-                SatelliteBorder.CornerRadius = new CornerRadius(0, 0, r, r);
-                SatelliteBorder.Opacity = _currentDimensions.Opacity;
+                // Coexistence: widen satellite to 56 DIP to place dots to the right of secondary view without overlap
+                SatelliteBorder.Width = 56.0;
+                PrivacySatellitePanel.Visibility = Visibility.Visible;
+                PrivacySatellitePanel.Margin = new Thickness(0, 0, 4, 0);
 
-                double innerSatWidth = Math.Max(0.0, SatelliteDiameter - 2.0);
-                double innerHeight = Math.Max(0.0, h - 1.0);
-                double innerRadius = Math.Max(0.0, r - 1.0);
-                SecondaryContentContainer.Clip = innerSatWidth > 0.0 && innerHeight > 0.0
-                    ? CreateNotchClipGeometry(innerSatWidth, innerHeight, innerRadius)
-                    : null;
+                double innerSatWidth = 54.0;
+                SecondaryContentContainer.Clip = CreateNotchClipGeometry(innerSatWidth, 35.0, 13.0);
             }
             else
             {
-                SecondaryContentContainer.Clip = null;
-            }
-            UpdateSatellitePrivacyLayout(hasSplitView: false);
-        }
-    }
+                SatelliteBorder.Width = SatelliteDiameter;
+                PrivacySatellitePanel.Visibility = Visibility.Collapsed;
+                PrivacySatellitePanel.Margin = new Thickness(0);
 
-    private void UpdateSatellitePrivacyLayout(bool hasSplitView)
-    {
-        if (hasSplitView)
-        {
-            PrivacySatellitePanel.VerticalAlignment = VerticalAlignment.Top;
-            PrivacySatellitePanel.Margin = new Thickness(0, 3, 0, 0);
+                double innerSatWidth = SatelliteDiameter - 2.0;
+                SecondaryContentContainer.Clip = CreateNotchClipGeometry(innerSatWidth, 35.0, 13.0);
+            }
+
+            SatelliteBorder.Visibility = Visibility.Visible;
         }
         else
         {
-            PrivacySatellitePanel.VerticalAlignment = VerticalAlignment.Center;
-            PrivacySatellitePanel.Margin = new Thickness(0);
+            SecondaryContent.Visibility = Visibility.Collapsed;
+
+            if (hasActivePrivacy)
+            {
+                SatelliteBorder.Width = SatelliteDiameter;
+                PrivacySatellitePanel.Visibility = Visibility.Visible;
+                PrivacySatellitePanel.Margin = new Thickness(0);
+                SatelliteBorder.Visibility = Visibility.Visible;
+
+                double innerSatWidth = SatelliteDiameter - 2.0;
+                SecondaryContentContainer.Clip = CreateNotchClipGeometry(innerSatWidth, 35.0, 13.0);
+            }
+            else
+            {
+                PrivacySatellitePanel.Visibility = Visibility.Collapsed;
+                PrivacySatellitePanel.Margin = new Thickness(0);
+                SatelliteBorder.Visibility = Visibility.Collapsed;
+                SecondaryContentContainer.Clip = null;
+            }
         }
     }
 

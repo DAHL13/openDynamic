@@ -42,6 +42,8 @@
                 VerticalAlignment="Top"
                 Width="36"
                 Height="36"
+                MinHeight="36"
+                MaxHeight="36"
                 Background="{DynamicResource AppCapsuleBackgroundBrush}"
                 BorderBrush="{DynamicResource AppBorderBrush}"
                 BorderThickness="{DynamicResource AppNotchBorderThickness}"
@@ -56,33 +58,39 @@
                 <TranslateTransform x:Name="SatelliteTranslate" X="0" Y="0" />
             </Border.RenderTransform>
             <Grid x:Name="SecondaryContentContainer" ClipToBounds="True">
-                <ContentControl x:Name="SecondaryContent"
-                                HorizontalAlignment="Stretch"
-                                VerticalAlignment="Stretch"
-                                Focusable="False"
-                                IsHitTestVisible="True" />
-
-                <!-- Subtle Persistent Privacy Sensor Indicators in Satellite (Camera Green, Microphone Amber) -->
-                <StackPanel x:Name="PrivacySatellitePanel"
-                            Orientation="Horizontal"
+                <StackPanel Orientation="Horizontal"
                             HorizontalAlignment="Center"
-                            VerticalAlignment="Center"
-                            IsHitTestVisible="False"
-                            Visibility="Collapsed">
-                    <!-- Camera Dot (Green #34C759, 6x6 DIP) -->
-                    <Ellipse x:Name="CameraIndicatorDot"
-                             Width="6"
-                             Height="6"
-                             Fill="#FF34C759"
-                             Margin="2,0"
-                             Visibility="Collapsed" />
-                    <!-- Microphone Dot (Amber/Orange #FFFF9500, 6x6 DIP) -->
-                    <Ellipse x:Name="MicrophoneIndicatorDot"
-                             Width="6"
-                             Height="6"
-                             Fill="#FFFF9500"
-                             Margin="2,0"
-                             Visibility="Collapsed" />
+                            VerticalAlignment="Center">
+                    <ContentControl x:Name="SecondaryContent"
+                                    Width="36"
+                                    Height="36"
+                                    VerticalAlignment="Center"
+                                    Focusable="False"
+                                    IsHitTestVisible="True"
+                                    Visibility="Collapsed" />
+
+                    <!-- Subtle Persistent Privacy Sensor Indicators in Satellite (Camera Green, Microphone Amber) -->
+                    <StackPanel x:Name="PrivacySatellitePanel"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Center"
+                                Margin="0,0,0,0"
+                                IsHitTestVisible="False"
+                                Visibility="Collapsed">
+                        <!-- Camera Dot (Green #34C759, 6x6 DIP) -->
+                        <Ellipse x:Name="CameraIndicatorDot"
+                                 Width="6"
+                                 Height="6"
+                                 Fill="#FF34C759"
+                                 Margin="2,0"
+                                 Visibility="Collapsed" />
+                        <!-- Microphone Dot (Amber/Orange #FFFF9500, 6x6 DIP) -->
+                        <Ellipse x:Name="MicrophoneIndicatorDot"
+                                 Width="6"
+                                 Height="6"
+                                 Fill="#FFFF9500"
+                                 Margin="2,0"
+                                 Visibility="Collapsed" />
+                    </StackPanel>
                 </StackPanel>
             </Grid>
         </Border>
