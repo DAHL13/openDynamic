@@ -48,15 +48,25 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- Top Section: Thumbnail + Metadata -->
-        <Grid Grid.Row="0" Margin="0,0,0,8">
+        <!-- Top Section: Thumbnail + Metadata with horizontal gesture dragging support -->
+        <Grid x:Name="ArtworkHeaderContainer"
+              Grid.Row="0"
+              Margin="0,0,0,8"
+              Background="Transparent"
+              Cursor="Hand"
+              MouseLeftButtonDown="OnArtworkHeaderMouseDown"
+              MouseMove="OnArtworkHeaderMouseMove"
+              MouseLeftButtonUp="OnArtworkHeaderMouseUp"
+              MouseLeave="OnArtworkHeaderMouseLeave"
+              AutomationProperties.Name="Zona de carátula e información de pista"
+              AutomationProperties.HelpText="Arrastra horizontalmente para cambiar de canción">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <!-- Large Album Art -->
+            <!-- Large Album Art with Spring Translation -->
             <Border Grid.Column="0"
                     Width="48"
                     Height="48"
@@ -66,6 +76,9 @@
                     Margin="0,0,10,0"
                     VerticalAlignment="Center"
                     AutomationProperties.Name="Carátula del álbum">
+                <Border.RenderTransform>
+                    <TranslateTransform x:Name="ArtworkTranslate" X="0" Y="0" />
+                </Border.RenderTransform>
                 <Grid>
                     <!-- Fallback Icon -->
                     <Path Data="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"
