@@ -20,6 +20,12 @@ public static class NativeMethods
     public const int WM_MOUSEACTIVATE = 0x0021;
     public const int WM_DISPLAYCHANGE = 0x007E;
     public const int WM_DPICHANGED = 0x02E0;
+    public const int WM_MOUSEHWHEEL = 0x020E;
+    public const int WHEEL_DELTA = 120;
+
+    public static short GetWheelDelta(IntPtr wParam) => (short)((wParam.ToInt64() >> 16) & 0xFFFF);
+    public static short GetXFromLParam(IntPtr lParam) => (short)(lParam.ToInt64() & 0xFFFF);
+    public static short GetYFromLParam(IntPtr lParam) => (short)((lParam.ToInt64() >> 16) & 0xFFFF);
 
     // SystemParametersInfo SPI Actions
     public const int SPI_GETCLIENTAREAANIMATION = 0x1042;

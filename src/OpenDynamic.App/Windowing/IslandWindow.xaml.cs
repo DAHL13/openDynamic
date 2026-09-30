@@ -214,6 +214,23 @@ public partial class IslandWindow : Window
                     wParam.ToInt32(), lParam.ToInt64());
                 _deviceService?.HandleDeviceChange(wParam, lParam);
                 break;
+
+            // React to horizontal mouse wheel or precision touchpad tilt/swipe
+            case NativeMethods.WM_MOUSEHWHEEL:
+                if (_settings.EnableMediaGestures && IsPointerOverNotch())
+                {
+                    var mediaWidget = _orchestrator.RegisteredWidgets.OfType<Widgets.Media.MediaWidget>().FirstOrDefault();
+                    if (mediaWidget != null && mediaWidget.IsActive)
+                    {
+                        short wheelDelta = NativeMethods.GetWheelDelta(wParam);
+                        if (mediaWidget.HandleWheelDelta(wheelDelta))
+                        {
+                            handled = true;
+                            return IntPtr.Zero;
+                        }
+                    }
+                }
+                break;
         }
 
         return IntPtr.Zero;
@@ -440,17 +457,17 @@ public partial class IslandWindow : Window
         IslandHostView.SatelliteBubble.MouseRightButtonUp += openMenu;
     }
 
+    private bool IsPointerOverNotch()
+    {
+        return IslandHostView.IsMouseOver ||
+               IslandHostView.CapsuleBorder.IsMouseOver ||
+               IslandHostView.SatelliteBubble.IsMouseOver;
+    }
+
     private void SetupMouseInteractions()
     {
         var mainCapsule = IslandHostView.CapsuleBorder;
         var satellite = IslandHostView.SatelliteBubble;
-
-        bool IsPointerOverNotch()
-        {
-            return IslandHostView.IsMouseOver ||
-                   mainCapsule.IsMouseOver ||
-                   satellite.IsMouseOver;
-        }
 
         void OnPointerEnter()
         {

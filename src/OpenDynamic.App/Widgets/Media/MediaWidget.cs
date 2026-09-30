@@ -1,4 +1,5 @@
 using System.Windows.Controls;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.Input;
@@ -7,6 +8,8 @@ using OpenDynamic.App.Services;
 using OpenDynamic.App.Widgets.Media.Views;
 using OpenDynamic.App.Widgets.Messages;
 using OpenDynamic.Core.Media;
+using OpenDynamic.Core.Media.Color;
+using OpenDynamic.Core.Media.Gestures;
 using OpenDynamic.Core.Settings;
 using OpenDynamic.Core.Widgets;
 using Serilog;
@@ -79,6 +82,37 @@ public sealed class MediaWidget : IslandWidgetBase
         get => _hasThumbnail;
         private set => SetProperty(ref _hasThumbnail, value);
     }
+
+    private readonly MediaColorService _colorService = new();
+    private readonly SwipeGestureDetector _wheelGestureDetector;
+    private readonly SwipeGestureDetector _dragGestureDetector;
+
+    private SolidColorBrush _accentBrush = MediaColorService.DefaultAccentBrush;
+    private Color _accentColor = Color.FromRgb(0x1E, 0xD7, 0x60);
+
+    /// <summary>
+    /// Frozen solid color brush derived dynamically from album cover artwork.
+    /// Safe for cross-thread access and leak-free UI binding.
+    /// </summary>
+    public SolidColorBrush AccentBrush
+    {
+        get => _accentBrush;
+        private set => SetProperty(ref _accentBrush, value);
+    }
+
+    /// <summary>
+    /// Raw WPF Color matching the current album art accent.
+    /// </summary>
+    public Color AccentColor
+    {
+        get => _accentColor;
+        private set => SetProperty(ref _accentColor, value);
+    }
+
+    /// <summary>
+    /// Event raised when a horizontal swipe or scroll gesture is successfully triggered.
+    /// </summary>
+    public event EventHandler<SwipeGestureAction>? GestureTriggered;
 
     private bool _isDecorativeAllowed = true;
 
@@ -197,6 +231,9 @@ public sealed class MediaWidget : IslandWidgetBase
         _mediaService = mediaService ?? throw new ArgumentNullException(nameof(mediaService));
         _settings = settings ?? new AppSettings();
         _dispatcher = dispatcher ?? (System.Windows.Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher);
+
+        _wheelGestureDetector = new SwipeGestureDetector(threshold: _settings.MediaGestureSensitivity > 0 ? _settings.MediaGestureSensitivity : SwipeGestureDetector.DefaultWheelThreshold);
+        _dragGestureDetector = new SwipeGestureDetector(threshold: SwipeGestureDetector.DefaultDragThreshold);
 
         TogglePlayPauseCommand = new AsyncRelayCommand(ExecuteTogglePlayPauseAsync);
         SkipPreviousCommand = new AsyncRelayCommand(ExecuteSkipPreviousAsync);
@@ -360,6 +397,78 @@ public sealed class MediaWidget : IslandWidgetBase
             Title: TrackTitle,
             Subtitle: TrackArtist,
             Priority: Priority);
+
+        var trackKey = $"{TrackTitle}|{TrackArtist}";
+        _ = UpdateAccentColorAsync(Thumbnail, trackKey);
+    }
+
+    private async Task UpdateAccentColorAsync(BitmapImage? thumbnail, string trackKey)
+    {
+        if (!_settings.EnableDynamicMediaColor || thumbnail == null)
+        {
+            await _dispatcher.InvokeAsync(() =>
+            {
+                AccentColor = Color.FromRgb(RgbColor.DefaultAccent.R, RgbColor.DefaultAccent.G, RgbColor.DefaultAccent.B);
+                AccentBrush = MediaColorService.DefaultAccentBrush;
+            });
+            return;
+        }
+
+        var rgb = await _colorService.GetAccentColorAsync(thumbnail, trackKey);
+        await _dispatcher.InvokeAsync(() =>
+        {
+            AccentColor = Color.FromRgb(rgb.R, rgb.G, rgb.B);
+            AccentBrush = MediaColorService.CreateFrozenBrush(rgb);
+        });
+    }
+
+    /// <summary>
+    /// Handles horizontal mouse wheel tilt (WM_MOUSEHWHEEL) over the media capsule.
+    /// Honors user sensitivity threshold, 400ms inertia cooldown, and player skip capabilities.
+    /// </summary>
+    public bool HandleWheelDelta(double delta)
+    {
+        if (!_settings.EnableMediaGestures) return false;
+
+        _wheelGestureDetector.Threshold = _settings.MediaGestureSensitivity > 0
+            ? _settings.MediaGestureSensitivity
+            : SwipeGestureDetector.DefaultWheelThreshold;
+
+        var action = _wheelGestureDetector.ProcessWheelDelta(delta);
+        return ExecuteGestureAction(action);
+    }
+
+    /// <summary>
+    /// Handles touch or mouse drag gestures over the artwork / title area in expanded view.
+    /// Uses a minimum ~40 DIP threshold and 400ms cooldown without interfering with the seek bar.
+    /// </summary>
+    public bool HandleDragDelta(double deltaX)
+    {
+        if (!_settings.EnableMediaGestures) return false;
+
+        var action = _dragGestureDetector.ProcessDragDelta(deltaX);
+        return ExecuteGestureAction(action);
+    }
+
+    private bool ExecuteGestureAction(SwipeGestureAction action)
+    {
+        if (action == SwipeGestureAction.Next && CanSkipNext)
+        {
+            Log.Information("Media Next track gesture executed.");
+            GestureTriggered?.Invoke(this, SwipeGestureAction.Next);
+            SkipNextCommand.Execute(null);
+            return true;
+        }
+
+        if (action == SwipeGestureAction.Previous && CanSkipPrevious)
+        {
+            Log.Information("Media Previous track gesture executed.");
+            GestureTriggered?.Invoke(this, SwipeGestureAction.Previous);
+            SkipPreviousCommand.Execute(null);
+            return true;
+        }
+
+        return false;
     }
 
     private void UpdateSessionTimeline()
@@ -450,6 +559,11 @@ public sealed class MediaWidget : IslandWidgetBase
         ProgressRatio = 0.0;
         CurrentPositionFormatted = "0:00";
         DurationFormatted = "0:00";
+        AccentColor = Color.FromRgb(RgbColor.DefaultAccent.R, RgbColor.DefaultAccent.G, RgbColor.DefaultAccent.B);
+        AccentBrush = MediaColorService.DefaultAccentBrush;
+
+        _wheelGestureDetector.ResetAll();
+        _dragGestureDetector.ResetAll();
 
         Log.Information("Media session terminated or removed. Widget set to inactive.");
     }
