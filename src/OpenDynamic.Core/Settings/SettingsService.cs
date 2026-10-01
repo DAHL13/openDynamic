@@ -190,8 +190,31 @@ public sealed class SettingsService : ISettingsService
                         }
                     }
 
+                    if (loaded.SchemaVersion < 10)
+                    {
+                        // Migration v9 -> v10: Introduce Antigravity Approvals in notch (Strictly disabled by default).
+                        loaded.EnableAgentApprovals = false;
+                        loaded.AgentApprovalTimeoutSeconds = 90;
+                        loaded.AgentApprovalGracePeriodMs = 600;
+                        loaded.EnableAgentApprovalSound = true;
+                        loaded.AgentApprovalPredefinedDenyReasons = new List<string>
+                        {
+                            "No: usa otro enfoque",
+                            "No: pregúntame antes de ejecutar esto",
+                            "No: no toques esos archivos"
+                        };
+                        loaded.AgentApprovalHighlightedOption = 1;
+                        loaded.CustomAgentHookPath = null;
+                    }
+
                     loaded.IgnoredPrivacyApps ??= new List<string>();
                     loaded.IgnoredDeviceNames ??= new List<string>();
+                    loaded.AgentApprovalPredefinedDenyReasons ??= new List<string>
+                    {
+                        "No: usa otro enfoque",
+                        "No: pregúntame antes de ejecutar esto",
+                        "No: no toques esos archivos"
+                    };
                     loaded.SchemaVersion = AppSettings.CurrentSchemaVersion;
                     CurrentSettings = loaded;
                     WriteSettingsToDisk(CurrentSettings);
@@ -200,6 +223,12 @@ public sealed class SettingsService : ISettingsService
                 {
                     loaded.IgnoredPrivacyApps ??= new List<string>();
                     loaded.IgnoredDeviceNames ??= new List<string>();
+                    loaded.AgentApprovalPredefinedDenyReasons ??= new List<string>
+                    {
+                        "No: usa otro enfoque",
+                        "No: pregúntame antes de ejecutar esto",
+                        "No: no toques esos archivos"
+                    };
                     CurrentSettings = loaded;
                 }
 

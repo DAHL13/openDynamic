@@ -19,8 +19,9 @@ public sealed class AppSettings
     /// Version 7 introduces Opt-In In-Memory Clipboard History, transient notices, preview toggle, capacity and expiration settings.
     /// Version 8 introduces Microphone & Camera indicators, privacy transient alerts, priority (85), and ignored privacy apps.
     /// Version 9 introduces Audio Spectrum Visualizer mode (Disabled, Simulated, Real).
+    /// Version 10 introduces Antigravity Agent Approvals in the notch, risk-aware policies, and pipe server settings.
     /// </summary>
-    public const int CurrentSchemaVersion = 9;
+    public const int CurrentSchemaVersion = 10;
 
     /// <summary>
     /// Configuration schema version. Defaults to <see cref="CurrentSchemaVersion"/>.
@@ -432,6 +433,55 @@ public sealed class AppSettings
 
     #endregion
 
+    #region Antigravity Agent Approvals Settings
+
+    /// <summary>
+    /// Master switch for intercepting Antigravity tool approval requests in the notch.
+    /// Strictly disabled by default (false) per golden rules.
+    /// </summary>
+    public bool EnableAgentApprovals { get; set; } = false;
+
+    /// <summary>
+    /// Maximum wait time in seconds before an unanswered approval request automatically times out to AskNative.
+    /// Default is 90 seconds (must be lower than the 120s hook timeout).
+    /// </summary>
+    public int AgentApprovalTimeoutSeconds { get; set; } = 90;
+
+    /// <summary>
+    /// Accidental-click protection grace period in milliseconds before action buttons are enabled.
+    /// Default is 600 milliseconds.
+    /// </summary>
+    public int AgentApprovalGracePeriodMs { get; set; } = 600;
+
+    /// <summary>
+    /// Flag indicating whether SystemSounds.Exclamation is played when an approval request arrives.
+    /// Default is true.
+    /// </summary>
+    public bool EnableAgentApprovalSound { get; set; } = true;
+
+    /// <summary>
+    /// Predefined reasons for denying tool execution without free-form text input.
+    /// </summary>
+    public List<string> AgentApprovalPredefinedDenyReasons { get; set; } = new()
+    {
+        "No: usa otro enfoque",
+        "No: pregúntame antes de ejecutar esto",
+        "No: no toques esos archivos"
+    };
+
+    /// <summary>
+    /// Default highlighted option in the approval menu (1 = Allow this time).
+    /// Used with Ctrl+Alt+Enter. Only moves focus, never executes automatically.
+    /// </summary>
+    public int AgentApprovalHighlightedOption { get; set; } = 1;
+
+    /// <summary>
+    /// Custom path to the Antigravity hook binary if explicitly configured.
+    /// </summary>
+    public string? CustomAgentHookPath { get; set; }
+
+    #endregion
+
     #region Hotkeys and Autostart
 
     /// <summary>
@@ -521,7 +571,14 @@ public sealed class AppSettings
             EnablePrivacyAlerts = this.EnablePrivacyAlerts,
             DefaultPrivacyPriority = this.DefaultPrivacyPriority,
             PrivacyTransientDurationSeconds = this.PrivacyTransientDurationSeconds,
-            IgnoredPrivacyApps = new List<string>(this.IgnoredPrivacyApps)
+            IgnoredPrivacyApps = new List<string>(this.IgnoredPrivacyApps),
+            EnableAgentApprovals = this.EnableAgentApprovals,
+            AgentApprovalTimeoutSeconds = this.AgentApprovalTimeoutSeconds,
+            AgentApprovalGracePeriodMs = this.AgentApprovalGracePeriodMs,
+            EnableAgentApprovalSound = this.EnableAgentApprovalSound,
+            AgentApprovalPredefinedDenyReasons = new List<string>(this.AgentApprovalPredefinedDenyReasons),
+            AgentApprovalHighlightedOption = this.AgentApprovalHighlightedOption,
+            CustomAgentHookPath = this.CustomAgentHookPath
         };
     }
 
@@ -593,5 +650,12 @@ public sealed class AppSettings
         DefaultPrivacyPriority = other.DefaultPrivacyPriority;
         PrivacyTransientDurationSeconds = other.PrivacyTransientDurationSeconds;
         IgnoredPrivacyApps = new List<string>(other.IgnoredPrivacyApps ?? Enumerable.Empty<string>());
+        EnableAgentApprovals = other.EnableAgentApprovals;
+        AgentApprovalTimeoutSeconds = other.AgentApprovalTimeoutSeconds;
+        AgentApprovalGracePeriodMs = other.AgentApprovalGracePeriodMs;
+        EnableAgentApprovalSound = other.EnableAgentApprovalSound;
+        AgentApprovalPredefinedDenyReasons = new List<string>(other.AgentApprovalPredefinedDenyReasons ?? Enumerable.Empty<string>());
+        AgentApprovalHighlightedOption = other.AgentApprovalHighlightedOption;
+        CustomAgentHookPath = other.CustomAgentHookPath;
     }
 }
