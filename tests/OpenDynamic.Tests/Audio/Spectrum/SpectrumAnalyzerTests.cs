@@ -176,4 +176,33 @@ public class SpectrumAnalyzerTests
 
         Assert.Equal(0, allocatedAfter - allocatedBefore);
     }
+
+    [Fact]
+    public void ProcessAudio_PerformanceBudget_ConsumesFractionOfCpuBudget()
+    {
+        var analyzer = new SpectrumAnalyzer(sampleRate: 48000);
+        float[] oneSecondAudio = new float[48000];
+        for (int i = 0; i < oneSecondAudio.Length; i++)
+        {
+            oneSecondAudio[i] = MathF.Sin(2.0f * MathF.PI * 440.0f * i / 48000);
+        }
+
+        // Warm up JIT execution
+        analyzer.AddSamples(oneSecondAudio.AsSpan(0, 4800));
+
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        // Simulate 5 seconds of continuous 48kHz audio (48000 * 5 = 240,000 samples ~ 468 FFT windows)
+        for (int sec = 0; sec < 5; sec++)
+        {
+            analyzer.AddSamples(oneSecondAudio);
+        }
+        sw.Stop();
+
+        double totalCpuTimeMs = sw.Elapsed.TotalMilliseconds;
+        double simulatedAudioMs = 5000.0;
+        double cpuPercentage = (totalCpuTimeMs / simulatedAudioMs) * 100.0;
+
+        // Must be well within budget (< 2% CPU)
+        Assert.True(cpuPercentage < 2.0, $"Audio FFT processing CPU load was {cpuPercentage:F2}%, expected < 2.0%");
+    }
 }
