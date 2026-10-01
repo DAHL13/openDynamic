@@ -13,6 +13,9 @@ public partial class MediaExpandedView : UserControl
     private readonly MediaWidget _widget;
     private bool _isDraggingHeader;
     private Point _dragStartPoint;
+    private Border[]? _spectrumBars;
+    private bool _isRenderingSubscribed;
+    private long _lastRenderTime;
 
     public MediaExpandedView(MediaWidget widget)
     {
@@ -27,15 +30,25 @@ public partial class MediaExpandedView : UserControl
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
+        _spectrumBars ??=
+        [
+            ExpBar0, ExpBar1, ExpBar2, ExpBar3, ExpBar4, ExpBar5,
+            ExpBar6, ExpBar7, ExpBar8, ExpBar9, ExpBar10, ExpBar11,
+            ExpBar12, ExpBar13, ExpBar14, ExpBar15, ExpBar16, ExpBar17,
+            ExpBar18, ExpBar19, ExpBar20, ExpBar21, ExpBar22, ExpBar23
+        ];
+
         _widget.PropertyChanged += OnWidgetPropertyChanged;
         _widget.GestureTriggered += OnGestureTriggered;
         UpdateProgressFill();
+        UpdateRenderingSubscription();
     }
 
     private void OnUnloaded(object sender, RoutedEventArgs e)
     {
         _widget.PropertyChanged -= OnWidgetPropertyChanged;
         _widget.GestureTriggered -= OnGestureTriggered;
+        StopRendering();
     }
 
     private void OnSizeChanged(object sender, SizeChangedEventArgs e)
@@ -48,6 +61,76 @@ public partial class MediaExpandedView : UserControl
         if (e.PropertyName is nameof(MediaWidget.ProgressRatio) or nameof(MediaWidget.CurrentPosition))
         {
             Dispatcher.InvokeAsync(UpdateProgressFill);
+        }
+        else if (e.PropertyName is nameof(MediaWidget.IsVisualizerActive)
+            or nameof(MediaWidget.IsPlaying)
+            or nameof(MediaWidget.IsVisibleOnIsland)
+            or nameof(MediaWidget.EqualizerVisibility))
+        {
+            Dispatcher.InvokeAsync(UpdateRenderingSubscription);
+        }
+    }
+
+    private void UpdateRenderingSubscription()
+    {
+        if (_widget.IsVisualizerActive && IsLoaded)
+        {
+            StartRendering();
+        }
+        else
+        {
+            StopRendering();
+        }
+    }
+
+    private void StartRendering()
+    {
+        if (_isRenderingSubscribed) return;
+        _isRenderingSubscribed = true;
+        _lastRenderTime = 0;
+        CompositionTarget.Rendering += OnRendering;
+    }
+
+    private void StopRendering()
+    {
+        if (!_isRenderingSubscribed) return;
+        _isRenderingSubscribed = false;
+        CompositionTarget.Rendering -= OnRendering;
+        ResetBars();
+    }
+
+    private void OnRendering(object? sender, EventArgs e)
+    {
+        if (!_isRenderingSubscribed || _spectrumBars == null) return;
+
+        long now = Environment.TickCount64;
+        // Limit rendering to ~30 FPS (33 ms interval)
+        if (now - _lastRenderTime < 33)
+        {
+            return;
+        }
+        _lastRenderTime = now;
+
+        Span<float> bands = stackalloc float[24];
+        var service = _widget.SpectrumService;
+        if (service != null)
+        {
+            service.GetExpandedBands(bands);
+
+            for (int i = 0; i < 24; i++)
+            {
+                // Dynamic height: [3.0, 16.0] DIP
+                _spectrumBars[i].Height = Math.Clamp(3.0 + bands[i] * 13.0, 3.0, 16.0);
+            }
+        }
+    }
+
+    private void ResetBars()
+    {
+        if (_spectrumBars == null) return;
+        for (int i = 0; i < _spectrumBars.Length; i++)
+        {
+            _spectrumBars[i].Height = 3.0;
         }
     }
 

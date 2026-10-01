@@ -102,6 +102,7 @@ public sealed class VolumeService : IVolumeController, IMMNotificationClient, ID
     }
 
     public event EventHandler<VolumeChangedEventArgs>? VolumeChanged;
+    public event EventHandler? DefaultDeviceChanged;
 
     public VolumeService()
     {
@@ -347,6 +348,7 @@ public sealed class VolumeService : IVolumeController, IMMNotificationClient, ID
             }
 
             VolumeChanged?.Invoke(this, new VolumeChangedEventArgs(currentVol, isMuted));
+            DefaultDeviceChanged?.Invoke(this, EventArgs.Empty);
         });
 
         return 0;

@@ -42,4 +42,9 @@ public interface IVolumeController
     /// Occurs when master volume or mute status changes on the active endpoint.
     /// </summary>
     event EventHandler<VolumeChangedEventArgs>? VolumeChanged;
+
+    /// <summary>
+    /// Occurs when Windows default audio rendering endpoint has changed.
+    /// </summary>
+    event EventHandler? DefaultDeviceChanged;
 }

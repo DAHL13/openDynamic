@@ -7,10 +7,12 @@ using CommunityToolkit.Mvvm.Messaging;
 using OpenDynamic.App.Services;
 using OpenDynamic.App.Widgets.Media.Views;
 using OpenDynamic.App.Widgets.Messages;
+using OpenDynamic.Core.Audio.Spectrum;
 using OpenDynamic.Core.Media;
 using OpenDynamic.Core.Media.Color;
 using OpenDynamic.Core.Media.Gestures;
 using OpenDynamic.Core.Settings;
+using OpenDynamic.Core.State;
 using OpenDynamic.Core.Widgets;
 using Serilog;
 
@@ -28,6 +30,7 @@ public sealed class MediaWidget : IslandWidgetBase
     private readonly IMediaService _mediaService;
     private readonly AppSettings _settings;
     private readonly Dispatcher _dispatcher;
+    private readonly IAudioSpectrumService? _spectrumService;
 
     private DispatcherTimer? _pauseGraceTimer;
     private DispatcherTimer? _progressExtrapolationTimer;
@@ -116,6 +119,21 @@ public sealed class MediaWidget : IslandWidgetBase
 
     private bool _isDecorativeAllowed = true;
 
+    /// <summary>
+    /// Gets the attached audio spectrum analysis service, if available.
+    /// </summary>
+    public IAudioSpectrumService? SpectrumService => _spectrumService;
+
+    /// <summary>
+    /// Indicates whether active spectrum visualization should be rendered.
+    /// </summary>
+    public bool IsVisualizerActive =>
+        _spectrumService != null &&
+        _isDecorativeAllowed &&
+        _isPlaying &&
+        IsVisibleOnIsland &&
+        (_spectrumService.IsCapturing || _spectrumService.ActiveMode == AudioVisualizerMode.Simulated);
+
     public bool IsPlaying
     {
         get => _isPlaying;
@@ -124,6 +142,7 @@ public sealed class MediaWidget : IslandWidgetBase
             if (SetProperty(ref _isPlaying, value))
             {
                 OnPropertyChanged(nameof(EqualizerVisibility));
+                UpdateVisualizerState();
             }
         }
     }
@@ -140,15 +159,18 @@ public sealed class MediaWidget : IslandWidgetBase
             if (SetProperty(ref _isDecorativeAllowed, value))
             {
                 OnPropertyChanged(nameof(EqualizerVisibility));
+                UpdateVisualizerState();
             }
         }
     }
 
     /// <summary>
-    /// Equalizer bars are visible ONLY if decorative animations are allowed and music is playing.
+    /// Equalizer bars are visible ONLY if music is playing and visualizer is not disabled.
     /// </summary>
     public System.Windows.Visibility EqualizerVisibility =>
-        (_isDecorativeAllowed && _isPlaying) ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+        (_isPlaying && _settings.VisualizerMode != AudioVisualizerMode.Disabled)
+            ? System.Windows.Visibility.Visible
+            : System.Windows.Visibility.Collapsed;
 
     public TimeSpan CurrentPosition
     {
@@ -226,13 +248,15 @@ public sealed class MediaWidget : IslandWidgetBase
         IMediaService mediaService,
         AppSettings? settings = null,
         Dispatcher? dispatcher = null,
-        MediaColorService? colorService = null)
+        MediaColorService? colorService = null,
+        IAudioSpectrumService? spectrumService = null)
         : base(settings?.DefaultMediaPriority ?? ActivityPriority.Media)
     {
         _mediaService = mediaService ?? throw new ArgumentNullException(nameof(mediaService));
         _settings = settings ?? new AppSettings();
         _dispatcher = dispatcher ?? (System.Windows.Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher);
         _colorService = colorService ?? new MediaColorService();
+        _spectrumService = spectrumService;
 
         _wheelGestureDetector = new SwipeGestureDetector(threshold: _settings.MediaGestureSensitivity > 0 ? _settings.MediaGestureSensitivity : SwipeGestureDetector.DefaultWheelThreshold);
         _dragGestureDetector = new SwipeGestureDetector(threshold: SwipeGestureDetector.DefaultDragThreshold);
@@ -678,12 +702,19 @@ public sealed class MediaWidget : IslandWidgetBase
         UpdateExtrapolatedProgress();
     }
 
+    public override void SetDisplayState(WidgetDisplayMode mode, bool isVisible)
+    {
+        base.SetDisplayState(mode, isVisible);
+        UpdateVisualizerState();
+    }
+
     public override void OnExpand()
     {
         base.OnExpand();
         DisplayMode = WidgetDisplayMode.Expanded;
         UpdateExtrapolatedProgress();
         EvaluateProgressTimerState();
+        UpdateVisualizerState();
     }
 
     public override void OnCollapse()
@@ -691,6 +722,29 @@ public sealed class MediaWidget : IslandWidgetBase
         base.OnCollapse();
         DisplayMode = WidgetDisplayMode.Compact;
         StopProgressTimer();
+        UpdateVisualizerState();
+    }
+
+    public void UpdateVisualizerState()
+    {
+        if (_spectrumService == null) return;
+
+        IslandState state = !IsVisibleOnIsland
+            ? IslandState.Hidden
+            : (DisplayMode == WidgetDisplayMode.Expanded
+                ? IslandState.Expanded
+                : (DisplayMode == WidgetDisplayMode.Split ? IslandState.Split : IslandState.Compact));
+
+        var context = new VisualizerActivationContext(
+            Mode: _settings.VisualizerMode,
+            IsMediaPlaying: _isPlaying,
+            IsMediaWidgetVisible: IsVisibleOnIsland,
+            IslandState: state,
+            IsFullscreenSuppressed: false);
+
+        _spectrumService.UpdateActivation(in context);
+        OnPropertyChanged(nameof(IsVisualizerActive));
+        OnPropertyChanged(nameof(EqualizerVisibility));
     }
 
     public async Task SeekToRatioAsync(double ratio)
@@ -786,6 +840,7 @@ public sealed class MediaWidget : IslandWidgetBase
 
             _mediaService.CurrentSessionChanged -= OnMediaServiceCurrentSessionChanged;
             UnhookCurrentSession();
+            _spectrumService?.Dispose();
         }
 
         base.Dispose(disposing);

@@ -180,9 +180,54 @@
             </Grid>
         </Grid>
 
-        <!-- Bottom Section: Playback Controls (Ensuring complete integrity without bottom border clipping) -->
-        <Grid Grid.Row="2" VerticalAlignment="Center" Margin="0,2,0,0">
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+        <!-- Bottom Section: Playback Controls & 24-Band Spectrum (Ensuring complete integrity) -->
+        <Grid Grid.Row="2" VerticalAlignment="Center" Margin="0,0,0,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- 24 Logarithmic Band Audio Spectrum Visualizer (Expanded View) -->
+            <Border Grid.Row="0"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Bottom"
+                    Height="16"
+                    Margin="0,0,0,5"
+                    ClipToBounds="True"
+                    Visibility="{Binding EqualizerVisibility}"
+                    AutomationProperties.Name="Visualizador de espectro de audio expandido">
+                <StackPanel x:Name="ExpandedSpectrumPanel"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Bottom"
+                            Height="16">
+                    <Border x:Name="ExpBar0" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
+                    <Border x:Name="ExpBar1" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
+                    <Border x:Name="ExpBar2" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
+                    <Border x:Name="ExpBar3" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
+                    <Border x:Name="ExpBar4" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
+                    <Border x:Name="ExpBar5" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
+                    <Border x:Name="ExpBar6" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
+                    <Border x:Name="ExpBar7" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
+                    <Border x:Name="ExpBar8" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
+                    <Border x:Name="ExpBar9" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
+                    <Border x:Name="ExpBar10" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
+                    <Border x:Name="ExpBar11" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
+                    <Border x:Name="ExpBar12" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
+                    <Border x:Name="ExpBar13" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
+                    <Border x:Name="ExpBar14" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
+                    <Border x:Name="ExpBar15" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
+                    <Border x:Name="ExpBar16" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
+                    <Border x:Name="ExpBar17" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
+                    <Border x:Name="ExpBar18" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
+                    <Border x:Name="ExpBar19" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
+                    <Border x:Name="ExpBar20" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
+                    <Border x:Name="ExpBar21" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
+                    <Border x:Name="ExpBar22" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
+                    <Border x:Name="ExpBar23" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" VerticalAlignment="Bottom" />
+                </StackPanel>
+            </Border>
+
+            <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                 <!-- Previous Button -->
                 <Button Command="{Binding SkipPreviousCommand}"
                         Style="{StaticResource TransportButtonStyle}"

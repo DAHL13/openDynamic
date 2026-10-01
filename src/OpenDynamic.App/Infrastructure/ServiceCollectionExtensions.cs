@@ -70,6 +70,15 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<AutostartService>();
         services.AddSingleton<IAutostartService>(sp => sp.GetRequiredService<AutostartService>());
 
+        // Audio & Volume Services
+        services.AddSingleton<VolumeService>();
+        services.AddSingleton<Core.Audio.IVolumeController>(sp => sp.GetRequiredService<VolumeService>());
+        services.AddSingleton<Widgets.Volume.VolumeWidget>();
+
+        // Audio Spectrum Analysis (WASAPI Loopback Capture)
+        services.AddSingleton<AudioSpectrumService>();
+        services.AddSingleton<Core.Audio.Spectrum.IAudioSpectrumService>(sp => sp.GetRequiredService<AudioSpectrumService>());
+
         // Media GSMTC Services
         services.AddSingleton<MediaColorService>();
         services.AddSingleton<MediaService>();
@@ -78,12 +87,8 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<Core.Media.IMediaService>(),
             sp.GetRequiredService<AppSettings>(),
             System.Windows.Application.Current?.Dispatcher,
-            sp.GetRequiredService<MediaColorService>()));
-
-        // Audio & Volume Services
-        services.AddSingleton<VolumeService>();
-        services.AddSingleton<Core.Audio.IVolumeController>(sp => sp.GetRequiredService<VolumeService>());
-        services.AddSingleton<Widgets.Volume.VolumeWidget>();
+            sp.GetRequiredService<MediaColorService>(),
+            sp.GetRequiredService<Core.Audio.Spectrum.IAudioSpectrumService>()));
 
         // Power & Battery Services
         services.AddSingleton<PowerService>();
