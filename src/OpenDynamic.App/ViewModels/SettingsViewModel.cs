@@ -5,7 +5,6 @@ using OpenDynamic.App.Orchestration;
 using OpenDynamic.App.Services;
 using OpenDynamic.App.Widgets.Hardware;
 using OpenDynamic.App.Windowing;
-using OpenDynamic.Core.AgentApprovals;
 using OpenDynamic.Core.Animation;
 using OpenDynamic.Core.Audio.Spectrum;
 using OpenDynamic.Core.Autostart;
@@ -67,8 +66,6 @@ public partial class SettingsViewModel : ObservableObject
     private readonly ITimerCollection? _timerCollection;
     private readonly ClipboardService? _clipboardService;
     private readonly Services.PrivacyAccessMonitor? _privacyMonitor;
-    private readonly ApprovalRuleStore? _ruleStore;
-    private readonly ApprovalHistoryTracker? _historyTracker;
 
     private readonly AppSettings _settings;
 
@@ -340,73 +337,6 @@ public partial class SettingsViewModel : ObservableObject
         }
     }
 
-    // Antigravity Agent Approvals (Phase 17)
-    [ObservableProperty]
-    private bool _enableAgentApprovals;
-
-    [ObservableProperty]
-    private int _agentApprovalTimeoutSeconds;
-
-    [ObservableProperty]
-    private int _agentApprovalGracePeriodMs;
-
-    [ObservableProperty]
-    private bool _enableAgentApprovalSound;
-
-    [ObservableProperty]
-    private int _agentApprovalHighlightedOption;
-
-    [ObservableProperty]
-    private ObservableCollection<string> _agentApprovalPredefinedDenyReasons = new();
-
-    [ObservableProperty]
-    private string _newDenyReason = string.Empty;
-
-    [ObservableProperty]
-    private string? _selectedDenyReasonItem;
-
-    [ObservableProperty]
-    private string _hooksFilePath = string.Empty;
-
-    [ObservableProperty]
-    private string _hookExecutablePath = string.Empty;
-
-    [ObservableProperty]
-    private bool _isHookInstalled;
-
-    [ObservableProperty]
-    private string _hookInstallStatusMessage = string.Empty;
-
-    [ObservableProperty]
-    private string _hookConfigPreview = string.Empty;
-
-    [ObservableProperty]
-    private string _testRequestStatus = string.Empty;
-
-    [ObservableProperty]
-    private bool _enableAgentRuleAutoAllow;
-
-    [ObservableProperty]
-    private bool _enableAgentRuleAutoAllowNotification;
-
-    [ObservableProperty]
-    private bool _enableAgentSafePrefixRules;
-
-    [ObservableProperty]
-    private bool _enableAgentStatusNotifications;
-
-    [ObservableProperty]
-    private bool _enableAgentStatusSound;
-
-    [ObservableProperty]
-    private ObservableCollection<ApprovalRule> _approvalRules = new();
-
-    [ObservableProperty]
-    private ApprovalRule? _selectedApprovalRule;
-
-    [ObservableProperty]
-    private ObservableCollection<ApprovalHistoryItem> _approvalHistory = new();
-
     public SettingsViewModel(
         ISettingsService settingsService,
         IslandOrchestrator orchestrator,
@@ -418,9 +348,7 @@ public partial class SettingsViewModel : ObservableObject
         DeviceService? deviceService = null,
         ITimerCollection? timerCollection = null,
         ClipboardService? clipboardService = null,
-        Services.PrivacyAccessMonitor? privacyMonitor = null,
-        ApprovalRuleStore? ruleStore = null,
-        ApprovalHistoryTracker? historyTracker = null)
+        Services.PrivacyAccessMonitor? privacyMonitor = null)
     {
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _orchestrator = orchestrator ?? throw new ArgumentNullException(nameof(orchestrator));
@@ -433,8 +361,6 @@ public partial class SettingsViewModel : ObservableObject
         _timerCollection = timerCollection;
         _clipboardService = clipboardService;
         _privacyMonitor = privacyMonitor;
-        _ruleStore = ruleStore;
-        _historyTracker = historyTracker;
 
         _settings = _settingsService.CurrentSettings;
 
@@ -519,24 +445,8 @@ public partial class SettingsViewModel : ObservableObject
         UpdateSystemAnimationStatus();
         System.Windows.SystemParameters.StaticPropertyChanged += OnSystemParametersStaticPropertyChanged;
 
-        _enableAgentApprovals = _settings.EnableAgentApprovals;
-        _agentApprovalTimeoutSeconds = _settings.AgentApprovalTimeoutSeconds;
-        _agentApprovalGracePeriodMs = _settings.AgentApprovalGracePeriodMs;
-        _enableAgentApprovalSound = _settings.EnableAgentApprovalSound;
-        _agentApprovalHighlightedOption = _settings.AgentApprovalHighlightedOption;
-        _enableAgentRuleAutoAllow = _settings.EnableAgentRuleAutoAllow;
-        _enableAgentRuleAutoAllowNotification = _settings.EnableAgentRuleAutoAllowNotification;
-        _enableAgentSafePrefixRules = _settings.EnableAgentSafePrefixRules;
-        _enableAgentStatusNotifications = _settings.EnableAgentStatusNotifications;
-        _enableAgentStatusSound = _settings.EnableAgentStatusSound;
-
-        ReloadApprovalRules();
-        ReloadApprovalHistory();
-
-        _agentApprovalPredefinedDenyReasons = new ObservableCollection<string>(_settings.AgentApprovalPredefinedDenyReasons ?? Enumerable.Empty<string>());
-        _hooksFilePath = AntigravityHookInstaller.GetDefaultGlobalHooksFilePath();
-        _hookExecutablePath = AntigravityHookInstaller.ResolveHookExecutablePath(_settings.CustomAgentHookPath);
-        UpdateHookInstallState();
+        _hasHotkeyConflict = _hotkeyService.HasConflict;
+        _hotkeyConflictMessage = _hotkeyService.ConflictMessage;
 
         _hotkeyService.HotkeyConflictOccurred += OnHotkeyConflictOccurred;
     }
@@ -1219,17 +1129,6 @@ public partial class SettingsViewModel : ObservableObject
         OnPropertyChanged(nameof(SelectedMotionModeOption));
         UpdateSystemAnimationStatus();
 
-        EnableAgentApprovals = _settings.EnableAgentApprovals;
-        AgentApprovalTimeoutSeconds = _settings.AgentApprovalTimeoutSeconds;
-        AgentApprovalGracePeriodMs = _settings.AgentApprovalGracePeriodMs;
-        EnableAgentApprovalSound = _settings.EnableAgentApprovalSound;
-        AgentApprovalHighlightedOption = _settings.AgentApprovalHighlightedOption;
-        EnableAgentRuleAutoAllow = _settings.EnableAgentRuleAutoAllow;
-        EnableAgentRuleAutoAllowNotification = _settings.EnableAgentRuleAutoAllowNotification;
-        EnableAgentSafePrefixRules = _settings.EnableAgentSafePrefixRules;
-        EnableAgentStatusNotifications = _settings.EnableAgentStatusNotifications;
-        EnableAgentStatusSound = _settings.EnableAgentStatusSound;
-
         ApplyPositionLive();
         ApplyHotkey();
     }
@@ -1244,287 +1143,6 @@ public partial class SettingsViewModel : ObservableObject
         catch (Exception ex)
         {
             Log.Warning(ex, "Failed to apply live position update from SettingsViewModel.");
-        }
-    }
-
-    partial void OnEnableAgentApprovalsChanged(bool value)
-    {
-        _settings.EnableAgentApprovals = value;
-        _settingsService.SaveDebounced();
-    }
-
-    partial void OnAgentApprovalTimeoutSecondsChanged(int value)
-    {
-        _settings.AgentApprovalTimeoutSeconds = Math.Clamp(value, 10, 300);
-        _settingsService.SaveDebounced();
-    }
-
-    partial void OnAgentApprovalGracePeriodMsChanged(int value)
-    {
-        _settings.AgentApprovalGracePeriodMs = Math.Clamp(value, 0, 3000);
-        _settingsService.SaveDebounced();
-    }
-
-    partial void OnEnableAgentApprovalSoundChanged(bool value)
-    {
-        _settings.EnableAgentApprovalSound = value;
-        _settingsService.SaveDebounced();
-    }
-
-    partial void OnAgentApprovalHighlightedOptionChanged(int value)
-    {
-        _settings.AgentApprovalHighlightedOption = value;
-        _settingsService.SaveDebounced();
-    }
-
-    partial void OnEnableAgentRuleAutoAllowChanged(bool value)
-    {
-        _settings.EnableAgentRuleAutoAllow = value;
-        _settingsService.SaveDebounced();
-    }
-
-    partial void OnEnableAgentRuleAutoAllowNotificationChanged(bool value)
-    {
-        _settings.EnableAgentRuleAutoAllowNotification = value;
-        _settingsService.SaveDebounced();
-    }
-
-    partial void OnEnableAgentSafePrefixRulesChanged(bool value)
-    {
-        _settings.EnableAgentSafePrefixRules = value;
-        _settingsService.SaveDebounced();
-    }
-
-    partial void OnEnableAgentStatusNotificationsChanged(bool value)
-    {
-        _settings.EnableAgentStatusNotifications = value;
-        _settingsService.SaveDebounced();
-    }
-
-    partial void OnEnableAgentStatusSoundChanged(bool value)
-    {
-        _settings.EnableAgentStatusSound = value;
-        _settingsService.SaveDebounced();
-    }
-
-    [RelayCommand]
-    public void DeleteApprovalRule(ApprovalRule? rule)
-    {
-        var target = rule ?? SelectedApprovalRule;
-        if (target != null && _ruleStore != null)
-        {
-            _ruleStore.RemoveRule(target.Id);
-            ReloadApprovalRules();
-        }
-    }
-
-    [RelayCommand]
-    public void ClearAllApprovalRules()
-    {
-        _ruleStore?.ClearRules();
-        ReloadApprovalRules();
-    }
-
-    [RelayCommand]
-    public void AddSuggestedRules()
-    {
-        if (_ruleStore == null) return;
-
-        var suggested = new[]
-        {
-            "git status",
-            "git diff --stat",
-            "git log --oneline"
-        };
-
-        foreach (var cmd in suggested)
-        {
-            var rule = new ApprovalRule
-            {
-                Scope = ApprovalRuleScope.Global,
-                ToolName = "run_command",
-                CommandPattern = cmd,
-                IsPrefixMatch = false
-            };
-            _ruleStore.AddRule(rule);
-        }
-
-        ReloadApprovalRules();
-    }
-
-    [RelayCommand]
-    public void ClearApprovalHistory()
-    {
-        _historyTracker?.Clear();
-        ReloadApprovalHistory();
-    }
-
-    [RelayCommand]
-    public void RefreshApprovalRules()
-    {
-        ReloadApprovalRules();
-        ReloadApprovalHistory();
-    }
-
-    public void ReloadApprovalRules()
-    {
-        ApprovalRules.Clear();
-        if (_ruleStore != null)
-        {
-            foreach (var r in _ruleStore.GetAllRules())
-            {
-                ApprovalRules.Add(r);
-            }
-        }
-    }
-
-    public void ReloadApprovalHistory()
-    {
-        ApprovalHistory.Clear();
-        if (_historyTracker != null)
-        {
-            foreach (var h in _historyTracker.GetRecent())
-            {
-                ApprovalHistory.Add(h);
-            }
-        }
-    }
-
-    [RelayCommand]
-    public void ConnectHook()
-    {
-        var result = AntigravityHookInstaller.Install(HooksFilePath, HookExecutablePath);
-        HookInstallStatusMessage = result.Message;
-        UpdateHookInstallState();
-    }
-
-    [RelayCommand]
-    public void DisconnectHook()
-    {
-        var result = AntigravityHookInstaller.Uninstall(HooksFilePath);
-        HookInstallStatusMessage = result.Message;
-        UpdateHookInstallState();
-    }
-
-    [RelayCommand]
-    public void RefreshHookStatus()
-    {
-        UpdateHookInstallState();
-        HookInstallStatusMessage = "Estado actualizado.";
-    }
-
-    [RelayCommand]
-    public async Task SendTestRequestAsync()
-    {
-        if (!EnableAgentApprovals)
-        {
-            TestRequestStatus = "Aviso: Primero debes activar el interruptor 'Aprobaciones de Antigravity'.";
-            return;
-        }
-
-        TestRequestStatus = "Enviando solicitud de prueba sintética al notch...";
-        try
-        {
-            var testReq = new ApprovalRequest(
-                id: "test-" + Guid.NewGuid().ToString("N")[..8],
-                conversationId: "test-conversation",
-                stepIdx: 1,
-                toolName: "run_command",
-                commandLine: "git status && git log -n 2 --oneline",
-                cwd: Environment.CurrentDirectory,
-                workspacePaths: [Environment.CurrentDirectory]);
-
-            using var client = new System.IO.Pipes.NamedPipeClientStream(
-                ".",
-                AgentApprovalPipeServer.PipeName,
-                System.IO.Pipes.PipeDirection.InOut,
-                System.IO.Pipes.PipeOptions.CurrentUserOnly | System.IO.Pipes.PipeOptions.Asynchronous);
-
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(95));
-            await client.ConnectAsync(cts.Token);
-
-            var msg = PipeMessage.CreateRequest(testReq);
-            var writeBytes = System.Text.Encoding.UTF8.GetBytes(msg.Serialize() + "\n");
-            await client.WriteAsync(writeBytes.AsMemory(), cts.Token);
-            await client.FlushAsync(cts.Token);
-
-            TestRequestStatus = "Solicitud visible en el notch. Responde en la isla...";
-
-            using var ms = new System.IO.MemoryStream();
-            var buffer = new byte[256];
-            string? responseLine = null;
-
-            while (!cts.IsCancellationRequested)
-            {
-                int read = await client.ReadAsync(buffer.AsMemory(0, buffer.Length), cts.Token);
-                if (read == 0) break;
-
-                for (int i = 0; i < read; i++)
-                {
-                    if (buffer[i] == (byte)'\n')
-                    {
-                        responseLine = System.Text.Encoding.UTF8.GetString(ms.ToArray()).TrimEnd('\r').TrimStart('\uFEFF');
-                        break;
-                    }
-                    ms.WriteByte(buffer[i]);
-                }
-
-                if (responseLine != null) break;
-            }
-
-            if (!string.IsNullOrWhiteSpace(responseLine))
-            {
-                var respMsg = PipeMessage.Deserialize(responseLine);
-                var appResp = ApprovalResponse.FromJsonSafe(respMsg.Payload);
-                TestRequestStatus = $"Respuesta recibida: {appResp.Decision}" +
-                    (!string.IsNullOrEmpty(appResp.Reason) ? $" ({appResp.Reason})" : string.Empty);
-            }
-            else
-            {
-                TestRequestStatus = "Conexión finalizada sin respuesta.";
-            }
-        }
-        catch (Exception ex)
-        {
-            TestRequestStatus = $"Resultado: {ex.Message}";
-        }
-    }
-
-    [RelayCommand]
-    public void AddDenyReason()
-    {
-        if (string.IsNullOrWhiteSpace(NewDenyReason)) return;
-        string trimmed = NewDenyReason.Trim();
-        if (!AgentApprovalPredefinedDenyReasons.Contains(trimmed))
-        {
-            AgentApprovalPredefinedDenyReasons.Add(trimmed);
-            _settings.AgentApprovalPredefinedDenyReasons = AgentApprovalPredefinedDenyReasons.ToList();
-            _settingsService.SaveDebounced();
-            NewDenyReason = string.Empty;
-        }
-    }
-
-    [RelayCommand]
-    public void RemoveDenyReason()
-    {
-        if (string.IsNullOrWhiteSpace(SelectedDenyReasonItem)) return;
-        if (AgentApprovalPredefinedDenyReasons.Remove(SelectedDenyReasonItem))
-        {
-            _settings.AgentApprovalPredefinedDenyReasons = AgentApprovalPredefinedDenyReasons.ToList();
-            _settingsService.SaveDebounced();
-        }
-    }
-
-    private void UpdateHookInstallState()
-    {
-        try
-        {
-            IsHookInstalled = AntigravityHookInstaller.IsHookInstalled(HooksFilePath);
-            HookConfigPreview = AntigravityHookInstaller.GeneratePreview(HooksFilePath, HookExecutablePath);
-        }
-        catch (Exception ex)
-        {
-            HookConfigPreview = $"Error generando vista previa: {ex.Message}";
         }
     }
 }

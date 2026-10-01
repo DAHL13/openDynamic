@@ -420,32 +420,5 @@ public static class NativeMethods
         RegNotifyFilter dwNotifyFilter,
         Microsoft.Win32.SafeHandles.SafeWaitHandle hEvent,
         bool fAsynchronous);
-
-    // Window Activation and Flashing
-    [StructLayout(LayoutKind.Sequential)]
-    public struct FLASHWINFO
-    {
-        public uint cbSize;
-        public IntPtr hwnd;
-        public uint dwFlags;
-        public uint uCount;
-        public uint dwTimeout;
-    }
-
-    public const uint FLASHW_ALL = 3;
-    public const uint FLASHW_TIMERNOFG = 12;
-
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    public static extern bool FlashWindowEx(ref FLASHWINFO pwfi);
-
-    public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
-
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
-
-    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
-    public static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder lpString, int nMaxCount);
 }
 

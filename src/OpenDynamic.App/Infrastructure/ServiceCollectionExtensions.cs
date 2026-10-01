@@ -7,7 +7,6 @@ using OpenDynamic.App.Services;
 using OpenDynamic.App.ViewModels;
 using OpenDynamic.App.Views;
 using OpenDynamic.App.Windowing;
-using OpenDynamic.Core.AgentApprovals;
 using OpenDynamic.Core.Autostart;
 using OpenDynamic.Core.Settings;
 using OpenDynamic.Core.State;
@@ -47,8 +46,7 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<NetworkService>(),
             sp.GetRequiredService<DeviceService>(),
             sp.GetRequiredService<ClipboardService>(),
-            sp.GetRequiredService<PrivacyAccessMonitor>(),
-            sp.GetRequiredService<Widgets.AgentApprovals.ApprovalWidget>()));
+            sp.GetRequiredService<PrivacyAccessMonitor>()));
 
         // Settings Service & Persistence
         services.AddSingleton<ISettingsService>(sp =>
@@ -145,21 +143,6 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<Core.Privacy.IPrivacyAccessMonitor>(sp => sp.GetRequiredService<PrivacyAccessMonitor>());
         services.AddSingleton<Widgets.Privacy.PrivacyWidget>();
 
-        // Antigravity Agent Approvals Services (Priority 95, Named Pipe Server, Rule Store, History & Widgets)
-        services.AddSingleton<ApprovalRuleStore>();
-        services.AddSingleton<ApprovalHistoryTracker>();
-        services.AddSingleton<Widgets.AgentApprovals.ApprovalWidget>(sp => new Widgets.AgentApprovals.ApprovalWidget(
-            sp.GetRequiredService<AppSettings>(),
-            sp.GetRequiredService<ApprovalRuleStore>(),
-            System.Windows.Application.Current?.Dispatcher));
-        services.AddSingleton<Widgets.AgentApprovals.AgentStatusWidget>(sp => new Widgets.AgentApprovals.AgentStatusWidget(
-            sp.GetRequiredService<AppSettings>(),
-            System.Windows.Application.Current?.Dispatcher));
-        services.AddSingleton<AgentApprovalPipeServer>(sp => new AgentApprovalPipeServer(
-            sp.GetRequiredService<AppSettings>(),
-            sp.GetRequiredService<ApprovalRuleStore>(),
-            sp.GetRequiredService<ApprovalHistoryTracker>()));
-
         // Settings Window & ViewModel
         services.AddSingleton<SettingsViewModel>(sp => new SettingsViewModel(
             sp.GetRequiredService<ISettingsService>(),
@@ -172,9 +155,7 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<DeviceService>(),
             sp.GetRequiredService<Core.Timer.ITimerCollection>(),
             sp.GetRequiredService<ClipboardService>(),
-            sp.GetRequiredService<PrivacyAccessMonitor>(),
-            sp.GetRequiredService<ApprovalRuleStore>(),
-            sp.GetRequiredService<ApprovalHistoryTracker>()));
+            sp.GetRequiredService<PrivacyAccessMonitor>()));
         services.AddSingleton<SettingsWindow>();
 
         // System Tray Icon Manager

@@ -79,6 +79,7 @@ public sealed class SettingsService : ISettingsService
         lock (_syncLock)
         {
             EnsureDirectoryExists();
+            CleanupLegacyApprovalRules();
 
             if (!File.Exists(SettingsFilePath))
             {
@@ -190,65 +191,14 @@ public sealed class SettingsService : ISettingsService
                         }
                     }
 
-                    if (loaded.SchemaVersion < 10)
-                    {
-                        // Migration v9 -> v10: Introduce Antigravity Approvals in notch (Strictly disabled by default).
-                        loaded.EnableAgentApprovals = false;
-                        loaded.AgentApprovalTimeoutSeconds = 90;
-                        loaded.AgentApprovalGracePeriodMs = 600;
-                        loaded.EnableAgentApprovalSound = true;
-                        loaded.AgentApprovalPredefinedDenyReasons = new List<string>
-                        {
-                            "No: usa otro enfoque",
-                            "No: pregúntame antes de ejecutar esto",
-                            "No: no toques esos archivos"
-                        };
-                        loaded.AgentApprovalHighlightedOption = 1;
-                        loaded.CustomAgentHookPath = null;
-                    }
-
                     if (loaded.SchemaVersion < 11)
                     {
-                        // Migration v10 -> v11: Introduce Approval Rules auto-allow, safe prefix whitelist, and Stop hook status notifications.
-                        loaded.EnableAgentRuleAutoAllow = true;
-                        loaded.EnableAgentRuleAutoAllowNotification = true;
-                        loaded.EnableAgentSafePrefixRules = false;
-                        loaded.AgentSafePrefixWhitelist ??= new List<string>
-                        {
-                            "git status",
-                            "git diff",
-                            "git log",
-                            "git show",
-                            "dotnet build",
-                            "dotnet test",
-                            "dotnet restore",
-                            "ls",
-                            "dir"
-                        };
-                        loaded.EnableAgentStatusNotifications = true;
-                        loaded.EnableAgentStatusSound = false;
+                        // Migration v10 -> v11: Legacy approval integration settings are cleanly omitted.
+                        // System.Text.Json automatically drops unknown properties during deserialization.
                     }
 
                     loaded.IgnoredPrivacyApps ??= new List<string>();
                     loaded.IgnoredDeviceNames ??= new List<string>();
-                    loaded.AgentApprovalPredefinedDenyReasons ??= new List<string>
-                    {
-                        "No: usa otro enfoque",
-                        "No: pregúntame antes de ejecutar esto",
-                        "No: no toques esos archivos"
-                    };
-                    loaded.AgentSafePrefixWhitelist ??= new List<string>
-                    {
-                        "git status",
-                        "git diff",
-                        "git log",
-                        "git show",
-                        "dotnet build",
-                        "dotnet test",
-                        "dotnet restore",
-                        "ls",
-                        "dir"
-                    };
                     loaded.SchemaVersion = AppSettings.CurrentSchemaVersion;
                     CurrentSettings = loaded;
                     WriteSettingsToDisk(CurrentSettings);
@@ -257,24 +207,6 @@ public sealed class SettingsService : ISettingsService
                 {
                     loaded.IgnoredPrivacyApps ??= new List<string>();
                     loaded.IgnoredDeviceNames ??= new List<string>();
-                    loaded.AgentApprovalPredefinedDenyReasons ??= new List<string>
-                    {
-                        "No: usa otro enfoque",
-                        "No: pregúntame antes de ejecutar esto",
-                        "No: no toques esos archivos"
-                    };
-                    loaded.AgentSafePrefixWhitelist ??= new List<string>
-                    {
-                        "git status",
-                        "git diff",
-                        "git log",
-                        "git show",
-                        "dotnet build",
-                        "dotnet test",
-                        "dotnet restore",
-                        "ls",
-                        "dir"
-                    };
                     CurrentSettings = loaded;
                 }
 
@@ -393,6 +325,64 @@ public sealed class SettingsService : ISettingsService
         if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
         {
             Directory.CreateDirectory(dir);
+        }
+    }
+
+    private void CleanupLegacyApprovalRules()
+    {
+        try
+        {
+            var directoriesToCheck = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            string? settingsDir = Path.GetDirectoryName(SettingsFilePath);
+            if (!string.IsNullOrEmpty(settingsDir))
+            {
+                directoriesToCheck.Add(settingsDir);
+            }
+
+            string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            if (!string.IsNullOrEmpty(appData))
+            {
+                directoriesToCheck.Add(Path.Combine(appData, "openDynamic"));
+            }
+
+            foreach (string dir in directoriesToCheck)
+            {
+                if (!Directory.Exists(dir)) continue;
+
+                string legacyFileName = string.Concat("approval", "-", "rules.json");
+                string rulesFile = Path.Combine(dir, legacyFileName);
+                if (File.Exists(rulesFile))
+                {
+                    try
+                    {
+                        File.Delete(rulesFile);
+                        _warningLogger?.Invoke("Legacy approval rules file was removed.", null);
+                    }
+                    catch (Exception ex)
+                    {
+                        _warningLogger?.Invoke("Failed to remove legacy approval rules file.", ex);
+                    }
+                }
+
+                string rulesBak = Path.Combine(dir, legacyFileName + ".bak");
+                if (File.Exists(rulesBak))
+                {
+                    try
+                    {
+                        File.Delete(rulesBak);
+                        _warningLogger?.Invoke("Legacy approval rules backup file was removed.", null);
+                    }
+                    catch (Exception ex)
+                    {
+                        _warningLogger?.Invoke("Failed to remove legacy approval rules backup file.", ex);
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // Defensive: ensure cleanup never crashes settings loading
         }
     }
 
