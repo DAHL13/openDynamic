@@ -20,8 +20,9 @@ public sealed class AppSettings
     /// Version 8 introduces Microphone & Camera indicators, privacy transient alerts, priority (85), and ignored privacy apps.
     /// Version 9 introduces Audio Spectrum Visualizer mode (Disabled, Simulated, Real).
     /// Version 10 introduces Antigravity Agent Approvals in the notch, risk-aware policies, and pipe server settings.
+    /// Version 11 introduces Approval Rules auto-allow, safe prefix whitelist, and Agent Status (Stop hook) notifications.
     /// </summary>
-    public const int CurrentSchemaVersion = 10;
+    public const int CurrentSchemaVersion = 11;
 
     /// <summary>
     /// Configuration schema version. Defaults to <see cref="CurrentSchemaVersion"/>.
@@ -480,6 +481,52 @@ public sealed class AppSettings
     /// </summary>
     public string? CustomAgentHookPath { get; set; }
 
+    /// <summary>
+    /// Flag to enable automated approval for commands matching active approval rules without showing a card.
+    /// Default is true.
+    /// </summary>
+    public bool EnableAgentRuleAutoAllow { get; set; } = true;
+
+    /// <summary>
+    /// Flag to show a subtle 2-second transient notification in the notch when a command is auto-approved by a rule.
+    /// Default is true.
+    /// </summary>
+    public bool EnableAgentRuleAutoAllowNotification { get; set; } = true;
+
+    /// <summary>
+    /// Flag to enable opt-in safe prefix rules for commands with repetitive arguments (Task 6b).
+    /// Default is false.
+    /// </summary>
+    public bool EnableAgentSafePrefixRules { get; set; } = false;
+
+    /// <summary>
+    /// Whitelist of command prefixes allowed for safe prefix rules.
+    /// </summary>
+    public List<string> AgentSafePrefixWhitelist { get; set; } = new()
+    {
+        "git status",
+        "git diff",
+        "git log",
+        "git show",
+        "dotnet build",
+        "dotnet test",
+        "dotnet restore",
+        "ls",
+        "dir"
+    };
+
+    /// <summary>
+    /// Flag to display a subtle transient notification in the Notch when an agent task finishes (Stop hook).
+    /// Default is true.
+    /// </summary>
+    public bool EnableAgentStatusNotifications { get; set; } = true;
+
+    /// <summary>
+    /// Flag to play a notification sound when the agent task finishes.
+    /// Default is false.
+    /// </summary>
+    public bool EnableAgentStatusSound { get; set; } = false;
+
     #endregion
 
     #region Hotkeys and Autostart
@@ -578,7 +625,13 @@ public sealed class AppSettings
             EnableAgentApprovalSound = this.EnableAgentApprovalSound,
             AgentApprovalPredefinedDenyReasons = new List<string>(this.AgentApprovalPredefinedDenyReasons),
             AgentApprovalHighlightedOption = this.AgentApprovalHighlightedOption,
-            CustomAgentHookPath = this.CustomAgentHookPath
+            CustomAgentHookPath = this.CustomAgentHookPath,
+            EnableAgentRuleAutoAllow = this.EnableAgentRuleAutoAllow,
+            EnableAgentRuleAutoAllowNotification = this.EnableAgentRuleAutoAllowNotification,
+            EnableAgentSafePrefixRules = this.EnableAgentSafePrefixRules,
+            AgentSafePrefixWhitelist = new List<string>(this.AgentSafePrefixWhitelist ?? Enumerable.Empty<string>()),
+            EnableAgentStatusNotifications = this.EnableAgentStatusNotifications,
+            EnableAgentStatusSound = this.EnableAgentStatusSound
         };
     }
 
@@ -657,5 +710,11 @@ public sealed class AppSettings
         AgentApprovalPredefinedDenyReasons = new List<string>(other.AgentApprovalPredefinedDenyReasons ?? Enumerable.Empty<string>());
         AgentApprovalHighlightedOption = other.AgentApprovalHighlightedOption;
         CustomAgentHookPath = other.CustomAgentHookPath;
+        EnableAgentRuleAutoAllow = other.EnableAgentRuleAutoAllow;
+        EnableAgentRuleAutoAllowNotification = other.EnableAgentRuleAutoAllowNotification;
+        EnableAgentSafePrefixRules = other.EnableAgentSafePrefixRules;
+        AgentSafePrefixWhitelist = new List<string>(other.AgentSafePrefixWhitelist ?? Enumerable.Empty<string>());
+        EnableAgentStatusNotifications = other.EnableAgentStatusNotifications;
+        EnableAgentStatusSound = other.EnableAgentStatusSound;
     }
 }

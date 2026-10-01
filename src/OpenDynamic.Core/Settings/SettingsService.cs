@@ -207,6 +207,28 @@ public sealed class SettingsService : ISettingsService
                         loaded.CustomAgentHookPath = null;
                     }
 
+                    if (loaded.SchemaVersion < 11)
+                    {
+                        // Migration v10 -> v11: Introduce Approval Rules auto-allow, safe prefix whitelist, and Stop hook status notifications.
+                        loaded.EnableAgentRuleAutoAllow = true;
+                        loaded.EnableAgentRuleAutoAllowNotification = true;
+                        loaded.EnableAgentSafePrefixRules = false;
+                        loaded.AgentSafePrefixWhitelist ??= new List<string>
+                        {
+                            "git status",
+                            "git diff",
+                            "git log",
+                            "git show",
+                            "dotnet build",
+                            "dotnet test",
+                            "dotnet restore",
+                            "ls",
+                            "dir"
+                        };
+                        loaded.EnableAgentStatusNotifications = true;
+                        loaded.EnableAgentStatusSound = false;
+                    }
+
                     loaded.IgnoredPrivacyApps ??= new List<string>();
                     loaded.IgnoredDeviceNames ??= new List<string>();
                     loaded.AgentApprovalPredefinedDenyReasons ??= new List<string>
@@ -214,6 +236,18 @@ public sealed class SettingsService : ISettingsService
                         "No: usa otro enfoque",
                         "No: pregúntame antes de ejecutar esto",
                         "No: no toques esos archivos"
+                    };
+                    loaded.AgentSafePrefixWhitelist ??= new List<string>
+                    {
+                        "git status",
+                        "git diff",
+                        "git log",
+                        "git show",
+                        "dotnet build",
+                        "dotnet test",
+                        "dotnet restore",
+                        "ls",
+                        "dir"
                     };
                     loaded.SchemaVersion = AppSettings.CurrentSchemaVersion;
                     CurrentSettings = loaded;
@@ -228,6 +262,18 @@ public sealed class SettingsService : ISettingsService
                         "No: usa otro enfoque",
                         "No: pregúntame antes de ejecutar esto",
                         "No: no toques esos archivos"
+                    };
+                    loaded.AgentSafePrefixWhitelist ??= new List<string>
+                    {
+                        "git status",
+                        "git diff",
+                        "git log",
+                        "git show",
+                        "dotnet build",
+                        "dotnet test",
+                        "dotnet restore",
+                        "ls",
+                        "dir"
                     };
                     CurrentSettings = loaded;
                 }
