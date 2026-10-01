@@ -748,3 +748,68 @@
       - Tiempo de arranque en estado estacionario / caliente: ~61-66 ms (muy por debajo del presupuesto estricto de 150 ms).
       - Suite de pruebas de integración completa ejecutada en ~1.0 s sin deadlocks.
 
+
+
+---
+
+## ADR-026: Motor de Reglas de Aprobación, Cola FIFO de Solicitudes y Notificación de Estado del Agente (Fase 18)
+
+- **Estado:** Aceptado
+- **Fecha:** 2026-10-01
+- **Contexto:**
+  La Fase 18 completa la sustitución del diálogo nativo de Antigravity en Windows. En lugar de desplegar una tarjeta simplificada que delegue decisiones permanentes al diálogo inferior de Antigravity, el Notch de openDynamic despliega DIRECTAMENTE las 5 opciones estructuradas equivalentes a las opciones nativas de Antigravity:
+  1. `[1] Sí, permitir esta vez`: Ejecuta el comando actual sin almacenar reglas de persistencia.
+  2. `[2] Sí, y siempre en esta conversación`: Almacena una regla volátil en memoria RAM vinculada al `conversationId` activo; desaparece al cerrar la aplicación o cambiar de sesión.
+  3. `[3] Sí, y siempre en este proyecto`: Almacena una regla persistente exacta en el archivo `.antigravity/approval-rules.json` ubicado en la raíz del espacio de trabajo del proyecto actual.
+  4. `[4] Sí, y siempre globalmente`: Almacena una regla persistente exacta en `%USERPROFILE%/.antigravity/approval-rules.json` válida para todos los proyectos y conversaciones del usuario.
+  5. `[5] No: Denegar`: Despliega un menú de motivos predefinidos ("Enfoque incorrecto", "Comando destructivo", "Otro método", etc.) para informar al agente sin necesidad de entrada de texto libre en la muesca.
+
+  Además, se resuelven los escenarios de concurrencia cuando múltiples agentes o tareas emiten solicitudes de autorización simultáneas (cola FIFO), y se intercepta el evento de finalización del agente (`Stop`) para notificar al desarrollador de manera no intrusiva en la muesca (Prioridad 70).
+
+- **Decisiones Técnicas:**
+
+  1. **Restricción de Seguridad Obligatoria para Alto Riesgo y Edición de Archivos (Regla de Oro 12):**
+     - Si el clasificador `CommandRiskClassifier` determina que el comando es de riesgo `High` (ej. comandos destructivos como `rm -rf`, formateos, borrado masivo de claves de registro, cambios forzados de ramas en Git), o si la herramienta invocada es de escritura/modificación de archivos (`write_to_file`, `replace_file_content`, `multi_replace_file_content`), el Notch OCULTA AUTOMÁTICAMENTE las opciones 2, 3 y 4.
+     - En estos casos, la interfaz muestra exclusivamente las opciones `[1] Sí, permitir esta vez` y `[5] No: Denegar`. Bajo ninguna circunstancia se permite almacenar reglas ni auto-aprobar acciones destructivas o escrituras en disco.
+
+  2. **Motor de Reglas con Coincidencia Exacta (`ApprovalRuleMatcher` y `ApprovalRuleStore`):**
+     - Las reglas se aplican exclusivamente a la herramienta `run_command` en la versión 1.
+     - Coincidencia exacta estricta (*exact match*): se valida carácter por carácter tras aplicar `Trim()` y normalización de saltos de línea (`\r\n` a `\n`). Se preservan los espacios internos y el casing (mayúsculas/minúsculas). Comandos como `npm test` no coinciden con `npm  test` ni con `npm test --watch`.
+     - Persistencia atómica y resiliente: escrituras en archivo temporal `.tmp` con reemplazo atómico y copia de seguridad previa `.bak`. Si el archivo JSON se corrompe por cierres abruptos, el motor recupera automáticamente el archivo `.bak` para evitar pérdida de reglas. Capacidad máxima limitada a 200 reglas por ámbito con política de poda LRU (menos recientemente utilizadas).
+     - Aplicación automática instantánea: si una solicitud entrante coincide con una regla autorizada, el hook responde `allow` de inmediato sin desplegar la tarjeta interactiva ni interrumpir al desarrollador, emitiendo una notificación transitoria de 2 segundos en el Notch ("Permitido por regla: <resumen>") configurable en Ajustes.
+
+  3. **Reglas de Prefijo Seguro Opt-In (Tarea 6b):**
+     - Como funcionalidad opcional desactivada por defecto (`EnableAgentSafePrefixRules = false`), se permite crear reglas basadas en prefijo para comandos repetitivos con argumentos benignos (`git status`, `git diff`, `git log`, `dotnet build`, `dotnet test`, etc.).
+     - Restricciones infranqueables:
+       - Solo se permite en el ámbito de Proyecto (nunca Global ni Conversación).
+       - Exige límite estricto de token (espacio en blanco tras el prefijo; ej. `git log` coincide con `git log --oneline`, pero rechaza `git logging`).
+       - Valida que el resto del comando contenga únicamente caracteres benignos (alfanuméricos, espacios, y signos `. _ - : / \ = , ' "`).
+       - Prohibición tajante de caracteres de encadenamiento o subshell (`;`, `&`, `|`, `>`, `<`, comillas invertidas, `$()`, saltos de línea).
+       - Exclusión estricta de intérpretes y shells (`pwsh`, `cmd`, `bash`, `wsl`, `python`, `node`) y descargadores (`curl`, `wget`, `certutil`, `iex`).
+
+  4. **Cola FIFO Multisesión de Solicitudes y Concurrencia:**
+     - Manejo de múltiples solicitudes concurrentes en `ApprovalWidget` mediante cola FIFO con indicador visual de posición (`1 / N`).
+     - Cada solicitud en cola mantiene su temporizador de expiración (90 s) y su guarda anti-clic accidental (600 ms) de forma completamente independiente.
+     - Los atajos dinámicos de teclado (`Ctrl+Alt+1` a `Ctrl+Alt+5`, `Enter`, `A`) y las acciones visuales se vinculan exclusivamente a la solicitud visible al frente de la cola.
+     - La cancelación o desconexión de un cliente no corrompe la cola; la sesión afectada se descarta limpiamente y la siguiente toma el frente.
+
+  5. **Notificación de Estado del Agente en el Notch (`AgentStatusWidget`, Prioridad 70):**
+     - Intercepción del evento `Stop` mediante el subcomando `--event stop` inyectado en `hooks.json` bajo la clave `openDynamic-status`.
+     - El cliente hook emite el evento al named pipe y responde de inmediato `{"decision": "stop"}` a Antigravity sin bloquear el apagado del agente.
+     - Se muestra un aviso transitorio sutil en el Notch de 4 segundos ("Antigravity terminó en <proyecto>") con sonido opcional, **únicamente si `fullyIdle == true`**. Si aún hay tareas en segundo plano (`fullyIdle == false`), la notificación se suprime para evitar ruido visual.
+
+  6. **Decisión de Descarte de la Insignia PostToolUse (Tarea 9):**
+     - La especificación autorizaba omitir la Tarea 9 (insignia de espera en Antigravity mediante hook `PostToolUse`) si agregaba latencia o complejidad innecesaria.
+     - Medición y evaluación técnica: invocar un proceso externo en cada llamada de herramienta (`PostToolUse`) introduce una sobrecarga acumulada de 60-150 ms en cada paso del agente. Dado que la delegación a `AskNative` transfiere de inmediato el control al diálogo nativo de Antigravity sin requerir seguimiento de estado en la muesca, se decidió omitir `PostToolUse` preservando la velocidad nativa del agente y el consumo de CPU en reposo (0%).
+
+  7. **Investigación sobre `permissionOverrides` de Antigravity (Tarea 10):**
+     - Se investigó el comportamiento de la propiedad `permissionOverrides` reportada en la salida JSON de hooks `PreToolUse`.
+     - Hallazgo: En la versión actual de Antigravity CLI / IDE, devolver `permissionOverrides` desde un hook de comando no inyecta ni persiste de forma fiable la autorización en la base de datos interna de concesiones del IDE sin integración nativa profunda a nivel de extensión. Por ende, la persistencia de reglas gestionada por openDynamic en `.antigravity/approval-rules.json` y `%USERPROFILE%/.antigravity/approval-rules.json` resulta el mecanismo más robusto, portable y seguro. No se requiere implementación adicional de `permissionOverrides`.
+
+  8. **Privacidad y Cero Registro de Datos Sensibles (Reglas de Oro 10 y 13):**
+     - Se implementó `ApprovalHistoryTracker`, un búfer circular en memoria RAM de hasta 50 elementos que almacena resúmenes sanitizados (máximo 60 caracteres) y nombres de carpetas relativos, sin rutas completas del sistema operativo ni contenido de archivos o credenciales.
+     - Verificado mediante pruebas unitarias y estáticas en `ZeroLogsSecurityTests`.
+
+  9. **Evolución del Esquema de Ajustes (v11):**
+     - Se actualizó `AppSettings.cs` a `CurrentSchemaVersion = 11`.
+     - Nuevas opciones: `EnableAgentRuleAutoAllow` (activado por defecto al habilitar aprobaciones), `ShowAgentRuleAutoAllowNotices` (true), `EnableAgentSafePrefixRules` (false, opt-in), `AgentApprovalHighlightedOption` (1), `EnableAgentStatusNotifications` (true), y `PlayAgentStatusSound` (true).
