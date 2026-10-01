@@ -684,7 +684,7 @@
 
 ## ADR-025: Arquitectura de Aprobaciones de Agente por Named Pipe y Superficie de Revisión en Notch (Fase 17)
 
-- **Estado:** Aceptado
+- **Estado:** Retirada (Withdrawn) por Tarea R1 (Sustituida por ADR-027)
 - **Fecha:** 2026-09-30
 - **Contexto:**
   openDynamic integra el sistema de intercepción y aprobación de acciones de agentes autónomos de codificación (Google Antigravity) directamente en la superficie del Notch/Dynamic Island. Esta integración permite inspeccionar y autorizar comandos del sistema, ediciones de archivos y llamadas a herramientas sin interrumpir el flujo visual del desarrollador ni robar el foco de la terminal (`WS_EX_NOACTIVATE`).
@@ -754,7 +754,7 @@
 
 ## ADR-026: Motor de Reglas de Aprobación, Cola FIFO de Solicitudes y Notificación de Estado del Agente (Fase 18)
 
-- **Estado:** Aceptado
+- **Estado:** Retirada (Withdrawn) por Tarea R1 (Sustituida por ADR-027)
 - **Fecha:** 2026-10-01
 - **Contexto:**
   La Fase 18 completa la sustitución del diálogo nativo de Antigravity en Windows. En lugar de desplegar una tarjeta simplificada que delegue decisiones permanentes al diálogo inferior de Antigravity, el Notch de openDynamic despliega DIRECTAMENTE las 5 opciones estructuradas equivalentes a las opciones nativas de Antigravity:
@@ -813,3 +813,51 @@
   9. **Evolución del Esquema de Ajustes (v11):**
      - Se actualizó `AppSettings.cs` a `CurrentSchemaVersion = 11`.
      - Nuevas opciones: `EnableAgentRuleAutoAllow` (activado por defecto al habilitar aprobaciones), `ShowAgentRuleAutoAllowNotices` (true), `EnableAgentSafePrefixRules` (false, opt-in), `AgentApprovalHighlightedOption` (1), `EnableAgentStatusNotifications` (true), y `PlayAgentStatusSound` (true).
+
+---
+
+## ADR-027: Retiro Completo de la Integración con Antigravity (Fases 17 y 18 - Tarea R1)
+
+- **Estado:** Aceptado
+- **Fecha:** 2026-10-01
+- **Contexto:**
+  Tras evaluar el impacto operativo, la complejidad arquitectónica y la experiencia de usuario de la integración con Google Antigravity desarrollada en las Fases 17 y 18, la dirección del proyecto decidió retirar íntegramente dicha integración. El objetivo es mantener openDynamic enfocado con máxima pureza en su propósito base como Dynamic Island de Windows, eliminando dependencias de IPC bidireccionales, clientes CLI intermedios, inyecciones en `hooks.json` y la complejidad añadida de motores de reglas y colas de solicitudes de agentes.
+
+- **Alcance de Publicación Determinado (Tarea 2):**
+  - Se verificó el historial de Git mediante `git tag --contains` para los commits de las Fases 17 y 18.
+  - Resultado: Las Fases 17 y 18 **nunca fueron incluidas en ninguna versión o release público** (la única etiqueta existente en el repositorio es `v1.0.0` sobre el commit `a54f5a6`, anterior a la Fase 10).
+  - Decisión consecuente: No se añade código de limpieza en tiempo de ejecución de la aplicación para `hooks.json` (manteniendo el binario libre de cualquier referencia a Antigravity). En su lugar, se proporciona el script auxiliar `scripts/limpiar-hooks-antigravity.ps1` con soporte para `-WhatIf` y copias de seguridad `.bak`.
+
+- **Estrategia de Retiro Elegida (Tarea 4):**
+  - **Estrategia B (Retiro Estructurado y Limpio):** Se ejecutó un retiro manual y sistemático basado en el inventario documentado, organizando la supresión de código, pruebas, empaquetado y documentación en pasos lógicos (`refactor`, `test`, `chore`, `docs`).
+  - **Justificación:** Si bien la reversión de código no presentó conflictos técnicos sobre el código fuente, la Fase 17 no poseía un commit de fusión único (consistía en 12 commits lineales en `main`), y un `git revert` ciego eliminaba indebidamente los registros históricos ADR-025 y ADR-026 en `DECISIONS.md`, violando las directrices de integridad documental. La estrategia estructurada preserva el historial de decisiones, mantiene intactas las fases 0 a 16 y garantiza que tanto `dotnet build` como `dotnet test` pasen limpiamente en cada fase.
+
+- **Inventario de Componentes Retirados:**
+  1. **Core (`OpenDynamic.Core.AgentApprovals`):**
+     - Protocolo IPC (`PipeMessage`, `ApprovalRequest`, `ApprovalResponse`, `RiskLevel`).
+     - Clasificador de riesgos (`CommandRiskClassifier`).
+     - Motor de reglas y almacén atómico (`ApprovalRule`, `ApprovalRuleMatcher`, `ApprovalRuleStore`, `ApprovalRuleScope`, `SafePrefixMatcher`).
+     - Políticas de sesión y presentación (`ApprovalSessionPolicy`, `ApprovalPresentation`, `ApprovalHistoryTracker`, `AgentStatusEvent`).
+     - Instalador de hooks (`AntigravityHookInstaller`).
+  2. **App (`OpenDynamic.App`):**
+     - Servidor Named Pipe `AgentApprovalPipeServer`.
+     - Activador Win32 `AntigravityWindowActivator` y P/Invokes no compartidos en `NativeMethods`.
+     - Widgets de isla: `ApprovalWidget` (prioridad 95) y `AgentStatusWidget` (prioridad 70), junto con sus vistas compactas y expandidas.
+     - Pestaña de Antigravity y sección de reglas en `SettingsWindow.xaml` y `SettingsViewModel.cs`.
+     - Registro y enlaces dinámicos de atajos (`Ctrl+Alt+1` a `5`, `Enter`, `A`).
+  3. **Proyecto CLI `OpenDynamic.Hook`:**
+     - Eliminado el proyecto `OpenDynamic.Hook.csproj` y `Program.cs`.
+     - Removido de la solución `openDynamic.sln`.
+     - Removido de la publicación ReadyToRun en `.github/workflows/release.yml`.
+  4. **Empaquetado e Instalador Inno Setup:**
+     - Agregada sección `[InstallDelete]` en `installer/setup.iss` para eliminar `{app}\hook` y `{app}\OpenDynamic.Hook.exe` en actualizaciones.
+  5. **Ajustes y Datos Locales:**
+     - Mantenido `SchemaVersion = 11` en `AppSettings.cs` para evitar degradaciones.
+     - Propiedades de Antigravity retiradas de `AppSettings.cs`; la deserialización ignora propiedades obsoletas sin fallar y se omiten al guardar.
+     - Migración automática en `SettingsService.Load()` que elimina de forma segura archivos residuales `approval-rules.json` y `approval-rules.json.bak` en `%AppData%\openDynamic\` sin registrar comandos en logs.
+
+- **Línea Base de Pruebas:**
+  - Pruebas iniciales antes del retiro: 551 pruebas.
+  - Pruebas eliminadas: 161 pruebas (13 archivos en `tests/OpenDynamic.Tests/AgentApprovals/`).
+  - Nuevas pruebas de regresión añadidas: 2 pruebas en `SettingsServiceTests` (validación de carga retrocompatible ignorando campos obsoletos y eliminación segura de `approval-rules.json`).
+  - Total de pruebas resultantes: 392 pruebas en verde (línea base original de 390 + 2 nuevas).

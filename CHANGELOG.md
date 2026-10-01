@@ -3,7 +3,26 @@
 Todas las modificaciones notables en este proyecto serán documentadas en este archivo.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y cumple con [SemVer](https://semver.org/).
 
-## [1.3.0-dev] - 2026-10-01 (Fase 18: Reglas "Siempre Permitir", Cola FIFO y Estado del Agente)
+## [1.4.0-dev] - 2026-10-01 (Tarea R1: Retiro de Integración con Antigravity)
+
+### Eliminado
+- **Retiro Completo de Integración con Antigravity (Fases 17 y 18):**
+  - Proyecto CLI independiente `OpenDynamic.Hook` y binario ejecutable (`OpenDynamic.Hook.exe`).
+  - Espacio de nombres completo `OpenDynamic.Core.AgentApprovals` (protocolo IPC, clasificador de riesgo `CommandRiskClassifier`, almacén de reglas `ApprovalRuleStore`, evaluadores `ApprovalRuleMatcher` y `SafePrefixMatcher`, política de sesión `ApprovalSessionPolicy`, historial y utilidades de presentación).
+  - Componentes de Dynamic Island en `OpenDynamic.App`: `ApprovalWidget` (prioridad 95), `AgentStatusWidget` (prioridad 70) y sus vistas XAML asociadas (`ApprovalCompactView`, `ApprovalExpandedView`, `AgentStatusCompactView`).
+  - Servidor Named Pipe `AgentApprovalPipeServer`, activador Win32 `AntigravityWindowActivator` y P/Invokes no compartidos.
+  - Pestaña "Antigravity" y sección "Reglas de aprobación" en `SettingsWindow.xaml` y `SettingsViewModel.cs`.
+  - Atajos globales dinámicos de teclado (`Ctrl+Alt+1` a `5`, `Ctrl+Alt+Enter`, `Ctrl+Alt+A`).
+  - Directivas de empaquetado de hooks en `.github/workflows/release.yml`.
+  - Batería de 161 pruebas de integración y reglas de agentes, retornando a una suite limpia de 392 pruebas unitarias (línea base 390 + 2 nuevas).
+
+### Modificado
+- `AppSettings.cs` mantiene `SchemaVersion = 11` y descarta campos de aprobaciones de forma limpia sin generar excepciones ante configuraciones previas.
+- `SettingsService.cs` migra y elimina de forma segura archivos residuales de reglas (`approval-rules.json` y `approval-rules.json.bak`) al iniciar sin registrar comandos en logs.
+- `installer/setup.iss` añade directivas `[InstallDelete]` para purgar `{app}\hook` y `{app}\OpenDynamic.Hook.exe` en actualizaciones.
+- `.github/workflows/ci.yml` incorpora paso de auditoría estricto contra restos de la integración en `src/` y `tests/`.
+
+## [1.3.0-dev] - 2026-10-01 (Fase 18: Reglas "Siempre Permitir", Cola FIFO y Estado del Agente - Retirada)
 
 ### Añadido
 - **Despliegue Completo de 5 Opciones en el Notch (`ApprovalWidget`):**
