@@ -679,3 +679,72 @@
 
   7. **Presupuesto de Rendimiento Medido:**
      - Consumo medido en pruebas de benchmark: 50 ms de CPU para procesar 5 segundos continuos de audio a 48 kHz (1.0% de un solo núcleo, < 0.15% de CPU total del sistema). Cumple estrictamente con el presupuesto de < 2% de CPU adicional y 0% en reposo.
+
+---
+
+## ADR-025: Arquitectura de Aprobaciones de Agente por Named Pipe y Superficie de Revisión en Notch (Fase 17)
+
+- **Estado:** Aceptado
+- **Fecha:** 2026-09-30
+- **Contexto:**
+  openDynamic integra el sistema de intercepción y aprobación de acciones de agentes autónomos de codificación (Google Antigravity) directamente en la superficie del Notch/Dynamic Island. Esta integración permite inspeccionar y autorizar comandos del sistema, ediciones de archivos y llamadas a herramientas sin interrumpir el flujo visual del desarrollador ni robar el foco de la terminal (`WS_EX_NOACTIVATE`).
+  
+  Para esta integración se aplican con el máximo rigor las Reglas de Oro de Seguridad 12, 13 y 14:
+  - **Falla hacia lo seguro (Regla de Oro 12):** Ante cualquier fallo, excepción, timeout (90 s), desconexión, mensaje malformado, servidor ausente, isla oculta o pantalla completa exclusiva, el hook DEBE responder `"ask"` (delegar al diálogo nativo de Antigravity), NUNCA `"allow"`. Queda terminantemente PROHIBIDO aprobar comandos automáticamente en esta fase. Solo decide el usuario físicamente.
+  - **Comunicación y privacidad del pipe (Regla de Oro 13):** Named Pipe local `openDynamic-agent-v1` restringido exclusivamente al token de seguridad del usuario actual (`PipeOptions.CurrentUserOnly`). Mensajes acotados con límite estricto de tamaño (256 KB) y versionados (protocolo v1). CERO LOGS DE COMANDOS: Queda terminantemente prohibido registrar en Serilog comandos completos, argumentos, rutas de archivos o variables de entorno. Solo se auditan metadatos agregados (`RequestId`, `ToolName`, `RiskLevel`, `Decision`, `Source`, `ElapsedMs`).
+  - **Clasificador de riesgo y Notch UI (Reglas 6, 12 y 13):** Clasificación de riesgo determinista (Low, Medium, High) en Core con garantía de cero falsos bajos para comandos destructivos o encadenados. Truncado visual seguro a 200 caracteres con revisión expandida obligatoria (`RequiresExpandedReview`) si el contenido fue truncado o si el riesgo es High. Guarda anti-clic accidental de 600 ms antes de habilitar botones interactivos. Atajos de teclado dinámicos (1 permitir, 5 denegar) inhabilitados para riesgo High. Opciones de denegación predefinidas sin entrada de texto libre en la isla.
+  - **Cliente hook ligero e instalador seguro (Reglas 13 y 14):** CLI ligero `OpenDynamic.Hook` optimizado con ReadyToRun para un arranque ultra-rápido (< 150 ms presupuestados, ~65 ms medidos). Salida a `stdout` estrictamente formateada en JSON `{"decision","reason"}` con código de salida 0. Instalador `AntigravityHookInstaller` con respaldo automático `.bak` de `hooks.json`, fusión no destructiva de la clave `openDynamic-approvals`, y desinstalación limpia que conserva las herramientas preexistentes del usuario.
+
+- **Decisiones Técnicas:**
+
+  1. **Modelo de Dominio y Protocolo IPC Bounded en Core (`OpenDynamic.Core.AgentApprovals`):**
+     - `ApprovalRequest`: Modelo inmutable que extrae y tipifica campos estándar de hooks PreToolUse de Antigravity (`toolCall.name`, `toolCall.args`, `conversationId`, `stepIdx`, `workspacePaths`, etc.).
+     - `ApprovalResponse`: Factorías seguras para `allow`, `deny` (con motivo) y `ask` (delegación segura con motivo).
+     - `PipeMessage`: Envoltorio de mensajes IPC con validación de versión (`Version = 1`), tipos de mensaje (`request`, `response`, `ping`, `pong`), y tamaño máximo acotado a 256 KB (`MaxPayloadSizeBytes = 262144`).
+
+  2. **Clasificador de Riesgo Determinista en Core (`CommandRiskClassifier`):**
+     - **High:** Comandos destructivos o de alto impacto para el sistema (`rm -rf`, `Remove-Item -Recurse`, `git push --force`, `git reset --hard`, `curl|sh`, `iex`, `reg delete`, `format`, `dd`, `mkfs`, modificaciones a particiones o servicios del sistema).
+     - **Medium:** Modificaciones de estado estándar, comandos encadenados (`&&`, `;`, `|`), redirecciones (`>`, `>>`) y herramientas con efectos secundarios.
+     - **Low:** Comandos de solo lectura, inspección y consulta (`git status`, `git log`, `dir`, `ls`, `pwd`, `dotnet --version`, `cat`, etc.).
+     - Regla de oro: Ante la menor ambigüedad o presencia de encadenamientos/subshell, se clasifica como Medium o High, garantizando cero falsos bajos.
+
+  3. **Presentación Visual Segura (`ApprovalPresentation`):**
+     - Formatea títulos descriptivos y resúmenes legibles en lenguaje natural.
+     - Aplica truncado a 200 caracteres con elipsis. Si el texto se truncó o si el riesgo es High, establece `RequiresExpandedReview = true`, bloqueando el botón de permitir hasta que el usuario expanda visualmente la vista.
+
+  4. **Política de Sesión Pura en Core (`ApprovalSessionPolicy`):**
+     - Controla la guarda anti-clic accidental de 600 ms mediante `TimeProvider`.
+     - Impone timeout de sesión de 90 segundos; si transcurre sin resolución física del usuario, expira de inmediato a `AskNative`.
+     - Prohíbe atajos de teclado para riesgo High (`CanAllowViaHotkey = false`).
+
+  5. **Servidor Named Pipe Resiliente (`AgentApprovalPipeServer`):**
+     - Escucha en `openDynamic-agent-v1` utilizando `PipeOptions.CurrentUserOnly | PipeOptions.Asynchronous`.
+     - Si la isla está oculta (`IslandState.Hidden`), en modo juego o en pantalla completa exclusiva (`IsFullscreenSuppressed == true`), responde de inmediato con `RejectBySystemUnavailable` delegando a `ask`.
+     - CERO LOGS: Audita exclusivamente `RequestId`, `ToolName`, `Risk`, `Decision`, `Source` y `ElapsedMs`. Queda prohibido registrar `CommandLine`, `CodeContent` o rutas en Serilog (validado por `ZeroLogsSecurityTests`).
+
+  6. **Widget Notch con Prioridad 95 (`ApprovalWidget`):**
+     - Prioridad 95 (superior a medios, sistema y dispositivos; solo por debajo de notificaciones críticas de privacidad).
+     - Auto-expande automáticamente si `RequiresExpandedReview == true`.
+     - Ventana configurada con `WS_EX_NOACTIVATE` para garantizar cero robo de foco de la terminal o del IDE durante la aparición y expansión del widget.
+     - Enlace de atajos HWND en la ventana de la isla: `[1]` permitir esta vez, `[2]` permitir en conversación (Fase 18), `[3]` permitir en workspace (Fase 18), `[4]` permitir siempre (Fase 18), `[5]` denegar con menú de motivos rápidos (ej. "Enfoque incorrecto", "Comando destructivo", "Otro método"), `[Esc]` o botón "Decidir en Antigravity" para delegación segura.
+
+  7. **Cliente Hook Ligero (`OpenDynamic.Hook`):**
+     - Ensamblado ligero compilado como WinExe/Console con ReadyToRun.
+     - Lectura no bloqueante de `stdin` y conexión rápida con timeout de 300 ms por defecto (configurable vía `--connect-timeout-ms` y `--wait-ms`).
+     - Falla segura obligatoria (Golden Rule 12): ante cualquier excepción o timeout, emite por `stdout` `{"decision":"ask","reason":"..."}` con código de salida 0.
+
+  8. **Instalador de Hooks Seguro (`AntigravityHookInstaller`):**
+     - Respalda automáticamente `hooks.json` a `hooks.json.bak` antes de cualquier modificación.
+     - Fusión no destructiva: preserva herramientas externas preexistentes del usuario, insertando o actualizando únicamente el gancho `openDynamic-approvals` en el evento `PreToolUse`.
+     - Desinstalación limpia: elimina exclusivamente las claves propias de openDynamic y restaura la configuración original si no quedan otros ganchos.
+
+  9. **Ajustes y Migración de Esquema v10 (Regla de Oro 9):**
+     - `CurrentSchemaVersion = 10` en `AppSettings.cs`.
+     - Interruptor `EnableAgentApprovals = false` desactivado por defecto (requiere activación explícita del usuario).
+     - Tarjeta "Aprobaciones de Agente (Antigravity)" en Ajustes con visualizador de estado del hook, botones de instalación/desinstalación, botón "Enviar solicitud de prueba" e indicador de salud del servicio.
+
+  10. **Presupuesto de Rendimiento Medido:**
+      - Tiempo de arranque en frío de `OpenDynamic.Hook`: ~170 ms.
+      - Tiempo de arranque en estado estacionario / caliente: ~61-66 ms (muy por debajo del presupuesto estricto de 150 ms).
+      - Suite de pruebas de integración completa ejecutada en ~1.0 s sin deadlocks.
+

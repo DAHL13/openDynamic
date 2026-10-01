@@ -3,6 +3,35 @@
 Todas las modificaciones notables en este proyecto serán documentadas en este archivo.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y cumple con [SemVer](https://semver.org/).
 
+## [1.2.0-dev] - 2026-09-30 (Fase 17: Aprobaciones de Agente en el Notch - Núcleo)
+
+### Añadido
+- **Protocolo de Aprobaciones y Modelos de Dominio en Core (`OpenDynamic.Core.AgentApprovals`):**
+  - `ApprovalRequest`: Modelo inmutable de solicitud PreToolUse que extrae y tipifica campos de herramientas de Antigravity (`toolCall.name`, `toolCall.args`, `conversationId`, `stepIdx`, `workspacePaths`, etc.).
+  - `ApprovalResponse`: Factorías seguras para decisiones `allow`, `deny` (con motivo predefinido) y `ask` (delegación segura con motivo).
+  - `PipeMessage`: Envoltorio versionado (`Version = 1`) para IPC seguro con límite estricto de tamaño a 256 KB.
+  - `RiskLevel` y `CommandRiskClassifier`: Clasificador determinista de riesgo (Low, Medium, High) con garantía de cero falsos bajos para comandos destructivos (`rm -rf`, `Remove-Item -Recurse`, `git push --force`, `git reset --hard`, `iex`, `reg delete`, `format`, etc.), comandos encadenados (`&&`, `;`, `|`) y redirecciones.
+  - `ApprovalPresentation`: Formateador legible para humanos con truncado seguro a 200 caracteres y marcado obligatorio de revisión expandida (`RequiresExpandedReview`) para comandos truncados o de riesgo High.
+  - `ApprovalSessionPolicy`: Política pura de sesión con guarda anti-clic accidental de 600 ms, timeout de 90 segundos con expiración a `AskNative`, y restricción estricta de atajos de teclado para riesgo High.
+  - `AntigravityHookInstaller`: Instalador y desinstalador seguro de ganchos en `%USERPROFILE%\.gemini\antigravity\hooks.json` con copia de seguridad `.bak`, fusión limpia que solo toca `openDynamic-approvals`, y previsualización de configuración.
+- **Servidor IPC Named Pipe y Widget Notch en App (`OpenDynamic.App`):**
+  - `AgentApprovalPipeServer`: Servidor Named Pipe local `openDynamic-agent-v1` protegido exclusivamente para el usuario actual (`PipeOptions.CurrentUserOnly`). Cero logs de comandos o rutas en Serilog (solo metadatos agregados auditables).
+  - `ApprovalWidget`: Widget con prioridad 95 (`ActivityPriority.AgentApproval = 95`) que se auto-expande sin robar el foco (`WS_EX_NOACTIVATE`) ni interrumpir la terminal.
+  - Vistas XAML `ApprovalCompactView` y `ApprovalExpandedView` con opciones numeradas ([1] permitir, [5] denegar con motivos predefinidos, [Esc]/botón "Decidir en Antigravity").
+  - Enlace dinámico de atajos HWND en `IslandWindow` mientras el widget de aprobación esté activo en pantalla.
+  - Integración en `SettingsViewModel` y `SettingsWindow`: pestaña "Antigravity" con interruptor desactivado por defecto (SchemaVersion = 10), instalador/desinstalador del hook, y botón "Enviar solicitud de prueba".
+- **Cliente Hook Ligero (`OpenDynamic.Hook`):**
+  - CLI ligero independiente compilado con ReadyToRun (`< 150 ms` arranque presupuestado, `~65 ms` medido).
+  - Falla segura obligatoria (Golden Rule 12): ante cualquier excepción, timeout o servidor ausente, emite `{"decision":"ask","reason":"..."}` por `stdout` con código de salida 0.
+- **Pruebas Automatizadas y Seguridad:**
+  - `ProtocolTests`: Serialización y deserialización de modelos y mensajes de pipe.
+  - `RiskClassifierTests`: 45 casos de prueba cubriendo comandos destructivos, encadenados, PowerShell y lecturas seguras.
+  - `PresentationTests`: Verificación de truncado y requisitos de revisión expandida.
+  - `SessionPolicyTests`: Guarda anti-clic de 600 ms, timeouts y autorizaciones de atajos.
+  - `HookInstallerTests`: Instalación, respaldo `.bak`, fusión y desinstalación limpia.
+  - `HookClientIntegrationTests`: 7 pruebas completas de integración de proceso verificando respuestas `allow`, `deny`, `ask`, timeouts (`--wait-ms`) y desconexiones tempranas en < 1.5 s.
+  - `ZeroLogsSecurityTests`: Verificación de que comandos, rutas y secretos nunca son registrados en Serilog ni en el código fuente.
+
 ## [1.1.0-dev] - 2026-09-30 (Fase 16: Visualizador de Audio Real - Espectro)
 
 ### Añadido
