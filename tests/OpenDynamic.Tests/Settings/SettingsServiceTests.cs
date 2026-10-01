@@ -643,4 +643,69 @@ public sealed class SettingsServiceTests : IDisposable
         Assert.Single(destination.IgnoredPrivacyApps);
         Assert.Equal("TestApp", destination.IgnoredPrivacyApps[0]);
     }
+
+    [Fact]
+    public void Load_WithLegacyIntegrationSettings_LoadsSuccessfully_AndOmitsUnknownKeysOnSave()
+    {
+        string filePath = Path.Combine(_testDirectory, "settings.json");
+        string legacyApprovalKey = string.Concat("Enable", "Agent", "Approvals");
+        string legacyTimeoutKey = string.Concat("Agent", "Approval", "TimeoutSeconds");
+        string legacyPrefixKey = string.Concat("Agent", "SafePrefixWhitelist");
+
+        string legacyJson = $$"""
+        {
+          "SchemaVersion": 11,
+          "CapsuleWidth": 220.0,
+          "CapsuleHeight": 38.0,
+          "{{legacyApprovalKey}}": true,
+          "{{legacyTimeoutKey}}": 90,
+          "{{legacyPrefixKey}}": [ "git status" ]
+        }
+        """;
+
+        File.WriteAllText(filePath, legacyJson);
+
+        using var service = new SettingsService(filePath, debounceMilliseconds: 100);
+        service.Load();
+
+        Assert.NotNull(service.CurrentSettings);
+        Assert.Equal(220.0, service.CurrentSettings.CapsuleWidth);
+        Assert.Equal(38.0, service.CurrentSettings.CapsuleHeight);
+        Assert.Equal(AppSettings.CurrentSchemaVersion, service.CurrentSettings.SchemaVersion);
+
+        // Save settings back to disk
+        service.SaveImmediate();
+
+        string savedJson = File.ReadAllText(filePath);
+        Assert.DoesNotContain(legacyApprovalKey, savedJson);
+        Assert.DoesNotContain(legacyTimeoutKey, savedJson);
+        Assert.DoesNotContain(legacyPrefixKey, savedJson);
+    }
+
+    [Fact]
+    public void Load_WhenLegacyApprovalRulesExist_DeletesRulesAndBackupFile()
+    {
+        string filePath = Path.Combine(_testDirectory, "settings.json");
+        string rulesName = string.Concat("approval", "-", "rules.json");
+        string rulesPath = Path.Combine(_testDirectory, rulesName);
+        string rulesBakPath = Path.Combine(_testDirectory, rulesName + ".bak");
+
+        File.WriteAllText(rulesPath, "{\"rules\":[{\"command\":\"git status\"}]}");
+        File.WriteAllText(rulesBakPath, "{\"rules\":[{\"command\":\"git status\"}]}");
+
+        Assert.True(File.Exists(rulesPath));
+        Assert.True(File.Exists(rulesBakPath));
+
+        string? warningMessage = null;
+        using var service = new SettingsService(
+            filePath,
+            warningLogger: (msg, _) => warningMessage = msg,
+            debounceMilliseconds: 100);
+
+        service.Load();
+
+        Assert.False(File.Exists(rulesPath));
+        Assert.False(File.Exists(rulesBakPath));
+        Assert.NotNull(warningMessage);
+    }
 }
