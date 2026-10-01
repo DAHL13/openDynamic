@@ -25,11 +25,22 @@ public partial class IslandView : UserControl
     private bool _isMicrophoneActive;
     private bool _isCameraActive;
     private bool _hasSecondarySplitView;
+    private bool _isSatelliteFadingOut;
     private IslandState _currentState = IslandState.Compact;
     private CapsuleDimensions _currentDimensions = new(200, 36, 14, 1.0);
 
     public Border CapsuleBorder => MainCapsuleBorder;
     public Border SatelliteBubble => SatelliteBorder;
+
+    /// <summary>
+    /// Indicates whether the satellite capsule is currently performing an animated exit fade-out.
+    /// </summary>
+    public bool IsSatelliteFadingOut => _isSatelliteFadingOut;
+
+    /// <summary>
+    /// Occurs when the satellite capsule exit fade-out animation completes.
+    /// </summary>
+    public event EventHandler? SatelliteFadeOutCompleted;
 
     public IslandView()
     {
@@ -76,7 +87,7 @@ public partial class IslandView : UserControl
             MainCapsuleBorder.Width = width;
             MainCapsuleBorder.Height = height;
             MainCapsuleBorder.CornerRadius = notchCornerRadius;
-            MainCapsuleBorder.Opacity = 0.0;
+            MainCapsuleBorder.Opacity = opacity;
 
             PrimaryContentContainer.Clip = null;
             UpdateSatelliteLayout();
@@ -206,59 +217,55 @@ public partial class IslandView : UserControl
         bool hasActivePrivacy = _isCameraActive || _isMicrophoneActive;
         bool isSplitMode = _currentState == IslandState.Split && _hasSecondarySplitView;
 
-        // Deterministic dot visibility
-        MicrophoneIndicatorDot.Visibility = _isMicrophoneActive ? Visibility.Visible : Visibility.Collapsed;
-        CameraIndicatorDot.Visibility = _isCameraActive ? Visibility.Visible : Visibility.Collapsed;
-
-        // If island is hidden and no privacy sensors are active, collapse everything on the satellite
-        if (_currentState == IslandState.Hidden && !hasActivePrivacy)
+        if (hasActivePrivacy || isSplitMode)
         {
-            SatelliteBorder.Visibility = Visibility.Collapsed;
-            SecondaryContent.Visibility = Visibility.Collapsed;
-            PrivacySatellitePanel.Visibility = Visibility.Collapsed;
-            SecondaryContentContainer.Clip = null;
-            return;
-        }
-
-        // Strictly lock satellite height and corner radius (0,0,14,14) - NEVER inherit from main notch!
-        SatelliteBorder.Height = SatelliteDiameter;
-        SatelliteBorder.MinHeight = SatelliteDiameter;
-        SatelliteBorder.MaxHeight = SatelliteDiameter;
-        SatelliteBorder.CornerRadius = new CornerRadius(0, 0, 14, 14);
-        SatelliteBorder.Opacity = _currentState == IslandState.Hidden ? 1.0 : _currentDimensions.Opacity;
-
-        if (isSplitMode)
-        {
-            SecondaryContent.Visibility = Visibility.Visible;
-
-            if (hasActivePrivacy)
+            // Sensors reactivated or split mode active: cancel any in-flight exit animation
+            if (_isSatelliteFadingOut)
             {
-                // Coexistence: widen satellite to 56 DIP to place dots to the right of secondary view without overlap
-                SatelliteBorder.Width = 56.0;
-                PrivacySatellitePanel.Visibility = Visibility.Visible;
-                PrivacySatellitePanel.Margin = new Thickness(0, 0, 4, 0);
+                CancelSatelliteFadeOut();
+            }
 
-                double innerSatWidth = 54.0;
-                SecondaryContentContainer.Clip = CreateNotchClipGeometry(innerSatWidth, 35.0, 13.0);
+            // Deterministic dot visibility
+            MicrophoneIndicatorDot.Visibility = _isMicrophoneActive ? Visibility.Visible : Visibility.Collapsed;
+            CameraIndicatorDot.Visibility = _isCameraActive ? Visibility.Visible : Visibility.Collapsed;
+
+            // Strictly lock satellite height and corner radius (0,0,14,14) - NEVER inherit from main notch!
+            SatelliteBorder.Height = SatelliteDiameter;
+            SatelliteBorder.MinHeight = SatelliteDiameter;
+            SatelliteBorder.MaxHeight = SatelliteDiameter;
+            SatelliteBorder.CornerRadius = new CornerRadius(0, 0, 14, 14);
+            SatelliteBorder.Opacity = _currentState == IslandState.Hidden ? 1.0 : _currentDimensions.Opacity;
+
+            if (isSplitMode)
+            {
+                SecondaryContent.Visibility = Visibility.Visible;
+
+                if (hasActivePrivacy)
+                {
+                    // Coexistence: widen satellite to 56 DIP to place dots to the right of secondary view without overlap
+                    SatelliteBorder.Width = 56.0;
+                    PrivacySatellitePanel.Visibility = Visibility.Visible;
+                    PrivacySatellitePanel.Margin = new Thickness(0, 0, 4, 0);
+
+                    double innerSatWidth = 54.0;
+                    SecondaryContentContainer.Clip = CreateNotchClipGeometry(innerSatWidth, 35.0, 13.0);
+                }
+                else
+                {
+                    SatelliteBorder.Width = SatelliteDiameter;
+                    PrivacySatellitePanel.Visibility = Visibility.Collapsed;
+                    PrivacySatellitePanel.Margin = new Thickness(0);
+
+                    double innerSatWidth = SatelliteDiameter - 2.0;
+                    SecondaryContentContainer.Clip = CreateNotchClipGeometry(innerSatWidth, 35.0, 13.0);
+                }
+
+                SatelliteBorder.Visibility = Visibility.Visible;
             }
             else
             {
-                SatelliteBorder.Width = SatelliteDiameter;
-                PrivacySatellitePanel.Visibility = Visibility.Collapsed;
-                PrivacySatellitePanel.Margin = new Thickness(0);
+                SecondaryContent.Visibility = Visibility.Collapsed;
 
-                double innerSatWidth = SatelliteDiameter - 2.0;
-                SecondaryContentContainer.Clip = CreateNotchClipGeometry(innerSatWidth, 35.0, 13.0);
-            }
-
-            SatelliteBorder.Visibility = Visibility.Visible;
-        }
-        else
-        {
-            SecondaryContent.Visibility = Visibility.Collapsed;
-
-            if (hasActivePrivacy)
-            {
                 SatelliteBorder.Width = SatelliteDiameter;
                 PrivacySatellitePanel.Visibility = Visibility.Visible;
                 PrivacySatellitePanel.Margin = new Thickness(0);
@@ -267,14 +274,97 @@ public partial class IslandView : UserControl
                 double innerSatWidth = SatelliteDiameter - 2.0;
                 SecondaryContentContainer.Clip = CreateNotchClipGeometry(innerSatWidth, 35.0, 13.0);
             }
-            else
+        }
+        else
+        {
+            // Sensors inactive and not in split mode: satellite should hide
+            SecondaryContent.Visibility = Visibility.Collapsed;
+
+            if (SatelliteBorder.Visibility == Visibility.Visible && !_isSatelliteFadingOut)
             {
-                PrivacySatellitePanel.Visibility = Visibility.Collapsed;
-                PrivacySatellitePanel.Margin = new Thickness(0);
+                // Smooth fade-out exit animation (~180ms with QuadraticEase)
+                StartSatelliteFadeOut();
+            }
+            else if (!_isSatelliteFadingOut)
+            {
                 SatelliteBorder.Visibility = Visibility.Collapsed;
+                PrivacySatellitePanel.Visibility = Visibility.Collapsed;
+                MicrophoneIndicatorDot.Visibility = Visibility.Collapsed;
+                CameraIndicatorDot.Visibility = Visibility.Collapsed;
                 SecondaryContentContainer.Clip = null;
             }
         }
+    }
+
+    /// <summary>
+    /// Starts a smooth opacity fade-out animation on the satellite capsule (~180ms QuadraticEase).
+    /// Upon completion, collapses the satellite and resets opacity to 1.0.
+    /// </summary>
+    private void StartSatelliteFadeOut()
+    {
+        if (_isSatelliteFadingOut) return;
+        _isSatelliteFadingOut = true;
+
+        if (_currentMotionProfile.CrossFadeOutDurationMs <= 0)
+        {
+            _isSatelliteFadingOut = false;
+            SatelliteBorder.BeginAnimation(OpacityProperty, null);
+            SatelliteBorder.Visibility = Visibility.Collapsed;
+            SatelliteBorder.Opacity = 1.0;
+            PrivacySatellitePanel.Visibility = Visibility.Collapsed;
+            MicrophoneIndicatorDot.Visibility = Visibility.Collapsed;
+            CameraIndicatorDot.Visibility = Visibility.Collapsed;
+            SecondaryContent.Visibility = Visibility.Collapsed;
+            SecondaryContentContainer.Clip = null;
+            SatelliteFadeOutCompleted?.Invoke(this, EventArgs.Empty);
+            return;
+        }
+
+        var fadeOut = new DoubleAnimation
+        {
+            From = SatelliteBorder.Opacity,
+            To = 0.0,
+            Duration = TimeSpan.FromMilliseconds(180),
+            EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+        };
+
+        fadeOut.Completed += (s, e) =>
+        {
+            if (_isSatelliteFadingOut)
+            {
+                _isSatelliteFadingOut = false;
+                SatelliteBorder.BeginAnimation(OpacityProperty, null);
+
+                bool currentHasActivePrivacy = _isCameraActive || _isMicrophoneActive;
+                bool currentIsSplit = _currentState == IslandState.Split && _hasSecondarySplitView;
+
+                if (!currentHasActivePrivacy && !currentIsSplit)
+                {
+                    SatelliteBorder.Visibility = Visibility.Collapsed;
+                    PrivacySatellitePanel.Visibility = Visibility.Collapsed;
+                    MicrophoneIndicatorDot.Visibility = Visibility.Collapsed;
+                    CameraIndicatorDot.Visibility = Visibility.Collapsed;
+                    SecondaryContent.Visibility = Visibility.Collapsed;
+                    SecondaryContentContainer.Clip = null;
+                }
+
+                SatelliteBorder.Opacity = 1.0;
+                SatelliteFadeOutCompleted?.Invoke(this, EventArgs.Empty);
+            }
+        };
+
+        SatelliteBorder.BeginAnimation(OpacityProperty, fadeOut);
+    }
+
+    /// <summary>
+    /// Cancels any running exit fade-out animation and restores full satellite opacity and visibility.
+    /// </summary>
+    private void CancelSatelliteFadeOut()
+    {
+        _isSatelliteFadingOut = false;
+        SatelliteBorder.BeginAnimation(OpacityProperty, null);
+        SatelliteBorder.Opacity = 1.0;
+        SatelliteBorder.Visibility = Visibility.Visible;
     }
 
     /// <summary>

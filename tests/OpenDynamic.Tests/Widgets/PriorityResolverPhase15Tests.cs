@@ -195,4 +195,38 @@ public sealed class PriorityResolverPhase15Tests
         showMic = settings.EnableMicrophoneIndicator && micActiveState.IsMicrophoneActive;
         Assert.False(showMic);
     }
+
+    [Fact]
+    public void SensorDeactivation_YieldsEmptyState_AndZeroActiveSensors()
+    {
+        var active = new PrivacyAccessState(isMicrophoneActive: true, isCameraActive: true);
+        Assert.True(active.HasActiveResource);
+
+        // Deactivate microphone
+        var micDeactivated = new PrivacyAccessState(isMicrophoneActive: false, isCameraActive: true);
+        Assert.False(micDeactivated.IsMicrophoneActive);
+        Assert.True(micDeactivated.IsCameraActive);
+        Assert.True(micDeactivated.HasActiveResource);
+
+        // Deactivate camera
+        var bothDeactivated = new PrivacyAccessState(isMicrophoneActive: false, isCameraActive: false);
+        Assert.False(bothDeactivated.IsMicrophoneActive);
+        Assert.False(bothDeactivated.IsCameraActive);
+        Assert.False(bothDeactivated.HasActiveResource);
+    }
+
+    [Fact]
+    public void MotionProfiles_ProvideCorrectCrossFadeParametersForTransitions()
+    {
+        var full = OpenDynamic.Core.Animation.MotionProfile.Full;
+        Assert.True(full.AllowDecorative);
+        Assert.True(full.CrossFadeOutDurationMs > 0);
+        Assert.True(full.CrossFadeInDurationMs > 0);
+
+        var reduced = OpenDynamic.Core.Animation.MotionProfile.Reduced;
+        Assert.False(reduced.AllowDecorative);
+        Assert.True(reduced.CrossFadeOutDurationMs > 0);
+        Assert.True(reduced.CrossFadeInDurationMs > 0);
+        Assert.True(reduced.CrossFadeOutDurationMs <= full.CrossFadeOutDurationMs);
+    }
 }

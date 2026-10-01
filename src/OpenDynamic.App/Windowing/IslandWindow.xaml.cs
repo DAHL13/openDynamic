@@ -82,6 +82,30 @@ public partial class IslandWindow : Window
         _hoverLeaveTimer.Tick += OnHoverLeaveTimerTick;
 
         _animator.FrameUpdated += OnAnimatorFrameUpdated;
+        _animator.Settled += OnAnimatorSettled;
+        IslandHostView.SatelliteFadeOutCompleted += OnSatelliteFadeOutCompleted;
+
+        WeakReferenceMessenger.Default.Register<Widgets.Messages.IslandStateChangedMessage>(this, (_, msg) =>
+        {
+            Dispatcher.InvokeAsync(() =>
+            {
+                if (msg.NewState != IslandState.Hidden)
+                {
+                    if (IslandHostView.Visibility != Visibility.Visible)
+                    {
+                        IslandHostView.Visibility = Visibility.Visible;
+                    }
+                    if (this.Visibility != Visibility.Visible)
+                    {
+                        this.Visibility = Visibility.Visible;
+                    }
+                }
+                else
+                {
+                    CheckAndApplyHiddenVisibility();
+                }
+            });
+        });
 
         // Attach IslandView to Orchestrator for view delivery
         _orchestrator.AttachView(IslandHostView);
@@ -172,6 +196,7 @@ public partial class IslandWindow : Window
         {
             UpdatePrivacyDots(state);
             _orchestrator.UpdateOrchestration();
+            CheckAndApplyHiddenVisibility();
         });
     }
 
@@ -191,6 +216,62 @@ public partial class IslandWindow : Window
             {
                 this.Visibility = Visibility.Visible;
             }
+        }
+        else
+        {
+            CheckAndApplyHiddenVisibility();
+        }
+    }
+
+    private void OnAnimatorSettled(object? sender, EventArgs e)
+    {
+        Dispatcher.InvokeAsync(CheckAndApplyHiddenVisibility);
+    }
+
+    private void OnSatelliteFadeOutCompleted(object? sender, EventArgs e)
+    {
+        Dispatcher.InvokeAsync(CheckAndApplyHiddenVisibility);
+    }
+
+    /// <summary>
+    /// Evaluates if the island has settled into Hidden state without active privacy sensors,
+    /// guaranteeing that window hiding waits until in-flight exit animations (main notch spring + satellite fade-out) complete.
+    /// </summary>
+    private void CheckAndApplyHiddenVisibility()
+    {
+        if (_orchestrator.IsFullscreenSuppressed)
+        {
+            return;
+        }
+
+        var state = _orchestrator.StateMachine.CurrentState;
+        bool hasActivePrivacy = (_privacyMonitor?.CurrentState.IsMicrophoneActive == true && _settings.EnableMicrophoneIndicator) ||
+                                (_privacyMonitor?.CurrentState.IsCameraActive == true && _settings.EnableCameraIndicator);
+
+        if (state != IslandState.Hidden || hasActivePrivacy)
+        {
+            if (IslandHostView.Visibility != Visibility.Visible)
+            {
+                IslandHostView.Visibility = Visibility.Visible;
+            }
+            if (this.Visibility != Visibility.Visible)
+            {
+                this.Visibility = Visibility.Visible;
+            }
+            return;
+        }
+
+        // State IS Hidden and NO active privacy sensors:
+        // Ensure all exit animations (main notch spring + satellite fade-out) have settled before hiding
+        if (IslandHostView.IsSatelliteFadingOut || !_animator.IsSettled)
+        {
+            return;
+        }
+
+        if (IslandHostView.Visibility != Visibility.Collapsed)
+        {
+            IslandHostView.Visibility = Visibility.Collapsed;
+            Log.Debug("IslandWindow: Exit animations completed. View collapsed.");
         }
     }
 
@@ -746,9 +827,10 @@ public partial class IslandWindow : Window
         _hoverEnterTimer.Tick -= OnHoverEnterTimerTick;
 
         _hoverLeaveTimer.Stop();
-        _hoverLeaveTimer.Tick -= OnHoverLeaveTimerTick;
-
         _animator.FrameUpdated -= OnAnimatorFrameUpdated;
+        _animator.Settled -= OnAnimatorSettled;
+        IslandHostView.SatelliteFadeOutCompleted -= OnSatelliteFadeOutCompleted;
+        CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger.Default.Unregister<Widgets.Messages.IslandStateChangedMessage>(this);
 
 #if DEBUG
         _debugWindow?.Close();
