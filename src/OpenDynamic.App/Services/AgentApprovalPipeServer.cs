@@ -25,8 +25,15 @@ public sealed class AgentApprovalPipeServer : IAsyncDisposable, IDisposable
     private readonly List<Task> _activeWorkerTasks = new();
     private readonly object _stateLock = new();
 
+    private readonly Core.Settings.AppSettings _settings;
+    private readonly ApprovalRuleStore _ruleStore;
+    private readonly ApprovalHistoryTracker _historyTracker;
+
     private bool _isRunning;
     private bool _isDisposed;
+
+    public ApprovalRuleStore RuleStore => _ruleStore;
+    public ApprovalHistoryTracker HistoryTracker => _historyTracker;
 
     /// <summary>
     /// Callback returning whether the Dynamic Island is currently capable of presenting
@@ -46,12 +53,32 @@ public sealed class AgentApprovalPipeServer : IAsyncDisposable, IDisposable
     /// </summary>
     public event Action<string>? RequestCancelled;
 
+    /// <summary>
+    /// Event fired when a command was auto-approved by a matching rule without user interaction.
+    /// </summary>
+    public event Action<ApprovalRule, ApprovalRequest>? AutoAllowedByRule;
+
+    /// <summary>
+    /// Event fired when an agent lifecycle status event arrives (e.g. Stop hook).
+    /// </summary>
+    public event Action<AgentStatusEvent>? StatusReceived;
+
     public bool IsRunning
     {
         get
         {
             lock (_stateLock) return _isRunning;
         }
+    }
+
+    public AgentApprovalPipeServer(
+        Core.Settings.AppSettings? settings = null,
+        ApprovalRuleStore? ruleStore = null,
+        ApprovalHistoryTracker? historyTracker = null)
+    {
+        _settings = settings ?? new Core.Settings.AppSettings();
+        _ruleStore = ruleStore ?? new ApprovalRuleStore();
+        _historyTracker = historyTracker ?? new ApprovalHistoryTracker();
     }
 
     /// <summary>
@@ -212,6 +239,25 @@ public sealed class AgentApprovalPipeServer : IAsyncDisposable, IDisposable
                 return;
             }
 
+            if (pipeMessage.Type.Equals("status", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!string.IsNullOrWhiteSpace(pipeMessage.Payload))
+                {
+                    try
+                    {
+                        var statusEvent = AgentStatusEvent.FromJson(pipeMessage.Payload);
+                        StatusReceived?.Invoke(statusEvent);
+                        Log.Information("Agent status received from hook. ConvId={ConvId}, FullyIdle={FullyIdle}, Reason={Reason}",
+                            statusEvent.ConversationId, statusEvent.FullyIdle, statusEvent.TerminationReason);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Warning(ex, "Failed to parse AgentStatusEvent from hook payload.");
+                    }
+                }
+                return;
+            }
+
             if (!pipeMessage.Type.Equals("request", StringComparison.OrdinalIgnoreCase) || string.IsNullOrWhiteSpace(pipeMessage.Payload))
             {
                 await SendResponseAsync(stream, ApprovalResponse.AskNative("Tipo de mensaje no reconocido"), ct).ConfigureAwait(false);
@@ -229,6 +275,41 @@ public sealed class AgentApprovalPipeServer : IAsyncDisposable, IDisposable
                 Log.Warning(ex, "Failed to parse ApprovalRequest payload from hook client.");
                 await SendResponseAsync(stream, ApprovalResponse.AskNative($"Error al analizar la solicitud: {ex.Message}"), ct).ConfigureAwait(false);
                 return;
+            }
+
+            // Task 4: Auto-approval via Approval Rules
+            if (_settings.EnableAgentApprovals && _settings.EnableAgentRuleAutoAllow && string.Equals(request.ToolName, "run_command", StringComparison.OrdinalIgnoreCase))
+            {
+                var risk = CommandRiskClassifier.Classify(request);
+                if (risk != RiskLevel.High)
+                {
+                    string? workspaceRoot = request.WorkspacePaths.Count > 0 ? request.WorkspacePaths[0] : request.Cwd;
+                    if (!string.IsNullOrWhiteSpace(workspaceRoot))
+                    {
+                        _ruleStore.LoadProjectRules(workspaceRoot);
+                    }
+
+                    var matchingRule = _ruleStore.FindMatchingRule(request, risk, _settings.EnableAgentSafePrefixRules);
+                    if (matchingRule != null)
+                    {
+                        _ruleStore.RecordUsage(matchingRule.Id, workspaceRoot);
+
+                        _historyTracker.Record(
+                            request,
+                            "rule_allow",
+                            $"Regla {matchingRule.Scope}: {matchingRule.DisplaySummary}");
+
+                        sw.Stop();
+                        Log.Information("Approval auto-allowed by rule. RequestId={RequestId}, Tool={Tool}, Scope={Scope}, RuleId={RuleId}, ElapsedMs={ElapsedMs}",
+                            request.Id, request.ToolName, matchingRule.Scope, matchingRule.Id, sw.ElapsedMilliseconds);
+
+                        AutoAllowedByRule?.Invoke(matchingRule, request);
+
+                        var autoAllowResponse = ApprovalResponse.Allow();
+                        await SendResponseAsync(stream, autoAllowResponse, ct).ConfigureAwait(false);
+                        return;
+                    }
+                }
             }
 
             var sessionPolicy = new ApprovalSessionPolicy(request);
@@ -272,6 +353,11 @@ public sealed class AgentApprovalPipeServer : IAsyncDisposable, IDisposable
                     // Ignore disconnect monitor cleanup
                 }
             }
+
+            _historyTracker.Record(
+                request,
+                resolvedResponse.Decision,
+                sessionPolicy.ResolutionSource);
 
             await SendResponseAsync(stream, resolvedResponse, ct).ConfigureAwait(false);
 

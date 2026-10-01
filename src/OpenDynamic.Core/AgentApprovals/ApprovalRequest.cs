@@ -30,6 +30,7 @@ public sealed record ApprovalRequest
     public string? ArtifactDirectoryPath { get; init; }
     public string? ModelName { get; init; }
     public DateTimeOffset TimestampUtc { get; init; } = DateTimeOffset.UtcNow;
+    public string WorkspaceFolder => ApprovalPresentation.GetFolderName(WorkspacePaths.Count > 0 ? WorkspacePaths[0] : Cwd);
 
     public ApprovalRequest()
     {

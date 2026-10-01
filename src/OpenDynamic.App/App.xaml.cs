@@ -95,9 +95,12 @@ public partial class App : Application
         var privacyWidget = Services.GetRequiredService<Widgets.Privacy.PrivacyWidget>();
         orchestrator.RegisterWidget(privacyWidget);
 
-        // Register ApprovalWidget (Priority 95) & Setup AgentApprovalPipeServer
+        // Register ApprovalWidget (Priority 95) & AgentStatusWidget (Priority 70) & Setup AgentApprovalPipeServer
         var approvalWidget = Services.GetRequiredService<Widgets.AgentApprovals.ApprovalWidget>();
         orchestrator.RegisterWidget(approvalWidget);
+
+        var agentStatusWidget = Services.GetRequiredService<Widgets.AgentApprovals.AgentStatusWidget>();
+        orchestrator.RegisterWidget(agentStatusWidget);
 
         var approvalServer = Services.GetRequiredService<Services.AgentApprovalPipeServer>();
         var appSettings = Services.GetRequiredService<Core.Settings.AppSettings>();
@@ -110,6 +113,14 @@ public partial class App : Application
 
         approvalServer.RequestReceived += policy => approvalWidget.HandleRequestAsync(policy);
         approvalServer.RequestCancelled += reqId => approvalWidget.HandleCancelled(reqId);
+        approvalServer.AutoAllowedByRule += (rule, req) =>
+        {
+            if (appSettings.EnableAgentRuleAutoAllowNotification)
+            {
+                approvalWidget.ShowAutoAllowedNotice(rule, req);
+            }
+        };
+        approvalServer.StatusReceived += statusEvent => agentStatusWidget.HandleStatusEvent(statusEvent);
 
         if (appSettings.EnableAgentApprovals)
         {

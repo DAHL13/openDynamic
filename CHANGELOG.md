@@ -3,6 +3,33 @@
 Todas las modificaciones notables en este proyecto serán documentadas en este archivo.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y cumple con [SemVer](https://semver.org/).
 
+## [1.3.0-dev] - 2026-10-01 (Fase 18: Reglas "Siempre Permitir", Cola FIFO y Estado del Agente)
+
+### Añadido
+- **Despliegue Completo de 5 Opciones en el Notch (`ApprovalWidget`):**
+  - Despliegue interactivo con estructura visual idéntica a Antigravity: `[1] Permitir esta vez`, `[2] Permitir siempre en esta conversación`, `[3] Permitir siempre en este proyecto`, `[4] Permitir siempre globalmente` y `[5] No: Denegar` con menú de motivos.
+  - Opción destacada/resaltada configurable en Ajustes (por defecto opción 1), activable mediante `Ctrl+Alt+Enter` tras vencer la guarda anti-clic.
+  - Atajos dinámicos de teclado `Ctrl+Alt+1` a `Ctrl+Alt+5` y `Ctrl+Alt+A` (Decidir en Antigravity) vinculados de forma no invasiva al HWND de la isla.
+  - Restricción de Seguridad Automática (Regla de Oro 12): Ocultamiento inmediato de las opciones 2, 3 y 4 cuando el comando clasifica como riesgo `High` o cuando se trata de herramientas de edición de archivos (`write_to_file`, `replace_file_content`).
+- **Motor de Reglas y Persistencia Atómica (`OpenDynamic.Core.AgentApprovals`):**
+  - `ApprovalRule`: Entidad inmutable con ámbito (`Conversation`, `Project`, `Global`), patrón de comando, claves de workspace y contadores de uso.
+  - `ApprovalRuleMatcher`: Evaluador puro de coincidencia exacta carácter por carácter (espacios internos y casing estrictos, normalización `\r\n` a `\n`). Cero auto-aprobaciones para riesgo `High` o herramientas de archivo.
+  - `ApprovalRuleStore`: Almacén con persistencia en memoria RAM para conversaciones, guardado atómico con archivos `.tmp` y recuperación automática desde `.bak` para proyectos (`.antigravity/approval-rules.json`) y global (`%USERPROFILE%/.antigravity/approval-rules.json`). Límite de 200 reglas por ámbito con política de poda LRU.
+  - `SafePrefixMatcher`: Módulo opcional (opt-in, Tarea 6b) para reglas de prefijo en proyectos (`git status`, `git diff`, `git log`, `dotnet test`, etc.) con límites de token y argumentos benignos. Exclusión total de shells, intérpretes y descargadores.
+  - `ApprovalHistoryTracker`: Búfer circular en memoria RAM de las últimas 50 decisiones sanitizadas (resúmenes de 60 caracteres y nombres de carpetas relativos, sin rutas absolutas ni credenciales).
+- **Cola FIFO Multisesión de Solicitudes:**
+  - Gestión secuencial de solicitudes concurrentes de múltiples agentes o proyectos con indicador `"1 / N"`.
+  - Temporizadores de guarda (600 ms) y expiración (90 s) totalmente independientes por solicitud.
+  - Descarte seguro y limpio de solicitudes si el cliente se desconecta anticipadamente.
+- **Hook `Stop` y Notificación de Estado del Agente (`AgentStatusWidget`):**
+  - Intercepción del ciclo de vida del agente mediante el subcomando `--event stop` en `OpenDynamic.Hook` registrado bajo la clave `openDynamic-status`.
+  - Notificación visual sutil de Prioridad 70 durante 4 segundos en el Notch ("Antigravity terminó en <proyecto>") con sonido opcional, emitida únicamente cuando `fullyIdle == true`.
+- **Ajustes y Migración de Esquema v11 (`AppSettings`):**
+  - `CurrentSchemaVersion = 11`.
+  - Nueva tarjeta "Reglas de Aprobación" con listado filtrable por ámbito, botón de borrado, reglas sugeridas con 1 clic (`git status`, `git diff --stat`, `git log --oneline`), historial reciente de 50 decisiones y controles para notificaciones de estado y prefijos seguros.
+- **Pruebas Automatizadas:**
+  - 551 pruebas en verde, incluyendo cobertura integral de coincidencia exacta, prefijo seguro, cola FIFO, recuperación de copias de seguridad `.bak`, poda LRU y privacidad estricta en logs.
+
 ## [1.2.0-dev] - 2026-09-30 (Fase 17: Aprobaciones de Agente en el Notch - Núcleo)
 
 ### Añadido

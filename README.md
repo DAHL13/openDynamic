@@ -70,6 +70,7 @@ openDynamic adopta una estética de **muesca rectangular superior (Notch)** pega
 | **Fase 15** | **Indicador de micrófono y cámara en uso (ConsentStore pasivo, cero polling, notch UI) (v1.1)** | **Completada** |
 | **Fase 16** | **Visualizador de audio real (espectro FFT propia, WASAPI loopback, 0 heap alloc, <2% CPU) (v1.1)** | **Completada** |
 | **Fase 17** | **Aprobaciones de agente en el Notch (núcleo IPC, clasificador de riesgo, fail-safe, notch UI) (v1.2)** | **Completada** |
+| **Fase 18** | **Reglas "siempre permitir", cola FIFO y estado del agente (ADR-026) (v1.3)** | **Completada** |
 
 ---
 
@@ -78,21 +79,30 @@ openDynamic adopta una estética de **muesca rectangular superior (Notch)** pega
 openDynamic se integra con **Google Antigravity** para proporcionar una superficie de inspección y aprobación de acciones de agentes autónomos de codificación directamente en el Notch de Windows, sin interrumpir el flujo visual ni robar el foco de la terminal (`WS_EX_NOACTIVATE`).
 
 ### Características Principales:
-- **Falla Hacia lo Seguro (Regla de Oro 12):** Ante cualquier excepción, timeout (90 s), desconexión, isla oculta o pantalla completa exclusiva, el gancho delega obligatoriamente a `"ask"` (el diálogo nativo de Antigravity), nunca a `"allow"`. Queda terminantemente prohibido aprobar comandos automáticamente en esta fase.
-- **Canal IPC Local Seguro y Privado (Regla de Oro 13):** Comunicación mediante un Named Pipe local (`openDynamic-agent-v1`) restringido estrictamente al token del usuario actual (`PipeOptions.CurrentUserOnly`). Mensajes versionados y acotados a un máximo estricto de 256 KB.
-- **Cero Registro de Comandos en Logs (Regla de Oro 13):** Prohibición estricta de registrar comandos completos, argumentos, rutas o código fuente en Serilog. Solo se auditan metadatos agregados (`RequestId`, `ToolName`, `RiskLevel`, `Decision`, `Source`, `ElapsedMs`), auditado y protegido mediante pruebas de seguridad (`ZeroLogsSecurityTests`).
-- **Clasificador de Riesgo Determinista en Core:**
-  - **High:** Comandos destructivos o de alto impacto (`rm -rf`, `Remove-Item -Recurse`, `git push --force`, `git reset --hard`, `iex`, `reg delete`, `format`, etc.). Requiere forzosamente revisión expandida en la isla y desactiva atajos rápidos de teclado.
-  - **Medium:** Modificaciones estándar, comandos encadenados (`&&`, `;`, `|`) y redirecciones.
-  - **Low:** Comandos de consulta e inspección de solo lectura (`git status`, `git log`, `dir`, `ls`, etc.).
-- **Protección Anti-Clic Accidental:** Guarda de 600 ms antes de habilitar los botones de acción interactivos en el Notch.
-- **Atajos Dinámicos en la Muesca:**
-  - `[1]`: Permitir esta vez.
-  - `[5]`: Menú de denegación rápida con motivos predefinidos (sin entrada de texto libre en la isla).
-  - `[Esc]` o botón "Decidir en Antigravity": Delegación pacífica al diálogo nativo de la terminal/IDE.
-- **Cliente Ligero Ultra-Rápido (`OpenDynamic.Hook`):**
-  - Compilado con ReadyToRun para una latencia de inicio mínima: **~65 ms** en estado estacionario y **~170 ms** en frío (presupuesto objetivo `< 150 ms`).
-- **Instalador Seguro Integrado:** Disponible en la pestaña *Antigravity* de los Ajustes de openDynamic. Respalda automáticamente `hooks.json` a `.bak`, fusiona de manera no destructiva únicamente la clave `openDynamic-approvals` e incluye botón de solicitud de prueba.
+- **Despliegue Completo de 5 Opciones en el Notch:**
+  - `[1]`: Sí, permitir esta vez (ejecuta el comando actual, sin almacenar reglas).
+  - `[2]`: Sí, y siempre en esta conversación (regla volátil en RAM, desaparece al cerrar la sesión).
+  - `[3]`: Sí, y siempre en este proyecto (regla persistente exacta en `.antigravity/approval-rules.json`).
+  - `[4]`: Sí, y siempre globalmente (regla persistente exacta en `%USERPROFILE%/.antigravity/approval-rules.json`).
+  - `[5]`: No: Denegar (menú con motivos predefinidos sin necesidad de escribir en la isla).
+  - `[Esc]` o `Ctrl+Alt+A`: Decidir en Antigravity (delegación segura).
+  - `Ctrl+Alt+Enter`: Activa directamente la opción resaltada configurable (por defecto la opción 1).
+- **Restricción de Seguridad Automática (Regla de Oro 12):**
+  - Comandos clasificados como riesgo `High` o herramientas de edición de archivos (`write_to_file`, `replace_file_content`) OCULTAN de inmediato las opciones 2, 3 y 4. Solo se permiten las opciones 1 y 5.
+- **Motor de Reglas Exactas y Persistencia Atómica:**
+  - Coincidencia exacta carácter por carácter (`run_command` únicamente) preservando espacios internos y casing.
+  - Guardado atómico con archivos temporales `.tmp` y recuperación automática de copias de seguridad `.bak` en caso de corrupción. Límite de 200 reglas por ámbito con política LRU.
+  - Notificación sutil de 2 segundos en el Notch cuando un comando es auto-aprobado por una regla activa.
+- **Reglas de Prefijo Seguro Opt-In (Tarea 6b):**
+  - Soporte opcional para comandos con argumentos benignos (`git status`, `git diff`, `git log`, `dotnet test`, etc.) en ámbito de proyecto, con exclusión tajante de shells y descargadores.
+- **Cola FIFO Multisesión de Solicitudes:**
+  - Atención ordenada de solicitudes concurrentes de múltiples agentes o tareas con indicador `"1 / N"`, y temporizadores de guarda (600 ms) y expiración (90 s) independientes por solicitud.
+- **Notificación de Estado del Agente (Hook Stop, Prioridad 70):**
+  - Intercepción del evento `Stop` (`openDynamic-status`). Notificación transitoria de 4 segundos ("Antigravity terminó en <proyecto>") solo si `fullyIdle == true`.
+- **Falla Hacia lo Seguro y Privacidad Estricta (Reglas de Oro 12 y 13):**
+  - Delegación forzosa a `"ask"` ante cualquier fallo, timeout o modo no disponible.
+  - Named Pipe local restringido a `CurrentUserOnly` con tamaño máximo acotado a 256 KB.
+  - Cero logs de comandos o rutas en Serilog; historial auditado de 50 elementos en memoria con nombres de carpetas y comandos sanitizados a 60 caracteres.
 
 ---
 
