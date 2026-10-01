@@ -47,7 +47,7 @@ public sealed class AudioSpectrumService : IAudioSpectrumService
         new float[SpectrumAnalyzer.ExpandedBandCount]
     ];
 
-    private volatile int _activeBufferIndex = 0;
+    private int _activeBufferIndex;
     private bool _disposed;
 
     /// <inheritdoc />
@@ -129,7 +129,7 @@ public sealed class AudioSpectrumService : IAudioSpectrumService
 
             _capture.StartRecording();
             _isCapturing = true;
-            _lastDataTimestamp = Environment.TickCount64;
+            Interlocked.Exchange(ref _lastDataTimestamp, Environment.TickCount64);
 
             Log.Information("WASAPI audio loopback capture started successfully (SampleRate: {SampleRate} Hz, Channels: {Channels}).",
                 _capture.WaveFormat.SampleRate, _capture.WaveFormat.Channels);
@@ -221,7 +221,7 @@ public sealed class AudioSpectrumService : IAudioSpectrumService
             return;
         }
 
-        _lastDataTimestamp = Environment.TickCount64;
+        Interlocked.Exchange(ref _lastDataTimestamp, Environment.TickCount64);
 
         var format = _capture?.WaveFormat;
         if (format == null)
@@ -316,22 +316,13 @@ public sealed class AudioSpectrumService : IAudioSpectrumService
 
     private void PublishDoubleBuffer()
     {
-        int writeIdx = 1 - _activeBufferIndex;
+        int currentActive = Volatile.Read(ref _activeBufferIndex);
+        int writeIdx = 1 - currentActive;
         _analyzer.GetCompactBands(_compactDoubleBuffer[writeIdx]);
         _analyzer.GetExpandedBands(_expandedDoubleBuffer[writeIdx]);
 
+        Interlocked.Exchange(ref _lastDataTimestamp, Environment.TickCount64);
         Interlocked.Exchange(ref _activeBufferIndex, writeIdx);
-    }
-
-    private void CheckSilenceDecay()
-    {
-        // When WASAPI loopback pauses or encounters complete silence, no DataAvailable packets arrive.
-        // Smoothly decay bands towards zero if > 60 ms have elapsed since last packet.
-        if (_isCapturing && (Environment.TickCount64 - _lastDataTimestamp) > 60)
-        {
-            _analyzer.DecayOnly();
-            PublishDoubleBuffer();
-        }
     }
 
     /// <inheritdoc />
@@ -350,11 +341,26 @@ public sealed class AudioSpectrumService : IAudioSpectrumService
             return;
         }
 
-        CheckSilenceDecay();
+        long lastData = Interlocked.Read(ref _lastDataTimestamp);
+        bool isSilent = _isCapturing && (Environment.TickCount64 - lastData > 60);
 
-        int readIdx = _activeBufferIndex;
+        int readIdx = Volatile.Read(ref _activeBufferIndex);
         int count = Math.Min(SpectrumAnalyzer.CompactBandCount, destination.Length);
-        _compactDoubleBuffer[readIdx].AsSpan(0, count).CopyTo(destination);
+        var source = _compactDoubleBuffer[readIdx];
+
+        if (isSilent)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                source[i] *= 0.85f;
+                if (source[i] < 0.001f) source[i] = 0.0f;
+                destination[i] = source[i];
+            }
+        }
+        else
+        {
+            source.AsSpan(0, count).CopyTo(destination);
+        }
     }
 
     /// <inheritdoc />
@@ -373,11 +379,26 @@ public sealed class AudioSpectrumService : IAudioSpectrumService
             return;
         }
 
-        CheckSilenceDecay();
+        long lastData = Interlocked.Read(ref _lastDataTimestamp);
+        bool isSilent = _isCapturing && (Environment.TickCount64 - lastData > 60);
 
-        int readIdx = _activeBufferIndex;
+        int readIdx = Volatile.Read(ref _activeBufferIndex);
         int count = Math.Min(SpectrumAnalyzer.ExpandedBandCount, destination.Length);
-        _expandedDoubleBuffer[readIdx].AsSpan(0, count).CopyTo(destination);
+        var source = _expandedDoubleBuffer[readIdx];
+
+        if (isSilent)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                source[i] *= 0.85f;
+                if (source[i] < 0.001f) source[i] = 0.0f;
+                destination[i] = source[i];
+            }
+        }
+        else
+        {
+            source.AsSpan(0, count).CopyTo(destination);
+        }
     }
 
     private static void GenerateSimulatedBands(Span<float> destination, int totalBands)

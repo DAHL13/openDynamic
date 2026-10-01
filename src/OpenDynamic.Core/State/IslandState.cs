@@ -21,7 +21,7 @@ public enum IslandState
     Split,
 
     /// <summary>
-    /// Expanded modal / card view (~400x160 DIP) showing rich interactive widget details.
+    /// Expanded modal / card view (~400x185 DIP) showing rich interactive widget details.
     /// </summary>
     Expanded
 }

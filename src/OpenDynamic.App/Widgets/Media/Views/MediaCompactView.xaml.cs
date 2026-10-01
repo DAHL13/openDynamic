@@ -14,7 +14,7 @@ namespace OpenDynamic.App.Widgets.Media.Views;
 public partial class MediaCompactView : UserControl
 {
     private readonly MediaWidget _widget;
-    private Border[]? _bars;
+    private ScaleTransform[]? _transforms;
     private bool _isRenderingSubscribed;
     private long _lastRenderTime;
 
@@ -30,10 +30,20 @@ public partial class MediaCompactView : UserControl
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
-        _bars ??=
+        _transforms ??=
         [
-            Bar0, Bar1, Bar2, Bar3, Bar4, Bar5,
-            Bar6, Bar7, Bar8, Bar9, Bar10, Bar11
+            (ScaleTransform)Bar0.RenderTransform,
+            (ScaleTransform)Bar1.RenderTransform,
+            (ScaleTransform)Bar2.RenderTransform,
+            (ScaleTransform)Bar3.RenderTransform,
+            (ScaleTransform)Bar4.RenderTransform,
+            (ScaleTransform)Bar5.RenderTransform,
+            (ScaleTransform)Bar6.RenderTransform,
+            (ScaleTransform)Bar7.RenderTransform,
+            (ScaleTransform)Bar8.RenderTransform,
+            (ScaleTransform)Bar9.RenderTransform,
+            (ScaleTransform)Bar10.RenderTransform,
+            (ScaleTransform)Bar11.RenderTransform
         ];
 
         _widget.PropertyChanged += OnWidgetPropertyChanged;
@@ -87,7 +97,7 @@ public partial class MediaCompactView : UserControl
 
     private void OnRendering(object? sender, EventArgs e)
     {
-        if (!_isRenderingSubscribed || _bars == null) return;
+        if (!_isRenderingSubscribed || _transforms == null) return;
 
         long now = Environment.TickCount64;
         // Throttle rendering to ~30 FPS (33 ms interval) to strictly respect performance budget
@@ -105,18 +115,18 @@ public partial class MediaCompactView : UserControl
 
             for (int i = 0; i < 12; i++)
             {
-                // Dynamic height: [2.0, 14.0] DIP
-                _bars[i].Height = Math.Clamp(2.0 + bands[i] * 12.0, 2.0, 14.0);
+                // Dynamic GPU scale: [0.15, 1.0] -> Height: [2.1, 14.0] DIP without layout invalidation
+                _transforms[i].ScaleY = Math.Clamp(0.15 + bands[i] * 0.85, 0.15, 1.0);
             }
         }
     }
 
     private void ResetBars()
     {
-        if (_bars == null) return;
-        for (int i = 0; i < _bars.Length; i++)
+        if (_transforms == null) return;
+        for (int i = 0; i < _transforms.Length; i++)
         {
-            _bars[i].Height = 2.0;
+            _transforms[i].ScaleY = 0.15;
         }
     }
 }

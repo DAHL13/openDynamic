@@ -5,7 +5,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              mc:Ignorable="d" 
              Width="390"
-             Height="165"
+             Height="185"
              Background="Transparent">
 
     <UserControl.Resources>
@@ -37,14 +37,16 @@
         </Style>
     </UserControl.Resources>
 
-    <!-- Balanced vertical margins with generous 14 DIP bottom clearance from the R:24 capsule curvature -->
+    <!-- Balanced vertical margins with generous 14 DIP bottom clearance from the notch curvature -->
     <Grid Margin="18,10,18,14">
         <Grid.RowDefinitions>
-            <!-- Top Track Info & Thumbnail -->
+            <!-- Row 0: Top Track Info & Artwork (Auto, ~48 DIP) -->
             <RowDefinition Height="Auto" />
-            <!-- Timeline & Progress Bar -->
+            <!-- Row 1: Timeline & Progress Bar (Auto, ~24 DIP) -->
             <RowDefinition Height="Auto" />
-            <!-- Playback Controls -->
+            <!-- Row 2: Dedicated 24-Band Spectrum Visualizer (Auto, ~32 DIP) -->
+            <RowDefinition Height="Auto" />
+            <!-- Row 3: Playback Controls (*, centered, ~44 DIP) -->
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -68,8 +70,8 @@
 
             <!-- Large Album Art with Spring Translation -->
             <Border Grid.Column="0"
-                    Width="48"
-                    Height="48"
+                    Width="46"
+                    Height="46"
                     CornerRadius="10"
                     ClipToBounds="True"
                     Background="#2AFFFFFF"
@@ -84,8 +86,8 @@
                     <Path Data="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"
                           Fill="{DynamicResource AppTextMutedBrush}"
                           Stretch="Uniform"
-                          Width="20"
-                          Height="20"
+                          Width="18"
+                          Height="18"
                           HorizontalAlignment="Center"
                           VerticalAlignment="Center" />
                     <!-- Album Image -->
@@ -138,8 +140,8 @@
             </Button>
         </Grid>
 
-        <!-- Middle Section: Interactive Progress Slider -->
-        <Grid Grid.Row="1" Margin="0,0,0,6">
+        <!-- Middle Section: Interactive Progress Slider (Horizontal margin 20 DIP for comfortable breathing room) -->
+        <Grid Grid.Row="1" Margin="20,0,20,6">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
@@ -180,60 +182,56 @@
             </Grid>
         </Grid>
 
-        <!-- Bottom Section: Playback Controls & 24-Band Spectrum (Ensuring complete integrity) -->
-        <Grid Grid.Row="2" VerticalAlignment="Center" Margin="0,0,0,0">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
+        <!-- Dedicated 24-Band Audio Spectrum Visualizer (Expanded View) -->
+        <Border Grid.Row="2"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Height="28"
+                Margin="0,0,0,6"
+                ClipToBounds="True"
+                Visibility="{Binding EqualizerVisibility}"
+                AutomationProperties.Name="Visualizador de espectro de audio expandido">
+            <StackPanel x:Name="ExpandedSpectrumPanel"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Bottom"
+                        Height="28">
+                <!-- 24 Logarithmic Bands: Width=2.5, Height=28, CornerRadius=1, Margin=0,0,2,0 with GPU ScaleTransform -->
+                <Border x:Name="ExpBar0" Width="2.5" Height="28" CornerRadius="1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,2,0" VerticalAlignment="Bottom" RenderTransformOrigin="0.5,1.0"><Border.RenderTransform><ScaleTransform ScaleX="1.0" ScaleY="0.10" /></Border.RenderTransform></Border>
+                <Border x:Name="ExpBar1" Width="2.5" Height="28" CornerRadius="1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,2,0" VerticalAlignment="Bottom" RenderTransformOrigin="0.5,1.0"><Border.RenderTransform><ScaleTransform ScaleX="1.0" ScaleY="0.10" /></Border.RenderTransform></Border>
+                <Border x:Name="ExpBar2" Width="2.5" Height="28" CornerRadius="1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,2,0" VerticalAlignment="Bottom" RenderTransformOrigin="0.5,1.0"><Border.RenderTransform><ScaleTransform ScaleX="1.0" ScaleY="0.10" /></Border.RenderTransform></Border>
+                <Border x:Name="ExpBar3" Width="2.5" Height="28" CornerRadius="1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,2,0" VerticalAlignment="Bottom" RenderTransformOrigin="0.5,1.0"><Border.RenderTransform><ScaleTransform ScaleX="1.0" ScaleY="0.10" /></Border.RenderTransform></Border>
+                <Border x:Name="ExpBar4" Width="2.5" Height="28" CornerRadius="1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,2,0" VerticalAlignment="Bottom" RenderTransformOrigin="0.5,1.0"><Border.RenderTransform><ScaleTransform ScaleX="1.0" ScaleY="0.10" /></Border.RenderTransform></Border>
+                <Border x:Name="ExpBar5" Width="2.5" Height="28" CornerRadius="1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,2,0" VerticalAlignment="Bottom" RenderTransformOrigin="0.5,1.0"><Border.RenderTransform><ScaleTransform ScaleX="1.0" ScaleY="0.10" /></Border.RenderTransform></Border>
+                <Border x:Name="ExpBar6" Width="2.5" Height="28" CornerRadius="1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,2,0" VerticalAlignment="Bottom" RenderTransformOrigin="0.5,1.0"><Border.RenderTransform><ScaleTransform ScaleX="1.0" ScaleY="0.10" /></Border.RenderTransform></Border>
+                <Border x:Name="ExpBar7" Width="2.5" Height="28" CornerRadius="1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,2,0" VerticalAlignment="Bottom" RenderTransformOrigin="0.5,1.0"><Border.RenderTransform><ScaleTransform ScaleX="1.0" ScaleY="0.10" /></Border.RenderTransform></Border>
+                <Border x:Name="ExpBar8" Width="2.5" Height="28" CornerRadius="1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,2,0" VerticalAlignment="Bottom" RenderTransformOrigin="0.5,1.0"><Border.RenderTransform><ScaleTransform ScaleX="1.0" ScaleY="0.10" /></Border.RenderTransform></Border>
+                <Border x:Name="ExpBar9" Width="2.5" Height="28" CornerRadius="1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,2,0" VerticalAlignment="Bottom" RenderTransformOrigin="0.5,1.0"><Border.RenderTransform><ScaleTransform ScaleX="1.0" ScaleY="0.10" /></Border.RenderTransform></Border>
+                <Border x:Name="ExpBar10" Width="2.5" Height="28" CornerRadius="1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,2,0" VerticalAlignment="Bottom" RenderTransformOrigin="0.5,1.0"><Border.RenderTransform><ScaleTransform ScaleX="1.0" ScaleY="0.10" /></Border.RenderTransform></Border>
+                <Border x:Name="ExpBar11" Width="2.5" Height="28" CornerRadius="1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,2,0" VerticalAlignment="Bottom" RenderTransformOrigin="0.5,1.0"><Border.RenderTransform><ScaleTransform ScaleX="1.0" ScaleY="0.10" /></Border.RenderTransform></Border>
+                <Border x:Name="ExpBar12" Width="2.5" Height="28" CornerRadius="1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,2,0" VerticalAlignment="Bottom" RenderTransformOrigin="0.5,1.0"><Border.RenderTransform><ScaleTransform ScaleX="1.0" ScaleY="0.10" /></Border.RenderTransform></Border>
+                <Border x:Name="ExpBar13" Width="2.5" Height="28" CornerRadius="1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,2,0" VerticalAlignment="Bottom" RenderTransformOrigin="0.5,1.0"><Border.RenderTransform><ScaleTransform ScaleX="1.0" ScaleY="0.10" /></Border.RenderTransform></Border>
+                <Border x:Name="ExpBar14" Width="2.5" Height="28" CornerRadius="1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,2,0" VerticalAlignment="Bottom" RenderTransformOrigin="0.5,1.0"><Border.RenderTransform><ScaleTransform ScaleX="1.0" ScaleY="0.10" /></Border.RenderTransform></Border>
+                <Border x:Name="ExpBar15" Width="2.5" Height="28" CornerRadius="1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,2,0" VerticalAlignment="Bottom" RenderTransformOrigin="0.5,1.0"><Border.RenderTransform><ScaleTransform ScaleX="1.0" ScaleY="0.10" /></Border.RenderTransform></Border>
+                <Border x:Name="ExpBar16" Width="2.5" Height="28" CornerRadius="1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,2,0" VerticalAlignment="Bottom" RenderTransformOrigin="0.5,1.0"><Border.RenderTransform><ScaleTransform ScaleX="1.0" ScaleY="0.10" /></Border.RenderTransform></Border>
+                <Border x:Name="ExpBar17" Width="2.5" Height="28" CornerRadius="1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,2,0" VerticalAlignment="Bottom" RenderTransformOrigin="0.5,1.0"><Border.RenderTransform><ScaleTransform ScaleX="1.0" ScaleY="0.10" /></Border.RenderTransform></Border>
+                <Border x:Name="ExpBar18" Width="2.5" Height="28" CornerRadius="1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,2,0" VerticalAlignment="Bottom" RenderTransformOrigin="0.5,1.0"><Border.RenderTransform><ScaleTransform ScaleX="1.0" ScaleY="0.10" /></Border.RenderTransform></Border>
+                <Border x:Name="ExpBar19" Width="2.5" Height="28" CornerRadius="1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,2,0" VerticalAlignment="Bottom" RenderTransformOrigin="0.5,1.0"><Border.RenderTransform><ScaleTransform ScaleX="1.0" ScaleY="0.10" /></Border.RenderTransform></Border>
+                <Border x:Name="ExpBar20" Width="2.5" Height="28" CornerRadius="1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,2,0" VerticalAlignment="Bottom" RenderTransformOrigin="0.5,1.0"><Border.RenderTransform><ScaleTransform ScaleX="1.0" ScaleY="0.10" /></Border.RenderTransform></Border>
+                <Border x:Name="ExpBar21" Width="2.5" Height="28" CornerRadius="1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,2,0" VerticalAlignment="Bottom" RenderTransformOrigin="0.5,1.0"><Border.RenderTransform><ScaleTransform ScaleX="1.0" ScaleY="0.10" /></Border.RenderTransform></Border>
+                <Border x:Name="ExpBar22" Width="2.5" Height="28" CornerRadius="1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,2,0" VerticalAlignment="Bottom" RenderTransformOrigin="0.5,1.0"><Border.RenderTransform><ScaleTransform ScaleX="1.0" ScaleY="0.10" /></Border.RenderTransform></Border>
+                <Border x:Name="ExpBar23" Width="2.5" Height="28" CornerRadius="1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" VerticalAlignment="Bottom" RenderTransformOrigin="0.5,1.0"><Border.RenderTransform><ScaleTransform ScaleX="1.0" ScaleY="0.10" /></Border.RenderTransform></Border>
+            </StackPanel>
+        </Border>
 
-            <!-- 24 Logarithmic Band Audio Spectrum Visualizer (Expanded View) -->
-            <Border Grid.Row="0"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Bottom"
-                    Height="16"
-                    Margin="0,0,0,5"
-                    ClipToBounds="True"
-                    Visibility="{Binding EqualizerVisibility}"
-                    AutomationProperties.Name="Visualizador de espectro de audio expandido">
-                <StackPanel x:Name="ExpandedSpectrumPanel"
-                            Orientation="Horizontal"
-                            VerticalAlignment="Bottom"
-                            Height="16">
-                    <Border x:Name="ExpBar0" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
-                    <Border x:Name="ExpBar1" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
-                    <Border x:Name="ExpBar2" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
-                    <Border x:Name="ExpBar3" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
-                    <Border x:Name="ExpBar4" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
-                    <Border x:Name="ExpBar5" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
-                    <Border x:Name="ExpBar6" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
-                    <Border x:Name="ExpBar7" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
-                    <Border x:Name="ExpBar8" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
-                    <Border x:Name="ExpBar9" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
-                    <Border x:Name="ExpBar10" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
-                    <Border x:Name="ExpBar11" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
-                    <Border x:Name="ExpBar12" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
-                    <Border x:Name="ExpBar13" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
-                    <Border x:Name="ExpBar14" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
-                    <Border x:Name="ExpBar15" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
-                    <Border x:Name="ExpBar16" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
-                    <Border x:Name="ExpBar17" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
-                    <Border x:Name="ExpBar18" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
-                    <Border x:Name="ExpBar19" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
-                    <Border x:Name="ExpBar20" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
-                    <Border x:Name="ExpBar21" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
-                    <Border x:Name="ExpBar22" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" Margin="0,0,1.2,0" VerticalAlignment="Bottom" />
-                    <Border x:Name="ExpBar23" Width="2.2" Height="3" CornerRadius="1.1" Background="{Binding AccentBrush, FallbackValue=#FFFFFFFF}" VerticalAlignment="Bottom" />
-                </StackPanel>
-            </Border>
-
-            <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+        <!-- Bottom Section: Playback Controls with Generous Clearance from Notch Curvature -->
+        <Grid Grid.Row="3" VerticalAlignment="Center">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                 <!-- Previous Button -->
                 <Button Command="{Binding SkipPreviousCommand}"
                         Style="{StaticResource TransportButtonStyle}"
                         Width="34"
                         Height="34"
-                        Margin="0,0,16,0"
+                        Margin="0,0,18,0"
                         AutomationProperties.Name="Pista anterior"
                         AutomationProperties.HelpText="Salta a la pista anterior">
                     <Path Data="M6 6h2v12H6zm3.5 6l8.5 6V6z"
@@ -298,7 +296,7 @@
                         Style="{StaticResource TransportButtonStyle}"
                         Width="34"
                         Height="34"
-                        Margin="16,0,0,0"
+                        Margin="18,0,0,0"
                         AutomationProperties.Name="Pista siguiente"
                         AutomationProperties.HelpText="Salta a la pista siguiente">
                     <Path Data="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"

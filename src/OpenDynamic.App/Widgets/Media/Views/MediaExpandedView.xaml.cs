@@ -13,7 +13,7 @@ public partial class MediaExpandedView : UserControl
     private readonly MediaWidget _widget;
     private bool _isDraggingHeader;
     private Point _dragStartPoint;
-    private Border[]? _spectrumBars;
+    private ScaleTransform[]? _spectrumTransforms;
     private bool _isRenderingSubscribed;
     private long _lastRenderTime;
 
@@ -30,12 +30,32 @@ public partial class MediaExpandedView : UserControl
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
-        _spectrumBars ??=
+        _spectrumTransforms ??=
         [
-            ExpBar0, ExpBar1, ExpBar2, ExpBar3, ExpBar4, ExpBar5,
-            ExpBar6, ExpBar7, ExpBar8, ExpBar9, ExpBar10, ExpBar11,
-            ExpBar12, ExpBar13, ExpBar14, ExpBar15, ExpBar16, ExpBar17,
-            ExpBar18, ExpBar19, ExpBar20, ExpBar21, ExpBar22, ExpBar23
+            (ScaleTransform)ExpBar0.RenderTransform,
+            (ScaleTransform)ExpBar1.RenderTransform,
+            (ScaleTransform)ExpBar2.RenderTransform,
+            (ScaleTransform)ExpBar3.RenderTransform,
+            (ScaleTransform)ExpBar4.RenderTransform,
+            (ScaleTransform)ExpBar5.RenderTransform,
+            (ScaleTransform)ExpBar6.RenderTransform,
+            (ScaleTransform)ExpBar7.RenderTransform,
+            (ScaleTransform)ExpBar8.RenderTransform,
+            (ScaleTransform)ExpBar9.RenderTransform,
+            (ScaleTransform)ExpBar10.RenderTransform,
+            (ScaleTransform)ExpBar11.RenderTransform,
+            (ScaleTransform)ExpBar12.RenderTransform,
+            (ScaleTransform)ExpBar13.RenderTransform,
+            (ScaleTransform)ExpBar14.RenderTransform,
+            (ScaleTransform)ExpBar15.RenderTransform,
+            (ScaleTransform)ExpBar16.RenderTransform,
+            (ScaleTransform)ExpBar17.RenderTransform,
+            (ScaleTransform)ExpBar18.RenderTransform,
+            (ScaleTransform)ExpBar19.RenderTransform,
+            (ScaleTransform)ExpBar20.RenderTransform,
+            (ScaleTransform)ExpBar21.RenderTransform,
+            (ScaleTransform)ExpBar22.RenderTransform,
+            (ScaleTransform)ExpBar23.RenderTransform
         ];
 
         _widget.PropertyChanged += OnWidgetPropertyChanged;
@@ -101,7 +121,7 @@ public partial class MediaExpandedView : UserControl
 
     private void OnRendering(object? sender, EventArgs e)
     {
-        if (!_isRenderingSubscribed || _spectrumBars == null) return;
+        if (!_isRenderingSubscribed || _spectrumTransforms == null) return;
 
         long now = Environment.TickCount64;
         // Limit rendering to ~30 FPS (33 ms interval)
@@ -119,18 +139,18 @@ public partial class MediaExpandedView : UserControl
 
             for (int i = 0; i < 24; i++)
             {
-                // Dynamic height: [3.0, 16.0] DIP
-                _spectrumBars[i].Height = Math.Clamp(3.0 + bands[i] * 13.0, 3.0, 16.0);
+                // Dynamic GPU scale: [0.10, 1.0] -> Height: [2.8, 28.0] DIP without layout invalidation
+                _spectrumTransforms[i].ScaleY = Math.Clamp(0.10 + bands[i] * 0.90, 0.10, 1.0);
             }
         }
     }
 
     private void ResetBars()
     {
-        if (_spectrumBars == null) return;
-        for (int i = 0; i < _spectrumBars.Length; i++)
+        if (_spectrumTransforms == null) return;
+        for (int i = 0; i < _spectrumTransforms.Length; i++)
         {
-            _spectrumBars[i].Height = 3.0;
+            _spectrumTransforms[i].ScaleY = 0.10;
         }
     }
 

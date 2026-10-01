@@ -17,7 +17,7 @@ public class IslandLayoutTests
 
         var expanded = layout.GetDimensions(IslandState.Expanded);
         Assert.Equal(400.0, expanded.Width);
-        Assert.Equal(160.0, expanded.Height);
+        Assert.Equal(185.0, expanded.Height);
         Assert.Equal(16.0, expanded.CornerRadius);
         Assert.Equal(1.0, expanded.Opacity);
 
