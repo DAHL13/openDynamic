@@ -46,7 +46,8 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<NetworkService>(),
             sp.GetRequiredService<DeviceService>(),
             sp.GetRequiredService<ClipboardService>(),
-            sp.GetRequiredService<PrivacyAccessMonitor>()));
+            sp.GetRequiredService<PrivacyAccessMonitor>(),
+            sp.GetRequiredService<Widgets.AgentApprovals.ApprovalWidget>()));
 
         // Settings Service & Persistence
         services.AddSingleton<ISettingsService>(sp =>
@@ -142,6 +143,10 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<PrivacyAccessMonitor>();
         services.AddSingleton<Core.Privacy.IPrivacyAccessMonitor>(sp => sp.GetRequiredService<PrivacyAccessMonitor>());
         services.AddSingleton<Widgets.Privacy.PrivacyWidget>();
+
+        // Antigravity Agent Approvals Services (Priority 95, Named Pipe Server & Widget)
+        services.AddSingleton<Widgets.AgentApprovals.ApprovalWidget>();
+        services.AddSingleton<AgentApprovalPipeServer>();
 
         // Settings Window & ViewModel
         services.AddSingleton<SettingsViewModel>(sp => new SettingsViewModel(

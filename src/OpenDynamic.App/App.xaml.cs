@@ -95,6 +95,39 @@ public partial class App : Application
         var privacyWidget = Services.GetRequiredService<Widgets.Privacy.PrivacyWidget>();
         orchestrator.RegisterWidget(privacyWidget);
 
+        // Register ApprovalWidget (Priority 95) & Setup AgentApprovalPipeServer
+        var approvalWidget = Services.GetRequiredService<Widgets.AgentApprovals.ApprovalWidget>();
+        orchestrator.RegisterWidget(approvalWidget);
+
+        var approvalServer = Services.GetRequiredService<Services.AgentApprovalPipeServer>();
+        var appSettings = Services.GetRequiredService<Core.Settings.AppSettings>();
+        var settingsSvc = Services.GetRequiredService<Core.Settings.ISettingsService>();
+
+        approvalServer.CanDisplayRequest = () =>
+            !orchestrator.IsFullscreenSuppressed &&
+            orchestrator.StateMachine.CurrentState != Core.State.IslandState.Hidden &&
+            appSettings.EnableAgentApprovals;
+
+        approvalServer.RequestReceived += policy => approvalWidget.HandleRequestAsync(policy);
+        approvalServer.RequestCancelled += reqId => approvalWidget.HandleCancelled(reqId);
+
+        if (appSettings.EnableAgentApprovals)
+        {
+            approvalServer.Start();
+        }
+
+        settingsSvc.SettingsChanged += (_, updatedSettings) =>
+        {
+            if (updatedSettings.EnableAgentApprovals && !approvalServer.IsRunning)
+            {
+                approvalServer.Start();
+            }
+            else if (!updatedSettings.EnableAgentApprovals && approvalServer.IsRunning)
+            {
+                _ = approvalServer.StopAsync();
+            }
+        };
+
         // Initialize System Tray Icon Manager (H.NotifyIcon.Wpf) stored in class field to prevent GC collection
         _trayIconManager = Services.GetRequiredService<TrayIconManager>();
         _trayIconManager.Initialize();
@@ -222,6 +255,12 @@ public partial class App : Application
 
             _hotkeyService?.Dispose();
             _hotkeyService = null;
+
+            var approvalServer = Services?.GetService<Services.AgentApprovalPipeServer>();
+            if (approvalServer != null)
+            {
+                approvalServer.Dispose();
+            }
 
             var settingsService = Services?.GetService<Core.Settings.ISettingsService>();
             settingsService?.SaveImmediate();

@@ -31,6 +31,7 @@ public partial class IslandWindow : Window
     private readonly Services.DeviceService? _deviceService;
     private readonly Services.ClipboardService? _clipboardService;
     private readonly Services.PrivacyAccessMonitor? _privacyMonitor;
+    private readonly Widgets.AgentApprovals.ApprovalWidget? _approvalWidget;
     private readonly Core.Settings.AppSettings _settings;
 
     private readonly DispatcherTimer _hoverEnterTimer;
@@ -53,7 +54,8 @@ public partial class IslandWindow : Window
         Services.NetworkService? networkService = null,
         Services.DeviceService? deviceService = null,
         Services.ClipboardService? clipboardService = null,
-        Services.PrivacyAccessMonitor? privacyMonitor = null)
+        Services.PrivacyAccessMonitor? privacyMonitor = null,
+        Widgets.AgentApprovals.ApprovalWidget? approvalWidget = null)
     {
         _windowPositioner = windowPositioner ?? throw new ArgumentNullException(nameof(windowPositioner));
         _foregroundWatcher = foregroundWatcher ?? throw new ArgumentNullException(nameof(foregroundWatcher));
@@ -65,6 +67,7 @@ public partial class IslandWindow : Window
         _deviceService = deviceService;
         _clipboardService = clipboardService;
         _privacyMonitor = privacyMonitor;
+        _approvalWidget = approvalWidget;
         _settings = settings ?? new Core.Settings.AppSettings();
 
         InitializeComponent();
@@ -158,9 +161,10 @@ public partial class IslandWindow : Window
         _networkService?.Start();
         _deviceService?.Start(_hwnd);
         _clipboardService?.Start(_hwnd);
+        _approvalWidget?.InitializeHwnd(_hwnd);
 
-        Log.Information("IslandWindow initialized successfully with HWND: {Hwnd}. NetworkService={HasNetwork}, DeviceService={HasDevice}, ClipboardService={HasClipboard}",
-            _hwnd, _networkService != null, _deviceService != null, _clipboardService != null);
+        Log.Information("IslandWindow initialized successfully with HWND: {Hwnd}. NetworkService={HasNetwork}, DeviceService={HasDevice}, ClipboardService={HasClipboard}, ApprovalWidget={HasApproval}",
+            _hwnd, _networkService != null, _deviceService != null, _clipboardService != null, _approvalWidget != null);
     }
 
     /// <summary>
@@ -359,6 +363,12 @@ public partial class IslandWindow : Window
                         }
                     }
                 }
+                break;
+
+            // React to dynamic agent approval hotkeys (Ctrl+Alt+1, Ctrl+Alt+5, Ctrl+Alt+Enter, Ctrl+Alt+A)
+            case NativeMethods.WM_HOTKEY:
+                int hotkeyId = wParam.ToInt32();
+                _approvalWidget?.OnHotkeyMessage(hotkeyId);
                 break;
         }
 

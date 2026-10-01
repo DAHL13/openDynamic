@@ -1,0 +1,212 @@
+<UserControl x:Class="OpenDynamic.App.Widgets.AgentApprovals.Views.ApprovalExpandedView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             mc:Ignorable="d" 
+             Width="380"
+             Background="Transparent">
+    <Grid Margin="12,6,12,8">
+        <Grid.RowDefinitions>
+            <!-- Header: Title, Project folder, Risk Badge, Timer -->
+            <RowDefinition Height="Auto" />
+            <!-- Command View / Code Box -->
+            <RowDefinition Height="Auto" />
+            <!-- Review confirmation bar (if required) -->
+            <RowDefinition Height="Auto" />
+            <!-- Options list (1. Allow, 5. Deny, Decide in AGY) -->
+            <RowDefinition Height="Auto" />
+            <!-- Hotkey guide footer -->
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Grid Grid.Row="0" Margin="0,0,0,6">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <Path Data="M 4,2 L 12,2 L 14,6 L 14,12 L 12,14 L 4,14 L 2,12 L 2,6 Z M 5,7 A 1,1 0 1 0 5,9 A 1,1 0 1 0 5,7 Z M 11,7 A 1,1 0 1 0 11,9 A 1,1 0 1 0 11,7 Z M 6,11 L 10,11"
+                      Stroke="{Binding RiskColorBrush}"
+                      StrokeThickness="1.5"
+                      Fill="Transparent"
+                      Width="14"
+                      Height="14"
+                      Stretch="Uniform"
+                      VerticalAlignment="Center"
+                      Margin="0,0,6,0" />
+
+                <TextBlock Text="Antigravity pide permiso"
+                           FontSize="12"
+                           FontWeight="Bold"
+                           Foreground="{DynamicResource AppTextPrimaryBrush}"
+                           VerticalAlignment="Center"
+                           Margin="0,0,8,0" />
+
+                <!-- Project Folder -->
+                <Border Background="#2C2C2E" CornerRadius="4" Padding="5,1" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding ProjectFolder, StringFormat='📁 {0}'}"
+                               FontSize="10"
+                               FontWeight="Medium"
+                               Foreground="{DynamicResource AppTextMutedBrush}" />
+                </Border>
+            </StackPanel>
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <!-- Risk Badge -->
+                <Border Background="{Binding RiskBackgroundBrush}" CornerRadius="4" Padding="6,2" Margin="0,0,6,0">
+                    <TextBlock Text="{Binding RiskBadgeText}"
+                               FontSize="10"
+                               FontWeight="Bold"
+                               Foreground="{Binding RiskColorBrush}" />
+                </Border>
+
+                <!-- Countdown -->
+                <TextBlock Text="{Binding RemainingSecondsText}"
+                           FontSize="11"
+                           FontWeight="Bold"
+                           Foreground="{DynamicResource AppTextMutedBrush}"
+                           VerticalAlignment="Center" />
+            </StackPanel>
+        </Grid>
+
+        <!-- Command / Code Display Box -->
+        <Border Grid.Row="1" Background="#141416" BorderBrush="#28282C" BorderThickness="1" CornerRadius="6" Padding="6" Margin="0,0,0,4">
+            <ScrollViewer MaxHeight="60" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                <TextBlock Text="{Binding FullSummary}"
+                           FontFamily="Consolas, Cascadia Code, monospace"
+                           FontSize="11"
+                           Foreground="#E0E0E0"
+                           TextWrapping="Wrap" />
+            </ScrollViewer>
+        </Border>
+
+        <!-- Review Warning & Confirmation if required -->
+        <Border Grid.Row="2" Background="#261A00" BorderBrush="#664600" BorderThickness="1" CornerRadius="4" Padding="6,3" Margin="0,0,0,4"
+                Visibility="{Binding ReviewRequiredBannerVisibility}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="{Binding ReviewBannerText}"
+                           FontSize="10"
+                           FontWeight="Medium"
+                           Foreground="#FFD60A"
+                           VerticalAlignment="Center" />
+                <Button Grid.Column="1"
+                        Content="Confirmar revisión"
+                        Command="{Binding ConfirmReviewCommand}"
+                        Background="#FF9F0A"
+                        Foreground="#000000"
+                        FontSize="10"
+                        FontWeight="Bold"
+                        Padding="6,2"
+                        BorderThickness="0"
+                        Cursor="Hand"
+                        Visibility="{Binding ConfirmReviewButtonVisibility}" />
+            </Grid>
+        </Border>
+
+        <!-- Options Container -->
+        <StackPanel Grid.Row="3" Margin="0,2,0,4">
+            <!-- Option 1: Allow this time -->
+            <Button Command="{Binding AllowCommand}"
+                    IsEnabled="{Binding CanAllow}"
+                    BorderThickness="{Binding Option1BorderThickness}"
+                    BorderBrush="{Binding Option1BorderBrush}"
+                    Background="#1C281E"
+                    Padding="8,5"
+                    HorizontalContentAlignment="Left"
+                    Cursor="Hand"
+                    Margin="0,0,0,3">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{Binding AllowButtonLabel}"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Foreground="{Binding AllowButtonForeground}" />
+                        <TextBlock Text="{Binding GracePeriodIndicator}"
+                                   FontSize="10"
+                                   FontWeight="Normal"
+                                   Foreground="#8E8E93"
+                                   Margin="6,0,0,0"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                    <TextBlock Grid.Column="1" Text="Ctrl+Alt+1" FontSize="10" Foreground="#636366" VerticalAlignment="Center" />
+                </Grid>
+            </Button>
+
+            <!-- Option 5: Deny with reason -->
+            <Border Background="#251C1D" BorderThickness="{Binding Option5BorderThickness}" BorderBrush="{Binding Option5BorderBrush}" CornerRadius="4" Padding="6,3" Margin="0,0,0,3">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Text="5. No:"
+                               FontSize="11"
+                               FontWeight="SemiBold"
+                               Foreground="#FF453A"
+                               VerticalAlignment="Center"
+                               Margin="0,0,6,0" />
+
+                    <ComboBox Grid.Column="1"
+                              ItemsSource="{Binding PredefinedDenyReasons}"
+                              SelectedItem="{Binding SelectedDenyReason}"
+                              FontSize="10"
+                              Height="22"
+                              VerticalAlignment="Center"
+                              Margin="0,0,6,0" />
+
+                    <Button Grid.Column="2"
+                            Content="Denegar"
+                            Command="{Binding DenyCommand}"
+                            IsEnabled="{Binding CanDeny}"
+                            Background="#FF453A"
+                            Foreground="#FFFFFF"
+                            FontSize="10"
+                            FontWeight="Bold"
+                            Padding="8,2"
+                            BorderThickness="0"
+                            Cursor="Hand" />
+                </Grid>
+            </Border>
+
+            <!-- Decide in Antigravity button -->
+            <Button Command="{Binding DecideInAntigravityCommand}"
+                    Background="#2C2C2E"
+                    BorderThickness="0"
+                    Padding="8,4"
+                    Cursor="Hand">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Decidir en Antigravity (aviso nativo)"
+                               FontSize="11"
+                               FontWeight="Medium"
+                               Foreground="{DynamicResource AppTextPrimaryBrush}" />
+                    <TextBlock Grid.Column="1" Text="Ctrl+Alt+A" FontSize="10" Foreground="#8E8E93" VerticalAlignment="Center" />
+                </Grid>
+            </Button>
+        </StackPanel>
+
+        <!-- Footer: Hotkey guidance -->
+        <TextBlock Grid.Row="4"
+                   Text="{Binding HotkeyGuideText}"
+                   FontSize="9"
+                   Foreground="{DynamicResource AppTextMutedBrush}"
+                   HorizontalAlignment="Center"
+                   Margin="0,2,0,0" />
+    </Grid>
+</UserControl>
