@@ -8,7 +8,7 @@ public static class Program
 {
     public const string DefaultPipeName = "openDynamic-agent-v1";
     public const int DefaultConnectionTimeoutMs = 300;
-    public const int DefaultWaitSeconds = 90;
+    public const int DefaultWaitMs = 90_000;
 
     public static async Task<int> Main(string[] args)
     {
@@ -26,7 +26,8 @@ public static class Program
 
     private static async Task<int> ExecuteHookAsync(string[] args)
     {
-        int waitSeconds = DefaultWaitSeconds;
+        int waitMs = DefaultWaitMs;
+        int connectionTimeoutMs = DefaultConnectionTimeoutMs;
         string pipeName = DefaultPipeName;
 
         for (int i = 0; i < args.Length; i++)
@@ -46,9 +47,23 @@ public static class Program
 
             if ((arg.Equals("--wait", StringComparison.OrdinalIgnoreCase) ||
                  arg.Equals("--timeout", StringComparison.OrdinalIgnoreCase)) &&
-                i + 1 < args.Length && int.TryParse(args[i + 1], out int parsedWait))
+                i + 1 < args.Length && int.TryParse(args[i + 1], out int parsedWaitSec))
             {
-                waitSeconds = Math.Max(1, parsedWait);
+                waitMs = Math.Max(50, parsedWaitSec * 1000);
+                i++;
+            }
+            else if ((arg.Equals("--wait-ms", StringComparison.OrdinalIgnoreCase) ||
+                      arg.Equals("--timeout-ms", StringComparison.OrdinalIgnoreCase)) &&
+                     i + 1 < args.Length && int.TryParse(args[i + 1], out int parsedWaitMs))
+            {
+                waitMs = Math.Max(50, parsedWaitMs);
+                i++;
+            }
+            else if ((arg.Equals("--connect-timeout", StringComparison.OrdinalIgnoreCase) ||
+                      arg.Equals("--connect-timeout-ms", StringComparison.OrdinalIgnoreCase)) &&
+                     i + 1 < args.Length && int.TryParse(args[i + 1], out int parsedConnTimeout))
+            {
+                connectionTimeoutMs = Math.Max(50, parsedConnTimeout);
                 i++;
             }
             else if (arg.Equals("--pipe", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
@@ -58,11 +73,12 @@ public static class Program
             }
         }
 
-        // Read hook payload strictly from standard input
-        string? inputJson = await ReadStdinSafelyAsync().ConfigureAwait(false);
+        // Read hook payload strictly from standard input with non-blocking line reading
+        using var stdinCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(Math.Min(waitMs, 2000)));
+        string? inputJson = await ReadStdinSafelyAsync(stdinCts.Token).ConfigureAwait(false);
         if (string.IsNullOrWhiteSpace(inputJson))
         {
-            EmitAsk("Entrada vacía recibida en stdin.");
+            EmitAsk("Entrada vacía o ausente recibida en stdin.");
             return 0;
         }
 
@@ -77,13 +93,13 @@ public static class Program
             return 0;
         }
 
-        // Connect to local Named Pipe server with fast timeout (300 ms)
-        using var clientStream = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
+        // Connect to local Named Pipe server with fast timeout (300 ms) and CurrentUserOnly security
+        using var clientStream = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.CurrentUserOnly | PipeOptions.Asynchronous);
 
         try
         {
-            using var connectCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(DefaultConnectionTimeoutMs));
-            await clientStream.ConnectAsync(connectCts.Token).ConfigureAwait(false);
+            using var connectCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(connectionTimeoutMs));
+            await clientStream.ConnectAsync(connectionTimeoutMs, connectCts.Token).ConfigureAwait(false);
         }
         catch
         {
@@ -92,46 +108,38 @@ public static class Program
             return 0;
         }
 
-        // Send request envelope
-        var requestMsg = PipeMessage.CreateRequest(request);
-        var bytes = Encoding.UTF8.GetBytes(requestMsg.Serialize() + "\n");
-        await clientStream.WriteAsync(bytes).ConfigureAwait(false);
-        await clientStream.FlushAsync().ConfigureAwait(false);
-
-        // Wait for response envelope up to waitSeconds
-        using var waitCts = new CancellationTokenSource(TimeSpan.FromSeconds(waitSeconds));
-        string? responseJson;
-        try
-        {
-            responseJson = await ReadLineWithLimitAsync(clientStream, PipeMessage.MaxPayloadSizeBytes, waitCts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            EmitAsk($"Tiempo de espera agotado ({waitSeconds} s).");
-            return 0;
-        }
-        catch
-        {
-            EmitAsk("Error durante la comunicación con openDynamic.");
-            return 0;
-        }
-
-        if (string.IsNullOrWhiteSpace(responseJson))
-        {
-            EmitAsk("El servidor cerró la conexión sin emitir respuesta.");
-            return 0;
-        }
+        // Wait for response envelope up to waitMs
+        using var waitCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(waitMs));
 
         try
         {
+            // Send request envelope
+            var requestMsg = PipeMessage.CreateRequest(request);
+            var bytes = Encoding.UTF8.GetBytes(requestMsg.Serialize() + "\n");
+            await clientStream.WriteAsync(bytes.AsMemory(), waitCts.Token).ConfigureAwait(false);
+            await clientStream.FlushAsync(waitCts.Token).ConfigureAwait(false);
+
+            string? responseJson = await ReadLineWithLimitAsync(clientStream, PipeMessage.MaxPayloadSizeBytes, waitCts.Token).ConfigureAwait(false);
+
+            if (string.IsNullOrWhiteSpace(responseJson))
+            {
+                EmitAsk("El servidor cerró la conexión sin emitir respuesta.");
+                return 0;
+            }
+
             var pipeResponse = PipeMessage.Deserialize(responseJson);
             var approvalResponse = ApprovalResponse.FromJsonSafe(pipeResponse.Payload);
             Console.WriteLine(approvalResponse.ToJson());
             return 0;
         }
+        catch (OperationCanceledException)
+        {
+            EmitAsk($"Tiempo de espera agotado ({waitMs} ms).");
+            return 0;
+        }
         catch (Exception ex)
         {
-            EmitAsk($"Error interpretando respuesta del servidor: {ex.Message}");
+            EmitAsk($"Error durante la comunicación con openDynamic: {ex.Message}");
             return 0;
         }
     }
@@ -173,35 +181,50 @@ public static class Program
         }
     }
 
-    private static async Task<string?> ReadStdinSafelyAsync()
+    private static async Task<string?> ReadStdinSafelyAsync(CancellationToken ct)
     {
         try
         {
-            using var ms = new MemoryStream();
-            var buffer = new byte[1024];
-            int totalBytes = 0;
-
-            using var stdin = Console.OpenStandardInput();
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-
-            while (true)
+            if (!Console.IsInputRedirected)
             {
-                int read = await stdin.ReadAsync(buffer.AsMemory(0, buffer.Length), cts.Token).ConfigureAwait(false);
-                if (read == 0) break;
+                return null;
+            }
 
-                ms.Write(buffer, 0, read);
-                totalBytes += read;
+            using var reader = new StreamReader(Console.OpenStandardInput(), Encoding.UTF8, detectEncodingFromByteOrderMarks: true, bufferSize: 4096, leaveOpen: true);
+            var sb = new StringBuilder();
 
-                if (totalBytes > PipeMessage.MaxPayloadSizeBytes)
+            string? line = await reader.ReadLineAsync(ct).ConfigureAwait(false);
+            if (line == null) return null;
+
+            line = line.Trim().Trim('\uFEFF');
+            if (string.IsNullOrWhiteSpace(line)) return null;
+
+            sb.Append(line);
+
+            // Fast path: single-line JSON payload (standard Antigravity hook invocation)
+            if (line.StartsWith('{') && line.EndsWith('}'))
+            {
+                return line;
+            }
+
+            // Multi-line JSON payload
+            while (!ct.IsCancellationRequested)
+            {
+                var nextLine = await reader.ReadLineAsync(ct).ConfigureAwait(false);
+                if (nextLine == null) break;
+                sb.AppendLine(nextLine);
+                var current = sb.ToString().Trim();
+                if (current.StartsWith('{') && current.EndsWith('}'))
+                {
+                    break;
+                }
+                if (sb.Length > PipeMessage.MaxPayloadSizeBytes)
                 {
                     return null;
                 }
-
-                // If stdin data is available and complete, break early if not redirected terminal
-                if (!Console.IsInputRedirected) break;
             }
 
-            return Encoding.UTF8.GetString(ms.ToArray()).Trim();
+            return sb.ToString().Trim().Trim('\uFEFF');
         }
         catch
         {
