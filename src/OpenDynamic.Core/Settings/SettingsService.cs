@@ -180,6 +180,16 @@ public sealed class SettingsService : ISettingsService
                         loaded.IgnoredPrivacyApps ??= new List<string>();
                     }
 
+                    if (loaded.SchemaVersion < 9)
+                    {
+                        // Migration v8 -> v9: Introduce Audio Visualizer mode (Disabled, Simulated, Real).
+                        // Defaults to Real.
+                        if (!Enum.IsDefined(typeof(Audio.Spectrum.AudioVisualizerMode), loaded.VisualizerMode))
+                        {
+                            loaded.VisualizerMode = Audio.Spectrum.AudioVisualizerMode.Real;
+                        }
+                    }
+
                     loaded.IgnoredPrivacyApps ??= new List<string>();
                     loaded.IgnoredDeviceNames ??= new List<string>();
                     loaded.SchemaVersion = AppSettings.CurrentSchemaVersion;

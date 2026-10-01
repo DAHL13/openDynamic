@@ -425,6 +425,34 @@ public sealed class SettingsServiceTests : IDisposable
     }
 
     [Fact]
+    public void Load_WhenSchemaVersionIs8_MigratesToSchemaVersion9_SetsDefaultVisualizerMode()
+    {
+        string filePath = Path.Combine(_testDirectory, "settings_v8.json");
+        // Schema version 8 (Phase 15 without VisualizerMode)
+        const string v8Json = """
+        {
+            "SchemaVersion": 8,
+            "EnableMicrophoneIndicator": true,
+            "CapsuleWidth": 215.0
+        }
+        """;
+
+        File.WriteAllText(filePath, v8Json);
+
+        using var service = new SettingsService(filePath, debounceMilliseconds: 100);
+        service.Load();
+
+        Assert.Equal(AppSettings.CurrentSchemaVersion, service.CurrentSettings.SchemaVersion);
+        Assert.Equal(215.0, service.CurrentSettings.CapsuleWidth);
+        Assert.Equal(OpenDynamic.Core.Audio.Spectrum.AudioVisualizerMode.Real, service.CurrentSettings.VisualizerMode);
+        Assert.True(service.CurrentSettings.IsReactiveVisualizerEnabled);
+
+        string reloadedJson = File.ReadAllText(filePath);
+        Assert.Contains($"\"SchemaVersion\": {AppSettings.CurrentSchemaVersion}", reloadedJson);
+        Assert.Contains("\"VisualizerMode\": \"Real\"", reloadedJson);
+    }
+
+    [Fact]
     public void Load_WhenMotionModeIsConfigured_PersistsAndDeserializesCorrectly()
     {
         string filePath = Path.Combine(_testDirectory, "settings_motion.json");
@@ -517,6 +545,7 @@ public sealed class SettingsServiceTests : IDisposable
             EnableMediaWidget = false,
             DefaultMediaPriority = 35,
             MediaPauseGracePeriodSeconds = 15,
+            VisualizerMode = OpenDynamic.Core.Audio.Spectrum.AudioVisualizerMode.Disabled,
             EnableVolumeWidget = false,
             DefaultVolumePriority = 85,
             VolumeTransientDurationSeconds = 2.5,
@@ -571,6 +600,7 @@ public sealed class SettingsServiceTests : IDisposable
         Assert.Equal(original.EnableDynamicMediaColor, cloned.EnableDynamicMediaColor);
         Assert.Equal(original.EnableMediaGestures, cloned.EnableMediaGestures);
         Assert.Equal(original.MediaGestureSensitivity, cloned.MediaGestureSensitivity);
+        Assert.Equal(original.VisualizerMode, cloned.VisualizerMode);
         Assert.Equal(original.EnableVolumeWidget, cloned.EnableVolumeWidget);
         Assert.Equal(original.DefaultVolumePriority, cloned.DefaultVolumePriority);
         Assert.Equal(original.VolumeTransientDurationSeconds, cloned.VolumeTransientDurationSeconds);
@@ -603,6 +633,7 @@ public sealed class SettingsServiceTests : IDisposable
         Assert.Equal(original.ToggleIslandHotkey, destination.ToggleIslandHotkey);
         Assert.Equal(original.StartWithWindows, destination.StartWithWindows);
         Assert.Equal(original.MotionMode, destination.MotionMode);
+        Assert.Equal(original.VisualizerMode, destination.VisualizerMode);
         Assert.Equal(original.EnableClipboardWidget, destination.EnableClipboardWidget);
         Assert.Equal(original.ClipboardHistoryCapacity, destination.ClipboardHistoryCapacity);
         Assert.Equal(original.EnableMicrophoneIndicator, destination.EnableMicrophoneIndicator);

@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using OpenDynamic.Core.Animation;
+using OpenDynamic.Core.Audio.Spectrum;
 
 namespace OpenDynamic.Core.Settings;
 
@@ -17,8 +18,9 @@ public sealed class AppSettings
     /// Version 6 introduces Dynamic Album Art Color and Horizontal Media Gestures with sensitivity.
     /// Version 7 introduces Opt-In In-Memory Clipboard History, transient notices, preview toggle, capacity and expiration settings.
     /// Version 8 introduces Microphone & Camera indicators, privacy transient alerts, priority (85), and ignored privacy apps.
+    /// Version 9 introduces Audio Spectrum Visualizer mode (Disabled, Simulated, Real).
     /// </summary>
-    public const int CurrentSchemaVersion = 8;
+    public const int CurrentSchemaVersion = 9;
 
     /// <summary>
     /// Configuration schema version. Defaults to <see cref="CurrentSchemaVersion"/>.
@@ -120,6 +122,22 @@ public sealed class AppSettings
     /// Default is 120.0 (standard mouse wheel step).
     /// </summary>
     public double MediaGestureSensitivity { get; set; } = 120.0;
+
+    /// <summary>
+    /// Audio visualizer operational mode in the media widget notch.
+    /// <see cref="AudioVisualizerMode.Disabled"/> hides equalizer bars.
+    /// <see cref="AudioVisualizerMode.Simulated"/> renders procedural wave bars.
+    /// <see cref="AudioVisualizerMode.Real"/> performs real-time WASAPI loopback capture and native FFT analysis.
+    /// Default is <see cref="AudioVisualizerMode.Real"/>.
+    /// </summary>
+    [JsonConverter(typeof(JsonStringEnumConverter<AudioVisualizerMode>))]
+    public AudioVisualizerMode VisualizerMode { get; set; } = AudioVisualizerMode.Real;
+
+    /// <summary>
+    /// Convenience helper indicating if real reactive loopback capture is enabled.
+    /// </summary>
+    [JsonIgnore]
+    public bool IsReactiveVisualizerEnabled => VisualizerMode == AudioVisualizerMode.Real;
 
     #endregion
 
@@ -457,6 +475,7 @@ public sealed class AppSettings
             EnableDynamicMediaColor = this.EnableDynamicMediaColor,
             EnableMediaGestures = this.EnableMediaGestures,
             MediaGestureSensitivity = this.MediaGestureSensitivity,
+            VisualizerMode = this.VisualizerMode,
             EnableVolumeWidget = this.EnableVolumeWidget,
             DefaultVolumePriority = this.DefaultVolumePriority,
             VolumeTransientDurationSeconds = this.VolumeTransientDurationSeconds,
@@ -528,6 +547,7 @@ public sealed class AppSettings
         EnableDynamicMediaColor = other.EnableDynamicMediaColor;
         EnableMediaGestures = other.EnableMediaGestures;
         MediaGestureSensitivity = other.MediaGestureSensitivity;
+        VisualizerMode = other.VisualizerMode;
         EnableVolumeWidget = other.EnableVolumeWidget;
         DefaultVolumePriority = other.DefaultVolumePriority;
         VolumeTransientDurationSeconds = other.VolumeTransientDurationSeconds;

@@ -6,6 +6,7 @@ using OpenDynamic.App.Services;
 using OpenDynamic.App.Widgets.Hardware;
 using OpenDynamic.App.Windowing;
 using OpenDynamic.Core.Animation;
+using OpenDynamic.Core.Audio.Spectrum;
 using OpenDynamic.Core.Autostart;
 using OpenDynamic.Core.Settings;
 using OpenDynamic.Core.Stopwatch;
@@ -110,6 +111,44 @@ public partial class SettingsViewModel : ObservableObject
 
     [ObservableProperty]
     private double _mediaGestureSensitivity;
+
+    [ObservableProperty]
+    private AudioVisualizerMode _visualizerMode;
+
+    public record VisualizerModeOption(AudioVisualizerMode Value, string DisplayName);
+
+    public IReadOnlyList<VisualizerModeOption> VisualizerModeOptions { get; } = new List<VisualizerModeOption>
+    {
+        new(AudioVisualizerMode.Disabled, "Desactivado (Sin barras)"),
+        new(AudioVisualizerMode.Simulated, "Simulado (Animación procedimental)"),
+        new(AudioVisualizerMode.Real, "Real (Espectro reactivo WASAPI)")
+    };
+
+    public VisualizerModeOption SelectedVisualizerModeOption
+    {
+        get => VisualizerModeOptions.FirstOrDefault(o => o.Value == VisualizerMode) ?? VisualizerModeOptions[2];
+        set
+        {
+            if (value != null && VisualizerMode != value.Value)
+            {
+                VisualizerMode = value.Value;
+                OnPropertyChanged(nameof(SelectedVisualizerModeOption));
+                OnPropertyChanged(nameof(IsReactiveVisualizerEnabled));
+            }
+        }
+    }
+
+    public bool IsReactiveVisualizerEnabled
+    {
+        get => VisualizerMode == AudioVisualizerMode.Real;
+        set
+        {
+            if (value != (VisualizerMode == AudioVisualizerMode.Real))
+            {
+                VisualizerMode = value ? AudioVisualizerMode.Real : AudioVisualizerMode.Simulated;
+            }
+        }
+    }
 
     // Volume
     [ObservableProperty]
@@ -344,6 +383,7 @@ public partial class SettingsViewModel : ObservableObject
         _enableDynamicMediaColor = _settings.EnableDynamicMediaColor;
         _enableMediaGestures = _settings.EnableMediaGestures;
         _mediaGestureSensitivity = _settings.MediaGestureSensitivity;
+        _visualizerMode = _settings.VisualizerMode;
 
         _enableVolumeWidget = _settings.EnableVolumeWidget;
         _defaultVolumePriority = _settings.DefaultVolumePriority;
@@ -500,6 +540,14 @@ public partial class SettingsViewModel : ObservableObject
     {
         _settings.MediaGestureSensitivity = value;
         _settingsService.SaveDebounced();
+    }
+
+    partial void OnVisualizerModeChanged(AudioVisualizerMode value)
+    {
+        _settings.VisualizerMode = value;
+        _settingsService.SaveDebounced();
+        OnPropertyChanged(nameof(SelectedVisualizerModeOption));
+        OnPropertyChanged(nameof(IsReactiveVisualizerEnabled));
     }
 
     partial void OnEnableVolumeWidgetChanged(bool value)
@@ -1011,6 +1059,9 @@ public partial class SettingsViewModel : ObservableObject
         EnableMediaWidget = _settings.EnableMediaWidget;
         DefaultMediaPriority = _settings.DefaultMediaPriority;
         MediaPauseGracePeriodSeconds = _settings.MediaPauseGracePeriodSeconds;
+        VisualizerMode = _settings.VisualizerMode;
+        OnPropertyChanged(nameof(SelectedVisualizerModeOption));
+        OnPropertyChanged(nameof(IsReactiveVisualizerEnabled));
 
         EnableVolumeWidget = _settings.EnableVolumeWidget;
         DefaultVolumePriority = _settings.DefaultVolumePriority;

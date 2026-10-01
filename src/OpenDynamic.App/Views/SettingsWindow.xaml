@@ -483,6 +483,38 @@
                                             AutomationProperties.Name="Sensibilidad de Gestos Horizontales"
                                             AutomationProperties.HelpText="Ajusta el umbral de activación para la rueda horizontal y gestos táctiles"/>
                                 </StackPanel>
+
+                                <!-- Phase 16: Audio Spectrum Visualizer -->
+                                <Grid Margin="0,12,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="220" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                        <TextBlock Text="Visualizador de Audio (Ecualizador)" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Barras dinámicas de espectro en la muesca durante la reproducción musical." Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <ComboBox Grid.Column="1"
+                                              ItemsSource="{Binding VisualizerModeOptions}"
+                                              SelectedItem="{Binding SelectedVisualizerModeOption}"
+                                              DisplayMemberPath="DisplayName"
+                                              Height="32" VerticalContentAlignment="Center"
+                                              Background="#1C1C1E" Foreground="#FFFFFF" BorderBrush="#3B4252"
+                                              AutomationProperties.Name="Modo del visualizador de audio"
+                                              AutomationProperties.HelpText="Selecciona entre visualizador en tiempo real (WASAPI), simulado o desactivado"/>
+                                </Grid>
+
+                                <Grid Margin="0,10,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="Habilitar Visualizador Reactivo (WASAPI)" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Analiza el audio del sistema con FFT propia solo cuando se reproduce música (0% CPU en reposo)." Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <CheckBox IsChecked="{Binding IsReactiveVisualizerEnabled}"
+                                              HorizontalAlignment="Right"
+                                              VerticalAlignment="Center"
+                                              AutomationProperties.Name="Habilitar visualizador reactivo"
+                                              AutomationProperties.HelpText="Conmuta rápidamente entre modo reactivo WASAPI y simulado"/>
+                                </Grid>
                             </StackPanel>
                         </Border>
 
