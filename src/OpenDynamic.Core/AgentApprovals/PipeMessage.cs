@@ -6,6 +6,7 @@ namespace OpenDynamic.Core.AgentApprovals;
 /// <summary>
 /// Envelope message for IPC communication over Named Pipe (protocol version 1).
 /// Enforces strict payload limits (max 256 KB) and protocol version validation (Golden Rule 13).
+/// Supports both {"v": 1} and {"version": 1} naming conventions.
 /// </summary>
 public sealed record PipeMessage
 {
@@ -35,7 +36,18 @@ public sealed record PipeMessage
     [JsonPropertyName("payload")]
     public string? Payload { get; init; }
 
+    public PipeMessage()
+    {
+    }
+
     [JsonConstructor]
+    public PipeMessage(int? v, int? version, string type, string? payload = null)
+    {
+        Version = v ?? version ?? CurrentProtocolVersion;
+        Type = type?.Trim() ?? string.Empty;
+        Payload = payload;
+    }
+
     public PipeMessage(int version, string type, string? payload = null)
     {
         Version = version;
@@ -97,38 +109,72 @@ public sealed record PipeMessage
 
     /// <summary>
     /// Deserializes and validates a JSON string into a <see cref="PipeMessage"/>.
+    /// Supports "v", "version", snake_case, raw hook payloads, and strips any UTF-8 BOM.
     /// </summary>
-    /// <param name="json">Raw JSON string received over the pipe.</param>
-    /// <returns>Validated <see cref="PipeMessage"/>.</returns>
-    /// <exception cref="InvalidOperationException">Thrown when message violates protocol constraints or size limits.</exception>
     public static PipeMessage Deserialize(string json)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(json);
-        ValidatePayloadSize(json);
+        string clean = json.Trim().Trim('\uFEFF');
+        ValidatePayloadSize(clean);
 
-        PipeMessage? message;
-        try
-        {
-            message = JsonSerializer.Deserialize<PipeMessage>(json, JsonOptions);
-        }
-        catch (JsonException ex)
-        {
-            throw new InvalidOperationException("Malformed pipe message JSON.", ex);
-        }
+        using var doc = JsonDocument.Parse(clean);
+        var root = doc.RootElement;
 
-        if (message == null)
+        // Auto-wrap raw Antigravity hook payloads or direct request JSON without envelope
+        if (root.TryGetProperty("toolCall", out _) || root.TryGetProperty("ToolCall", out _) ||
+            ((root.TryGetProperty("toolName", out _) || root.TryGetProperty("tool_name", out _)) && !root.TryGetProperty("type", out _)))
         {
-            throw new InvalidOperationException("Deserialized pipe message is null.");
+            return new PipeMessage(CurrentProtocolVersion, "request", clean);
         }
 
-        message.ValidateVersion();
+        // Version: check "v", "version", "protocol_version" (number or string)
+        int version = CurrentProtocolVersion;
+        if (root.TryGetProperty("v", out var vProp) ||
+            root.TryGetProperty("version", out vProp) ||
+            root.TryGetProperty("protocol_version", out vProp))
+        {
+            if (vProp.ValueKind == JsonValueKind.Number && vProp.TryGetInt32(out int vNum))
+            {
+                version = vNum;
+            }
+            else if (vProp.ValueKind == JsonValueKind.String && int.TryParse(vProp.GetString(), out int vParsed))
+            {
+                version = vParsed;
+            }
+        }
 
-        if (string.IsNullOrWhiteSpace(message.Type))
+        if (version != CurrentProtocolVersion)
+        {
+            throw new InvalidOperationException(
+                $"Unsupported protocol version {version}. Expected protocol version {CurrentProtocolVersion}.");
+        }
+
+        // Type: check "type", "Type", "message_type"
+        string type = string.Empty;
+        if (root.TryGetProperty("type", out var typeProp) ||
+            root.TryGetProperty("Type", out typeProp) ||
+            root.TryGetProperty("message_type", out typeProp))
+        {
+            type = typeProp.GetString() ?? string.Empty;
+        }
+
+        if (string.IsNullOrWhiteSpace(type))
         {
             throw new InvalidOperationException("Pipe message type cannot be empty.");
         }
 
-        return message;
+        // Payload: check "payload", "Payload", "data"
+        string? payload = null;
+        if (root.TryGetProperty("payload", out var payloadProp) ||
+            root.TryGetProperty("Payload", out payloadProp) ||
+            root.TryGetProperty("data", out payloadProp))
+        {
+            payload = payloadProp.ValueKind == JsonValueKind.String
+                ? payloadProp.GetString()
+                : payloadProp.GetRawText();
+        }
+
+        return new PipeMessage(version, type, payload);
     }
 
     private void ValidateVersion()

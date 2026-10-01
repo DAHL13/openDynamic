@@ -201,7 +201,7 @@ public sealed class AgentApprovalPipeServer : IAsyncDisposable, IDisposable
             catch (Exception ex)
             {
                 Log.Warning(ex, "Rejected invalid IPC message from hook client.");
-                await SendResponseAsync(stream, ApprovalResponse.AskNative("Mensaje IPC malformado o no soportado"), ct).ConfigureAwait(false);
+                await SendResponseAsync(stream, ApprovalResponse.AskNative($"Mensaje IPC malformado o no soportado: {ex.Message}"), ct).ConfigureAwait(false);
                 return;
             }
 
@@ -227,7 +227,7 @@ public sealed class AgentApprovalPipeServer : IAsyncDisposable, IDisposable
             catch (Exception ex)
             {
                 Log.Warning(ex, "Failed to parse ApprovalRequest payload from hook client.");
-                await SendResponseAsync(stream, ApprovalResponse.AskNative("Error al analizar la solicitud"), ct).ConfigureAwait(false);
+                await SendResponseAsync(stream, ApprovalResponse.AskNative($"Error al analizar la solicitud: {ex.Message}"), ct).ConfigureAwait(false);
                 return;
             }
 
@@ -341,7 +341,7 @@ public sealed class AgentApprovalPipeServer : IAsyncDisposable, IDisposable
                 byte b = buffer[i];
                 if (b == (byte)'\n')
                 {
-                    return Encoding.UTF8.GetString(ms.ToArray()).TrimEnd('\r');
+                    return Encoding.UTF8.GetString(ms.ToArray()).TrimEnd('\r').TrimStart('\uFEFF');
                 }
 
                 ms.WriteByte(b);
@@ -354,7 +354,7 @@ public sealed class AgentApprovalPipeServer : IAsyncDisposable, IDisposable
             }
         }
 
-        return Encoding.UTF8.GetString(ms.ToArray()).TrimEnd('\r');
+        return Encoding.UTF8.GetString(ms.ToArray()).TrimEnd('\r').TrimStart('\uFEFF');
     }
 
     private static async Task WriteBoundedLineAsync(NamedPipeServerStream stream, string content, CancellationToken ct)

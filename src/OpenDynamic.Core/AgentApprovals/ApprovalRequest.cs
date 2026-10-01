@@ -203,7 +203,119 @@ public sealed record ApprovalRequest
     public static ApprovalRequest FromJson(string json)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(json);
-        var parsed = JsonSerializer.Deserialize<ApprovalRequest>(json, JsonOptions);
-        return parsed ?? throw new JsonException("Deserialized ApprovalRequest was null.");
+        string clean = json.Trim().Trim('\uFEFF');
+
+        using var doc = JsonDocument.Parse(clean);
+        var root = doc.RootElement;
+
+        // If payload is a raw Antigravity toolCall payload, delegate to FromHookPayload
+        if (root.TryGetProperty("toolCall", out _) || root.TryGetProperty("ToolCall", out _))
+        {
+            string? id = null;
+            if (root.TryGetProperty("id", out var idProp) || root.TryGetProperty("Id", out idProp) ||
+                root.TryGetProperty("request_id", out idProp))
+            {
+                id = idProp.GetString();
+            }
+            return FromHookPayload(clean, id);
+        }
+
+        // Support camelCase, PascalCase, and snake_case properties
+        string generatedId = Guid.NewGuid().ToString("N");
+        if (root.TryGetProperty("id", out var idP) || root.TryGetProperty("Id", out idP) ||
+            root.TryGetProperty("request_id", out idP) || root.TryGetProperty("requestId", out idP))
+        {
+            var idVal = idP.GetString();
+            if (!string.IsNullOrWhiteSpace(idVal)) generatedId = idVal;
+        }
+
+        string? convId = null;
+        if (root.TryGetProperty("conversationId", out var cP) || root.TryGetProperty("ConversationId", out cP) ||
+            root.TryGetProperty("conversation_id", out cP))
+        {
+            convId = cP.GetString();
+        }
+
+        int? step = null;
+        if (root.TryGetProperty("stepIdx", out var sP) || root.TryGetProperty("StepIdx", out sP) ||
+            root.TryGetProperty("step_idx", out sP))
+        {
+            if (sP.TryGetInt32(out int sVal)) step = sVal;
+        }
+
+        string tool = "unknown_tool";
+        if (root.TryGetProperty("toolName", out var tP) || root.TryGetProperty("ToolName", out tP) ||
+            root.TryGetProperty("tool_name", out tP) || root.TryGetProperty("tool", out tP))
+        {
+            tool = tP.GetString() ?? "unknown_tool";
+        }
+
+        string? cmd = null;
+        if (root.TryGetProperty("commandLine", out var cmdP) || root.TryGetProperty("CommandLine", out cmdP) ||
+            root.TryGetProperty("command_line", out cmdP) || root.TryGetProperty("command", out cmdP))
+        {
+            cmd = cmdP.GetString();
+        }
+
+        string? cwd = null;
+        if (root.TryGetProperty("cwd", out var cwdP) || root.TryGetProperty("Cwd", out cwdP) ||
+            root.TryGetProperty("working_directory", out cwdP))
+        {
+            cwd = cwdP.GetString();
+        }
+
+        string? targetFile = null;
+        if (root.TryGetProperty("targetFile", out var tfP) || root.TryGetProperty("TargetFile", out tfP) ||
+            root.TryGetProperty("target_file", out tfP) || root.TryGetProperty("file", out tfP))
+        {
+            targetFile = tfP.GetString();
+        }
+
+        string? instruction = null;
+        if (root.TryGetProperty("instruction", out var insP) || root.TryGetProperty("Instruction", out insP))
+        {
+            instruction = insP.GetString();
+        }
+
+        string? codeContent = null;
+        if (root.TryGetProperty("codeContent", out var codeP) || root.TryGetProperty("CodeContent", out codeP) ||
+            root.TryGetProperty("code_content", out codeP))
+        {
+            codeContent = codeP.GetString();
+        }
+
+        string? rawArgsJson = null;
+        if (root.TryGetProperty("rawArgsJson", out var rawP) || root.TryGetProperty("raw_args_json", out rawP) ||
+            root.TryGetProperty("args", out rawP))
+        {
+            rawArgsJson = rawP.ValueKind == JsonValueKind.String ? rawP.GetString() : rawP.GetRawText();
+        }
+
+        var workspaces = new List<string>();
+        if (root.TryGetProperty("workspacePaths", out var wsP) || root.TryGetProperty("WorkspacePaths", out wsP) ||
+            root.TryGetProperty("workspace_paths", out wsP))
+        {
+            if (wsP.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in wsP.EnumerateArray())
+                {
+                    var p = item.GetString();
+                    if (!string.IsNullOrWhiteSpace(p)) workspaces.Add(p);
+                }
+            }
+        }
+
+        return new ApprovalRequest(
+            id: generatedId,
+            conversationId: convId,
+            stepIdx: step,
+            toolName: tool,
+            commandLine: cmd,
+            cwd: cwd,
+            targetFile: targetFile,
+            instruction: instruction,
+            codeContent: codeContent,
+            rawArgsJson: rawArgsJson,
+            workspacePaths: workspaces);
     }
 }

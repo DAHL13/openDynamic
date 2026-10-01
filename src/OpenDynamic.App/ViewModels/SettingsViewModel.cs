@@ -1272,18 +1272,44 @@ public partial class SettingsViewModel : ObservableObject
                 cwd: Environment.CurrentDirectory,
                 workspacePaths: [Environment.CurrentDirectory]);
 
-            using var client = new System.IO.Pipes.NamedPipeClientStream(".", AgentApprovalPipeServer.PipeName, System.IO.Pipes.PipeDirection.InOut, System.IO.Pipes.PipeOptions.Asynchronous);
+            using var client = new System.IO.Pipes.NamedPipeClientStream(
+                ".",
+                AgentApprovalPipeServer.PipeName,
+                System.IO.Pipes.PipeDirection.InOut,
+                System.IO.Pipes.PipeOptions.CurrentUserOnly | System.IO.Pipes.PipeOptions.Asynchronous);
+
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(95));
             await client.ConnectAsync(cts.Token);
 
             var msg = PipeMessage.CreateRequest(testReq);
-            var writer = new System.IO.StreamWriter(client, System.Text.Encoding.UTF8) { AutoFlush = true };
-            var reader = new System.IO.StreamReader(client, System.Text.Encoding.UTF8);
+            var writeBytes = System.Text.Encoding.UTF8.GetBytes(msg.Serialize() + "\n");
+            await client.WriteAsync(writeBytes.AsMemory(), cts.Token);
+            await client.FlushAsync(cts.Token);
 
-            await writer.WriteLineAsync(msg.Serialize());
             TestRequestStatus = "Solicitud visible en el notch. Responde en la isla...";
 
-            string? responseLine = await reader.ReadLineAsync(cts.Token);
+            using var ms = new System.IO.MemoryStream();
+            var buffer = new byte[256];
+            string? responseLine = null;
+
+            while (!cts.IsCancellationRequested)
+            {
+                int read = await client.ReadAsync(buffer.AsMemory(0, buffer.Length), cts.Token);
+                if (read == 0) break;
+
+                for (int i = 0; i < read; i++)
+                {
+                    if (buffer[i] == (byte)'\n')
+                    {
+                        responseLine = System.Text.Encoding.UTF8.GetString(ms.ToArray()).TrimEnd('\r').TrimStart('\uFEFF');
+                        break;
+                    }
+                    ms.WriteByte(buffer[i]);
+                }
+
+                if (responseLine != null) break;
+            }
+
             if (!string.IsNullOrWhiteSpace(responseLine))
             {
                 var respMsg = PipeMessage.Deserialize(responseLine);
@@ -1293,7 +1319,7 @@ public partial class SettingsViewModel : ObservableObject
             }
             else
             {
-                TestRequestStatus = "Conexión finalizada.";
+                TestRequestStatus = "Conexión finalizada sin respuesta.";
             }
         }
         catch (Exception ex)
