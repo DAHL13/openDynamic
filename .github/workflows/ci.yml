@@ -27,3 +27,12 @@ jobs:
 
     - name: Test
       run: dotnet test openDynamic.sln -c Release --no-build --verbosity normal
+
+    - name: Verify no Antigravity remnants in src and tests
+      shell: pwsh
+      run: |
+        $matches = git grep -n -i -E "antigravity|AgentApproval|OpenDynamic\.Hook|approval-rules|openDynamic-agent|hooks\.json" -- src/ tests/
+        if ($matches) {
+          Write-Error "Found Antigravity remnants in src/ or tests/:`n$matches"
+          exit 1
+        }

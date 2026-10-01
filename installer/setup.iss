@@ -83,6 +83,11 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
+[InstallDelete]
+; Tarea R1: Limpieza de binarios huérfanos de la integración con Antigravity en actualizaciones
+Type: filesandordirs; Name: "{app}\hook"
+Type: files; Name: "{app}\OpenDynamic.Hook.exe"
+
 [UninstallDelete]
 Type: files; Name: "{app}\*.*"
 Type: dirifempty; Name: "{app}"
