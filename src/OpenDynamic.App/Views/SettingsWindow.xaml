@@ -1143,6 +1143,169 @@
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
+
+            <!-- TAB 4: Antigravity -->
+            <TabItem Header="🤖 Antigravity">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="4,12,12,12">
+                    <StackPanel>
+                        <!-- Master Switch & Test Request Card -->
+                        <Border Style="{StaticResource SettingCard}">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="Aprobaciones de Antigravity en el Notch" Style="{StaticResource SettingTitle}" />
+                                        <TextBlock Text="Muestra las solicitudes de permiso de Antigravity en la Dynamic Island sin robar foco (WS_EX_NOACTIVATE)." Style="{StaticResource SettingDesc}" />
+                                    </StackPanel>
+                                    <CheckBox Grid.Column="1" IsChecked="{Binding EnableAgentApprovals}"
+                                              VerticalAlignment="Center" Content="Activado" Foreground="#E2E8F0" />
+                                </Grid>
+
+                                <Separator Background="#252730" Margin="0,8,0,12" />
+
+                                <CheckBox IsChecked="{Binding EnableAgentApprovalSound}" Content="Reproducir sonido al recibir solicitud (SystemSounds.Exclamation)"
+                                          Foreground="#CBD5E1" Margin="0,0,0,12" />
+
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Simulación de Solicitud de Permiso" FontWeight="SemiBold" Foreground="#E2E8F0" VerticalAlignment="Center" />
+                                    <Button Grid.Column="1" Content="Enviar solicitud de prueba"
+                                            Command="{Binding SendTestRequestCommand}"
+                                            Height="30" Padding="14,0"
+                                            Background="#3B82F6" Foreground="#FFFFFF" BorderThickness="0" Cursor="Hand" />
+                                </Grid>
+                                <TextBlock Text="{Binding TestRequestStatus}" Foreground="#94A3B8" FontSize="11" Margin="0,4,0,0" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Hooks Integration Card -->
+                        <Border Style="{StaticResource SettingCard}">
+                            <StackPanel>
+                                <TextBlock Text="Conexión de Hooks de Antigravity" Style="{StaticResource SettingTitle}" />
+                                <TextBlock Text="openDynamic se registra como hook en hooks.json respetando la configuración existente con respaldo automático (.bak)." Style="{StaticResource SettingDesc}" />
+
+                                <Grid Margin="0,12,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="130" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Archivo hooks.json:" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                    <TextBox Grid.Column="1" Text="{Binding HooksFilePath, UpdateSourceTrigger=LostFocus}"
+                                             Background="#1A1C23" Foreground="#E2E8F0" BorderBrush="#2E3342" Padding="6,4" />
+                                </Grid>
+
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="130" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Ejecutable del Hook:" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                    <TextBox Grid.Column="1" Text="{Binding HookExecutablePath, UpdateSourceTrigger=LostFocus}"
+                                             Background="#1A1C23" Foreground="#E2E8F0" BorderBrush="#2E3342" Padding="6,4" />
+                                </Grid>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                    <Button Content="Conectar a Antigravity" Command="{Binding ConnectHookCommand}"
+                                            Background="#10B981" Foreground="#FFFFFF" BorderThickness="0" Height="28" Padding="12,0" Margin="0,0,8,0" Cursor="Hand" />
+                                    <Button Content="Desconectar" Command="{Binding DisconnectHookCommand}"
+                                            Background="#EF4444" Foreground="#FFFFFF" BorderThickness="0" Height="28" Padding="12,0" Margin="0,0,8,0" Cursor="Hand" />
+                                    <Button Content="Actualizar estado" Command="{Binding RefreshHookStatusCommand}"
+                                            Background="#2B303C" Foreground="#E2E8F0" BorderBrush="#3B4252" Height="28" Padding="12,0" Cursor="Hand" />
+                                </StackPanel>
+
+                                <TextBlock Text="{Binding HookInstallStatusMessage}" Foreground="#38BDF8" FontSize="11" Margin="0,0,0,8" />
+
+                                <TextBlock Text="Vista previa de configuración generada:" FontSize="10.5" Foreground="#64748B" Margin="0,0,0,4" />
+                                <TextBox Text="{Binding HookConfigPreview, Mode=OneWay}"
+                                         FontFamily="Consolas, monospace" FontSize="10"
+                                         Background="#141416" Foreground="#CBD5E1" BorderBrush="#252730"
+                                         Height="90" IsReadOnly="true" TextWrapping="NoWrap"
+                                         VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" Padding="6" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Policies & Timers Card -->
+                        <Border Style="{StaticResource SettingCard}">
+                            <StackPanel>
+                                <TextBlock Text="Tiempos y Protección Anti-Clic" Style="{StaticResource SettingTitle}" />
+                                <TextBlock Text="Configuración de seguridad y expiración de solicitudes (Reglas 12 y 13)." Style="{StaticResource SettingDesc}" />
+
+                                <Grid Margin="0,12,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="100" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="Tiempo máximo de espera (segundos)" Foreground="#E2E8F0" />
+                                        <TextBlock Text="Al expirar, se delega de forma segura al aviso nativo de Antigravity (AskNative)." Style="{StaticResource SettingDesc}" />
+                                    </StackPanel>
+                                    <TextBox Grid.Column="1" Text="{Binding AgentApprovalTimeoutSeconds}"
+                                             Background="#1A1C23" Foreground="#E2E8F0" BorderBrush="#2E3342" Height="26" Padding="6,2" HorizontalContentAlignment="Center" VerticalAlignment="Center" />
+                                </Grid>
+
+                                <Grid Margin="0,8,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="100" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="Periodo de guarda anti-clic accidental (milisegundos)" Foreground="#E2E8F0" />
+                                        <TextBlock Text="Tiempo inicial en el que los botones de aprobación están deshabilitados (mínimo 600 ms)." Style="{StaticResource SettingDesc}" />
+                                    </StackPanel>
+                                    <TextBox Grid.Column="1" Text="{Binding AgentApprovalGracePeriodMs}"
+                                             Background="#1A1C23" Foreground="#E2E8F0" BorderBrush="#2E3342" Height="26" Padding="6,2" HorizontalContentAlignment="Center" VerticalAlignment="Center" />
+                                </Grid>
+
+                                <Grid Margin="0,8,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="100" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="Opción resaltada por defecto" Foreground="#E2E8F0" />
+                                        <TextBlock Text="Opción enfocada con Ctrl+Alt+Enter (1 = Permitir, 5 = Denegar). Nunca ejecuta automáticamente." Style="{StaticResource SettingDesc}" />
+                                    </StackPanel>
+                                    <TextBox Grid.Column="1" Text="{Binding AgentApprovalHighlightedOption}"
+                                             Background="#1A1C23" Foreground="#E2E8F0" BorderBrush="#2E3342" Height="26" Padding="6,2" HorizontalContentAlignment="Center" VerticalAlignment="Center" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Predefined Deny Reasons Card -->
+                        <Border Style="{StaticResource SettingCard}">
+                            <StackPanel>
+                                <TextBlock Text="Motivos Predefinidos de Denegación" Style="{StaticResource SettingTitle}" />
+                                <TextBlock Text="Opciones enviadas al agente al pulsar '5. No'. Queda estrictamente prohibido el texto libre en la isla." Style="{StaticResource SettingDesc}" />
+
+                                <ListBox ItemsSource="{Binding AgentApprovalPredefinedDenyReasons}"
+                                         SelectedItem="{Binding SelectedDenyReasonItem}"
+                                         Background="#1A1C23" BorderBrush="#2E3342" Foreground="#E2E8F0"
+                                         Height="80" Margin="0,10,0,8" />
+
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox Grid.Column="0" Text="{Binding NewDenyReason, UpdateSourceTrigger=PropertyChanged}"
+                                             Background="#1A1C23" Foreground="#E2E8F0" BorderBrush="#2E3342" Height="28" Padding="6,4" Margin="0,0,8,0" />
+                                    <Button Grid.Column="1" Content="Agregar" Command="{Binding AddDenyReasonCommand}"
+                                            Background="#2B303C" Foreground="#E2E8F0" BorderBrush="#3B4252" Height="28" Padding="12,0" Margin="0,0,8,0" Cursor="Hand" />
+                                    <Button Grid.Column="2" Content="Eliminar seleccionado" Command="{Binding RemoveDenyReasonCommand}"
+                                            Background="#2B303C" Foreground="#E2E8F0" BorderBrush="#3B4252" Height="28" Padding="12,0" Cursor="Hand" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
         </TabControl>
 
         <!-- Bottom Footer -->

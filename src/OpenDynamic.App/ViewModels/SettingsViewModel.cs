@@ -5,6 +5,7 @@ using OpenDynamic.App.Orchestration;
 using OpenDynamic.App.Services;
 using OpenDynamic.App.Widgets.Hardware;
 using OpenDynamic.App.Windowing;
+using OpenDynamic.Core.AgentApprovals;
 using OpenDynamic.Core.Animation;
 using OpenDynamic.Core.Audio.Spectrum;
 using OpenDynamic.Core.Autostart;
@@ -337,6 +338,49 @@ public partial class SettingsViewModel : ObservableObject
         }
     }
 
+    // Antigravity Agent Approvals (Phase 17)
+    [ObservableProperty]
+    private bool _enableAgentApprovals;
+
+    [ObservableProperty]
+    private int _agentApprovalTimeoutSeconds;
+
+    [ObservableProperty]
+    private int _agentApprovalGracePeriodMs;
+
+    [ObservableProperty]
+    private bool _enableAgentApprovalSound;
+
+    [ObservableProperty]
+    private int _agentApprovalHighlightedOption;
+
+    [ObservableProperty]
+    private ObservableCollection<string> _agentApprovalPredefinedDenyReasons = new();
+
+    [ObservableProperty]
+    private string _newDenyReason = string.Empty;
+
+    [ObservableProperty]
+    private string? _selectedDenyReasonItem;
+
+    [ObservableProperty]
+    private string _hooksFilePath = string.Empty;
+
+    [ObservableProperty]
+    private string _hookExecutablePath = string.Empty;
+
+    [ObservableProperty]
+    private bool _isHookInstalled;
+
+    [ObservableProperty]
+    private string _hookInstallStatusMessage = string.Empty;
+
+    [ObservableProperty]
+    private string _hookConfigPreview = string.Empty;
+
+    [ObservableProperty]
+    private string _testRequestStatus = string.Empty;
+
     public SettingsViewModel(
         ISettingsService settingsService,
         IslandOrchestrator orchestrator,
@@ -445,8 +489,16 @@ public partial class SettingsViewModel : ObservableObject
         UpdateSystemAnimationStatus();
         System.Windows.SystemParameters.StaticPropertyChanged += OnSystemParametersStaticPropertyChanged;
 
-        _hasHotkeyConflict = _hotkeyService.HasConflict;
-        _hotkeyConflictMessage = _hotkeyService.ConflictMessage;
+        _enableAgentApprovals = _settings.EnableAgentApprovals;
+        _agentApprovalTimeoutSeconds = _settings.AgentApprovalTimeoutSeconds;
+        _agentApprovalGracePeriodMs = _settings.AgentApprovalGracePeriodMs;
+        _enableAgentApprovalSound = _settings.EnableAgentApprovalSound;
+        _agentApprovalHighlightedOption = _settings.AgentApprovalHighlightedOption;
+
+        _agentApprovalPredefinedDenyReasons = new ObservableCollection<string>(_settings.AgentApprovalPredefinedDenyReasons ?? Enumerable.Empty<string>());
+        _hooksFilePath = AntigravityHookInstaller.GetDefaultGlobalHooksFilePath();
+        _hookExecutablePath = AntigravityHookInstaller.ResolveHookExecutablePath(_settings.CustomAgentHookPath);
+        UpdateHookInstallState();
 
         _hotkeyService.HotkeyConflictOccurred += OnHotkeyConflictOccurred;
     }
@@ -1143,6 +1195,148 @@ public partial class SettingsViewModel : ObservableObject
         catch (Exception ex)
         {
             Log.Warning(ex, "Failed to apply live position update from SettingsViewModel.");
+        }
+    }
+
+    partial void OnEnableAgentApprovalsChanged(bool value)
+    {
+        _settings.EnableAgentApprovals = value;
+        _settingsService.SaveDebounced();
+    }
+
+    partial void OnAgentApprovalTimeoutSecondsChanged(int value)
+    {
+        _settings.AgentApprovalTimeoutSeconds = Math.Clamp(value, 10, 300);
+        _settingsService.SaveDebounced();
+    }
+
+    partial void OnAgentApprovalGracePeriodMsChanged(int value)
+    {
+        _settings.AgentApprovalGracePeriodMs = Math.Clamp(value, 0, 3000);
+        _settingsService.SaveDebounced();
+    }
+
+    partial void OnEnableAgentApprovalSoundChanged(bool value)
+    {
+        _settings.EnableAgentApprovalSound = value;
+        _settingsService.SaveDebounced();
+    }
+
+    partial void OnAgentApprovalHighlightedOptionChanged(int value)
+    {
+        _settings.AgentApprovalHighlightedOption = value;
+        _settingsService.SaveDebounced();
+    }
+
+    [RelayCommand]
+    public void ConnectHook()
+    {
+        var result = AntigravityHookInstaller.Install(HooksFilePath, HookExecutablePath);
+        HookInstallStatusMessage = result.Message;
+        UpdateHookInstallState();
+    }
+
+    [RelayCommand]
+    public void DisconnectHook()
+    {
+        var result = AntigravityHookInstaller.Uninstall(HooksFilePath);
+        HookInstallStatusMessage = result.Message;
+        UpdateHookInstallState();
+    }
+
+    [RelayCommand]
+    public void RefreshHookStatus()
+    {
+        UpdateHookInstallState();
+        HookInstallStatusMessage = "Estado actualizado.";
+    }
+
+    [RelayCommand]
+    public async Task SendTestRequestAsync()
+    {
+        if (!EnableAgentApprovals)
+        {
+            TestRequestStatus = "Aviso: Primero debes activar el interruptor 'Aprobaciones de Antigravity'.";
+            return;
+        }
+
+        TestRequestStatus = "Enviando solicitud de prueba sintética al notch...";
+        try
+        {
+            var testReq = new ApprovalRequest(
+                id: "test-" + Guid.NewGuid().ToString("N")[..8],
+                conversationId: "test-conversation",
+                stepIdx: 1,
+                toolName: "run_command",
+                commandLine: "git status && git log -n 2 --oneline",
+                cwd: Environment.CurrentDirectory,
+                workspacePaths: [Environment.CurrentDirectory]);
+
+            using var client = new System.IO.Pipes.NamedPipeClientStream(".", AgentApprovalPipeServer.PipeName, System.IO.Pipes.PipeDirection.InOut, System.IO.Pipes.PipeOptions.Asynchronous);
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(95));
+            await client.ConnectAsync(cts.Token);
+
+            var msg = PipeMessage.CreateRequest(testReq);
+            var writer = new System.IO.StreamWriter(client, System.Text.Encoding.UTF8) { AutoFlush = true };
+            var reader = new System.IO.StreamReader(client, System.Text.Encoding.UTF8);
+
+            await writer.WriteLineAsync(msg.Serialize());
+            TestRequestStatus = "Solicitud visible en el notch. Responde en la isla...";
+
+            string? responseLine = await reader.ReadLineAsync(cts.Token);
+            if (!string.IsNullOrWhiteSpace(responseLine))
+            {
+                var respMsg = PipeMessage.Deserialize(responseLine);
+                var appResp = ApprovalResponse.FromJsonSafe(respMsg.Payload);
+                TestRequestStatus = $"Respuesta recibida: {appResp.Decision}" +
+                    (!string.IsNullOrEmpty(appResp.Reason) ? $" ({appResp.Reason})" : string.Empty);
+            }
+            else
+            {
+                TestRequestStatus = "Conexión finalizada.";
+            }
+        }
+        catch (Exception ex)
+        {
+            TestRequestStatus = $"Resultado: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    public void AddDenyReason()
+    {
+        if (string.IsNullOrWhiteSpace(NewDenyReason)) return;
+        string trimmed = NewDenyReason.Trim();
+        if (!AgentApprovalPredefinedDenyReasons.Contains(trimmed))
+        {
+            AgentApprovalPredefinedDenyReasons.Add(trimmed);
+            _settings.AgentApprovalPredefinedDenyReasons = AgentApprovalPredefinedDenyReasons.ToList();
+            _settingsService.SaveDebounced();
+            NewDenyReason = string.Empty;
+        }
+    }
+
+    [RelayCommand]
+    public void RemoveDenyReason()
+    {
+        if (string.IsNullOrWhiteSpace(SelectedDenyReasonItem)) return;
+        if (AgentApprovalPredefinedDenyReasons.Remove(SelectedDenyReasonItem))
+        {
+            _settings.AgentApprovalPredefinedDenyReasons = AgentApprovalPredefinedDenyReasons.ToList();
+            _settingsService.SaveDebounced();
+        }
+    }
+
+    private void UpdateHookInstallState()
+    {
+        try
+        {
+            IsHookInstalled = AntigravityHookInstaller.IsHookInstalled(HooksFilePath);
+            HookConfigPreview = AntigravityHookInstaller.GeneratePreview(HooksFilePath, HookExecutablePath);
+        }
+        catch (Exception ex)
+        {
+            HookConfigPreview = $"Error generando vista previa: {ex.Message}";
         }
     }
 }
