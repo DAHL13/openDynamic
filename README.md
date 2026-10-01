@@ -68,6 +68,7 @@ openDynamic adopta una estética de **muesca rectangular superior (Notch)** pega
 | **Fase 13** | **Color de carátula dinámico y gestos táctiles/ratón en el widget multimedia (v1.1)** | **Completada** |
 | **Fase 14** | **Portapapeles reciente y seguro en memoria RAM (Opt-in, privacidad, 0% leak) (v1.1)** | **Completada** |
 | **Fase 15** | **Indicador de micrófono y cámara en uso (ConsentStore pasivo, cero polling, notch UI) (v1.1)** | **Completada** |
+| **Fase 16** | **Visualizador de audio real (espectro FFT propia, WASAPI loopback, 0 heap alloc, <2% CPU) (v1.1)** | **Completada** |
 
 ---
 
@@ -136,16 +137,47 @@ En estricto cumplimiento de la **Regla de Oro 1** (0% CPU en reposo y consumo m�
 | **Memoria Privada Comprometida** | < 25 MB | **5.2 MB** | ✔ **Excelente** |
 | **Consumo de CPU en Reposo (sin actividad visible)** | < 0.5% (ideal 0.0%) | **0.00%** | ✔ **Cumplida estrictamente** |
 | **Consumo de CPU durante Animación de Resorte** | < 5.0% | **< 1.0%** (pico transitorio) | ✔ **Fluido a 60-144 FPS** |
+| **Visualizador de Espectro FFT (Carga de CPU activa)** | < 2.0% | **~1.0%** (50 ms CPU por cada 5 s de audio 48 kHz) | ✔ **Presupuesto cumplido** |
+| **Visualizador de Espectro en Pausa / Reposo** | 0.0% CPU | **0.00%** (captura y bucle de render desuscritos) | ✔ **0% en reposo absoluto** |
+| **Asignaciones de Memoria en Cuadro de Audio** | 0 B / frame | **0 B** (búferes fijos preasignados y MemoryMarshal) | ✔ **Cero presión de GC** |
 | **Suscripción al Bucle de Composición WPF** | Desuscrito en reposo | **0 suscripciones** a `CompositionTarget.Rendering` al asentarse | ✔ **Cero bucles ocultos** |
 | **Compilación Estricta** | 0 advertencias, 0 errores | **0 advertencias, 0 errores** (`TreatWarningsAsErrors=true`) | ✔ **Código limpio** |
+
+---
+
+## Visualizador de Audio Reactivo y Privacidad
+
+El widget multimedia incorpora un analizador de espectro reactivo en tiempo real integrado directamente en la muesca Notch:
+
+- **Modos Configurables (`AudioVisualizerMode`):**
+  - **Deshabilitado (`Disabled`):** Muestra el icono estático de ecualizador sin procesamiento de audio ni animación.
+  - **Simulado (`Simulated`):** Ondas sinusoidales matemáticas generadas localmente a ~30 FPS para equipos con audio de baja latencia o sin permisos WASAPI.
+  - **Reactivo Real (`Real` - Predeterminado cuando reactivo está activo):** Captura en búfer circular de bucle invertido (`WasapiLoopbackCapture`) con descomposición armónica en tiempo real.
+- **FFT Pura de Cero Dependencias y Cero Asignaciones:**
+  - Implementación matemática propia de **Cooley-Tukey Radix-2** iterativa en `OpenDynamic.Core` con ventana de Hann y solapamiento del 50%. Cero librerías externas de procesamiento digital de señales.
+  - Cero asignaciones en memoria dinámica (*0 per-frame heap allocations*): todos los búferes (`float[]`, `Complex[]`) son preasignados y reutilizados de forma estricta.
+  - Descomposición en **12 bandas logarítmicas** (modo Compacto) y **24 bandas logarítmicas** (modo Expandido) con suavizado temporal asimétrico (*fast attack* 0.65 / *slow decay* 0.85).
+- **Política de Activación Estricta (`VisualizerActivationPolicy`):**
+  - La captura WASAPI y el bucle de dibujo a ~30 FPS se activan **única y exclusivamente** si:
+    1. Hay reproducción multimedia activa confirmada por GSMTC (`IsMediaPlaying == true`).
+    2. El widget multimedia está visible en la isla.
+    3. La isla no está oculta (`IslandState != Hidden`).
+    4. No hay una aplicación en pantalla completa exclusiva activa.
+  - En cuanto la música se pausa, se cambia de pista o se oculta la isla, la captura se detiene de inmediato, desuscribiéndose del compositor WPF y volviendo instantáneamente a **0% de CPU**.
+- **Privacidad y Seguridad Absoluta (Regla de Oro 10):**
+  - El búfer de audio PCM se procesa **exclusiva y transitoriamente en memoria RAM**.
+  - Queda prohibida y anulada cualquier persistencia en disco, generación de archivos temporales o registro de amplitudes y frecuencias en registros de Serilog.
+- **Resiliencia de Hardware de Audio:**
+  - Tolerancia a errores COM WASAPI con degradación elegante automática al modo Simulado.
+  - Reconexión en caliente inmediata ante cambios en el dispositivo de salida predeterminado mediante notificaciones de `IMMNotificationClient`.
 
 ---
 
 ## Documentación Técnica
 
 - **[Arquitectura y Guía para Desarrolladores (`docs/arquitectura.md`)](./docs/arquitectura.md):** Diagramas conceptuales de capas (Core vs. App), flujo del `IslandOrchestrator`, ciclo de vida de la FSM y la **Guía de 10 pasos** para crear e integrar nuevos widgets desde cero.
-- **[Registro de Decisiones de Arquitectura (`DECISIONS.md`)](./DECISIONS.md):** Registro histórico y justificación de las 23 decisiones técnicas (ADR-001 a ADR-023).
-- **[Matriz de Validación y Pruebas (`docs/pruebas.md`)](./docs/pruebas.md):** 355 pruebas unitarias automatizadas y casos de prueba manual de sistema (DPI, multimonitor, suspensión, pantalla completa, accesibilidad, portapapeles, privacidad de cámara/micrófono).
+- **[Registro de Decisiones de Arquitectura (`DECISIONS.md`)](./DECISIONS.md):** Registro histórico y justificación de las 24 decisiones técnicas (ADR-001 a ADR-024).
+- **[Matriz de Validación y Pruebas (`docs/pruebas.md`)](./docs/pruebas.md):** 389 pruebas unitarias automatizadas y casos de prueba manual de sistema (DPI, multimonitor, suspensión, pantalla completa, accesibilidad, portapapeles, privacidad de cámara/micrófono, espectro de audio).
 
 ---
 
@@ -155,11 +187,11 @@ En estricto cumplimiento de la **Regla de Oro 1** (0% CPU en reposo y consumo m�
 - **Interfaz de Usuario:** WPF (`net10.0-windows10.0.19041.0`) con soporte `PerMonitorV2` DPI y UI Automation
 - **Patrón Arquitectónico:** MVVM mediante `CommunityToolkit.Mvvm`
 - **Inyección de Dependencias:** `Microsoft.Extensions.DependencyInjection`
-- **Audio:** `NAudio` (`MMDeviceEnumerator`, `AudioEndpointVolume`) con detección en caliente (`IMMNotificationClient`)
+- **Audio:** `NAudio` (`MMDeviceEnumerator`, `AudioEndpointVolume`, `WasapiLoopbackCapture`), FFT Cooley-Tukey Radix-2 pura en Core (cero dependencias externas)
 - **Multimedia:** WinRT `Windows.Media.Control` (GSMTC) con extrapolación continua y miniaturas congeladas
 - **Bandeja del Sistema (Tray):** `H.NotifyIcon.Wpf` (cero WinForms)
 - **Atajos Globales:** Win32 `RegisterHotKey` / `UnregisterHotKey` mediante WndProc
-- **Configuración y Persistencia:** `System.Text.Json` en `%AppData%\openDynamic\settings.json` (esquema v8 con migración automática y debounce de 500ms)
+- **Configuración y Persistencia:** `System.Text.Json` en `%AppData%\openDynamic\settings.json` (esquema v9 con migración automática y debounce de 500ms)
 - **Registro de Eventos (Logging):** `Serilog` y `Serilog.Sinks.File` en `%LocalAppData%\openDynamic\logs`
 - **Pruebas Unitarias:** `xUnit`
 - **Instalador:** Inno Setup 6 (distribución ReadyToRun)

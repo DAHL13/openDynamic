@@ -82,6 +82,11 @@ La estrategia de aseguramiento de calidad de **openDynamic** se sustenta en tres
 | **MAN-24** | Privacidad | **Indicador de Micrófono en Uso (ConsentStore)** | Iniciar una grabación de audio con *Grabadora de voz*, Discord o Teams. Verificar el punto naranja/ámbar en el notch y el aviso transitorio "Micrófono en uso: <app>". Al detener la grabación, verificar liberación. | [ ] | |
 | **MAN-25** | Privacidad | **Respeto a la Visibilidad de la Isla Oculta** | Ocultar la cápsula con `Win+Ctrl+I` o entrando a pantalla completa. Iniciar uso de cámara o micrófono. Confirmar que la cápsula NO se fuerza a aparecer. | [ ] | |
 | **MAN-26** | Privacidad | **Liberación Limpia de Hilos y Handles (0% CPU)** | Desactivar los interruptores de privacidad en Ajustes o cerrar la app. Verificar en el Administrador de Tareas que no quedan subprocesos huérfanos ni consumo residual de CPU. | [ ] | |
+| **MAN-27** | Audio / Espectro | **Visualizador Reactivo Real (WASAPI Loopback)** | Reproducir música en Spotify/Navegador. Verificar que las 12 barras en Compacto y 24 barras en Expandido oscilan al ritmo de las frecuencias reales (graves a la izquierda, agudos a la derecha). | [ ] | |
+| **MAN-28** | Audio / Espectro | **Parada Inmediata y 0% CPU al Pausar / Ocultar** | Pausar la música o presionar `Win+Ctrl+I`. Verificar que las barras decaen inmediatamente a 0, la captura WASAPI se detiene y la CPU en el Administrador de Tareas retorna a 0.0%. | [ ] | |
+| **MAN-29** | Audio / Espectro | **Selector de Modo en Ajustes (Deshabilitado / Simulado / Real)** | En Ajustes > Multimedia, cambiar entre *Deshabilitado* (icono estático), *Simulado* (ondas matemáticas sin captura) y *Reactivo Real*. Confirmar cambio inmediato sin reiniciar. | [ ] | |
+| **MAN-30** | Audio / Espectro | **Cambio de Dispositivo de Audio en Caliente** | Con música en reproducción, cambiar el dispositivo de salida predeterminado en Windows (ej. de altavoces a auriculares). Verificar reenganche automático de la captura sin error ni cuelgue. | [ ] | |
+| **MAN-31** | Audio / Espectro | **Supresión en Modo de Movimiento Reducido** | Activar `MotionMode.Reduced` en Ajustes. Confirmar que el visualizador no oscila y se muestra el icono estático para evitar fatiga visual o trastornos vestibulares. | [ ] | |
 
 ---
 

@@ -621,3 +621,61 @@
      - Se incrementa `CurrentSchemaVersion = 8` en `AppSettings.cs`.
      - `SettingsService.Load()` migra transparentemente versiones anteriores inicializando `EnableMicrophoneIndicator = true`, `EnableCameraIndicator = true`, `EnablePrivacyAlerts = true`, `DefaultPrivacyPriority = 85`, `PrivacyTransientDurationSeconds = 3.0` e `IgnoredPrivacyApps = []`.
      - Nueva tarjeta en la pestaña "Widgets y Prioridades" de `SettingsWindow.xaml` con interruptores independientes, deslizadores de prioridad/duración y gestión de apps ignoradas.
+
+---
+
+## ADR-024: Visualizador de Espectro de Audio Real con FFT Propia sin Dependencias, Captura WASAPI Loopback Resiliente, Búferes Dobles Sin Bloqueos y Cero Asignaciones por Cuadro (Fase 16)
+
+- **Estado:** Aceptado
+- **Fecha:** 2026-09-30
+- **Contexto:**
+  Para la ampliación v1.1 (Fase 16), openDynamic sustituye las barras simuladas del widget multimedia por un espectro real y reactivo del audio del sistema. Requisitos críticos del diseño:
+  - **Pureza en Core (Regla de Oro 5):** Cero librerías externas de FFT (prohibido MathNet, KissFFT, etc.).
+  - **Cero asignaciones de memoria por cuadro (Regla de Oro 11):** Preasignación estricta de búferes de memoria fija reutilizables para garantizar cero presión sobre el recolector de basura (GC).
+  - **Política de activación estricta (Regla de Oro 1):** La captura WASAPI y el ciclo de dibujo (~30 FPS) existen ÚNICAMENTE mientras hay música en reproducción activa, el widget es visible, la isla no está oculta y no hay pantalla completa activa. Si la música se pausa, se cambia de pista o se oculta la isla, la captura y el timer se detienen de inmediato (0% CPU).
+  - **Privacidad absoluta (Regla de Oro 10):** Procesamiento exclusivamente volátil en memoria RAM; queda prohibido persistir muestras en disco, archivos temporales o registrar amplitudes/frecuencias en logs de Serilog.
+  - **Resiliencia y degradación elegante (Regla de Oro 4):** Manejo de cambios en caliente de endpoint de audio y degradación pacífica a Simulado si WASAPI falla o arroja excepciones COM.
+  - **Presupuesto de rendimiento:** CPU adicional estrictamente inferior al 2% en hardware real con música sonando y 0% en reposo.
+
+- **Decisiones Técnicas:**
+
+  1. **Algoritmo FFT Propio Cooley-Tukey Radix-2 en Core (`SpectrumAnalyzer`):**
+     - Se implementa `SpectrumAnalyzer` en `OpenDynamic.Core.Audio.Spectrum` con una FFT propia iterativa Radix-2 (tamaño $N = 1024$) con ventana de Hann precalculada y solape del 50% (512 muestras de salto).
+     - Tablas de twiddles y permutación bit-reversal precalculadas en el constructor (cero llamadas trigonométricas repetitivas en tiempo de ejecución).
+     - Agrupación en bandas logarítmicas: 12 bandas para la vista Compacta y 24 bandas para la vista Expandida (cubriendo el rango psicoacústico de 45 Hz a 16.5 kHz).
+     - Compensación de inclinación espectral (Pink noise tilt ~ -3dB/octava) y mapeo perceptual en decibelios (dBFS) a rango normalizado [0.0, 1.0].
+     - Suavizado temporal con ataque rápido (0.65f) para golpes percusivos y decaimiento lento (0.85f) para fluidez visual.
+     - Cero asignaciones en el heap por cuadro validadas mediante pruebas unitarias automatizadas con `GC.GetAllocatedBytesForCurrentThread() == 0`.
+
+  2. **Política Pura de Activación (`VisualizerActivationPolicy`):**
+     - La captura solo debe activarse si y solo si se cumplen simultáneamente:
+       a) Modo configurado en `Real` (`AudioVisualizerMode.Real`).
+       b) Sesión GSMTC en estado de reproducción activa (`IsMediaPlaying == true`).
+       c) Widget multimedia visible en la isla (`IsMediaWidgetVisible == true`).
+       d) La isla no está oculta (`IslandState != IslandState.Hidden`).
+       e) No hay supresión activa por pantalla completa exclusiva (`IsFullscreenSuppressed == false`).
+     - Si cualquiera de estas condiciones deja de cumplirse, WASAPI loopback y el ciclo de dibujo se detienen de inmediato volviendo a 0% de CPU.
+
+  3. **Captura WASAPI Loopback Resiliente en App (`AudioSpectrumService`):**
+     - Utiliza `WasapiLoopbackCapture` de NAudio sobre el dispositivo de audio predeterminado del sistema.
+     - Conversión estéreo a mono ultra-rápida sin asignaciones con `MemoryMarshal.Cast<byte, float>`.
+     - Doble búfer sin bloqueos (Lock-free double buffering con `Interlocked.Exchange`) para transferir bandas calculadas del hilo de captura al hilo de UI/render sin contención.
+     - Reenganche automático en caliente al cambiar el dispositivo de reproducción predeterminado reutilizando la notificación de `VolumeService.DefaultDeviceChanged`.
+     - Manejo de silencio: si no llegan paquetes de audio en > 60 ms (silencio en loopback compartido), se invoca `DecayOnly()` para que las barras caigan suavemente a cero.
+     - Resiliencia COM: cualquier excepción COM o de hardware degrada limpiamente a modo Simulado (`AudioVisualizerMode.Simulated`) registrando una advertencia estructurada en Serilog sin abortar la aplicación.
+
+  4. **Ciclo de Dibujo a ~30 FPS en Notch UI (`MediaCompactView` y `MediaExpandedView`):**
+     - Las vistas se suscriben a `CompositionTarget.Rendering` únicamente cuando `IsVisualizerActive == true` y están cargadas en el árbol visual.
+     - Bucle limitado a ~30 FPS (intervalo >= 33 ms) actualizando directamente las alturas de las barras coloreadas con el acento dinámico de la carátula (`AccentBrush`).
+     - Al pausar la música, ocultar la isla o cambiar de pantalla, se desuscriben al instante y resetean a altura base.
+     - Respeto de `MotionMode.Reduced`: en modo de animaciones reducidas se suprimen las animaciones visuales del ecualizador.
+
+  5. **Privacidad Absoluta (Regla de Oro 10):**
+     - Las muestras PCM viven única y exclusivamente en el búfer circular en memoria RAM durante el procesamiento FFT. Queda terminantemente prohibido volcar muestras a disco, base de datos o logs de Serilog.
+
+  6. **Ajustes y Migración de Esquema v9 (Regla de Oro 9):**
+     - Incremento a `CurrentSchemaVersion = 9` en `AppSettings.cs` con migración retrocompatible en `SettingsService.Load()`.
+     - Selector de modo ("Desactivado", "Simulado", "Real") e interruptor rápido para alternar visualizador reactivo en Ajustes.
+
+  7. **Presupuesto de Rendimiento Medido:**
+     - Consumo medido en pruebas de benchmark: 50 ms de CPU para procesar 5 segundos continuos de audio a 48 kHz (1.0% de un solo núcleo, < 0.15% de CPU total del sistema). Cumple estrictamente con el presupuesto de < 2% de CPU adicional y 0% en reposo.

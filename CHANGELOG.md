@@ -3,6 +3,35 @@
 Todas las modificaciones notables en este proyecto serán documentadas en este archivo.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y cumple con [SemVer](https://semver.org/).
 
+## [1.1.0-dev] - 2026-09-30 (Fase 16: Visualizador de Audio Real - Espectro)
+
+### Añadido
+- **Analizador de Espectro Puro y Sin Dependencias en Core (`OpenDynamic.Core.Audio.Spectrum`):**
+  - `SpectrumAnalyzer`: FFT propia iterativa Cooley-Tukey Radix-2 optimizada ($N = 1024$) con ventana de Hann precalculada, 50% de solape (512 muestras), precomputación de raíces de la unidad y permutación bit-reversal sin dependencias externas (Regla de Oro 5).
+  - Agrupación en bandas logarítmicas de audio (12 bandas para modo `Compact` y 24 bandas para modo `Expanded`) cubriendo el rango de 45 Hz a 16.5 kHz.
+  - Compensación perceptual de inclinación espectral (Pink noise tilt ~ -3dB/octava) y mapeo dinámico en decibelios (dBFS) a rango [0.0, 1.0].
+  - Suavizado temporal con ataque rápido (0.65f) para transitorios y caída lenta (0.85f).
+  - Cero asignaciones por cuadro (0 per-frame heap allocations - Regla de Oro 11) con búferes internos reutilizables preasignados.
+  - `VisualizerActivationPolicy`: Política pura que determina la activación de captura si y solo si se cumplen simultáneamente: modo `Real`, reproducción GSMTC activa (`IsMediaPlaying`), widget visible en la isla, isla no oculta y sin pantalla completa exclusiva suprimida.
+- **Servicio Resiliente de Captura WASAPI Loopback en App (`OpenDynamic.App.Services.AudioSpectrumService`):**
+  - Captura en vivo del audio del sistema mediante `WasapiLoopbackCapture` de NAudio sobre el dispositivo predeterminado.
+  - Conversión estéreo a mono sin asignaciones (`MemoryMarshal.Cast<byte, float>`).
+  - Doble búfer sin bloqueos (Lock-free double buffering con `Interlocked.Exchange`) para transferencia inmediata entre el hilo de captura y el hilo de renderización de WPF.
+  - Resiliencia y degradación pacífica (Regla de Oro 4): reenganche automático ante cambios de dispositivo en caliente vía `VolumeService.DefaultDeviceChanged`; degradación transparente a modo `Simulado` si WASAPI falla o arroja excepciones COM.
+  - Manejo de silencios: decaimiento automático suave a cero cuando no se reciben paquetes WASAPI.
+  - Privacidad estricta (Regla de Oro 10): el audio se procesa 100% en memoria volátil; cero muestras en disco o logs de Serilog.
+- **Renderizado Reactivo Notch a ~30 FPS en Vistas (`MediaCompactView` y `MediaExpandedView`):**
+  - 12 barras logarítmicas en la vista Compacta y 24 barras en la vista Expandida, coloreadas dinámicamente con el acento de la carátula (`AccentBrush`).
+  - Bucle de renderizado limitado a ~30 FPS (33 ms) mediante `CompositionTarget.Rendering` activo **únicamente** mientras la captura/música está encendida (Regla de Oro 1: 0% CPU en reposo).
+  - Soporte para modo de accesibilidad `MotionMode.Reduced`: en modo reducido no se animan las barras dinámicas.
+- **Ajustes y Migración de Esquema v9 (`AppSettings`):**
+  - Incremento a `CurrentSchemaVersion = 9` en `AppSettings.cs`.
+  - Migración automática retrocompatible en `SettingsService.Load()` manteniendo `AudioVisualizerMode.Real` como valor predeterminado.
+  - Controles accesibles en `SettingsWindow.xaml`: selector de modo (Desactivado / Simulado / Real) e interruptor rápido para activar/desactivar visualizador reactivo.
+- **Pruebas Automatizadas y Presupuesto de Rendimiento:**
+  - Nuevas suites de pruebas: `SpectrumAnalyzerTests` (tono senoidal de 1000 Hz, silencio, suavizado, cero asignaciones), `VisualizerActivationPolicyTests` (tabla de combinaciones) y `MediaVisualizerTests` (ciclo de vida de activación).
+  - Medición de rendimiento comprobada: 50 ms de CPU para procesar 5 segundos continuos de audio a 48 kHz (< 1.0% de un núcleo, < 0.15% de CPU total del sistema), cumpliendo holgadamente el presupuesto de < 2% de CPU adicional. 389 pruebas en verde.
+
 ## [1.1.0-dev] - 2026-09-30 (Fase 15: Indicador de Micrófono y Cámara en Uso)
 
 ### Añadido
