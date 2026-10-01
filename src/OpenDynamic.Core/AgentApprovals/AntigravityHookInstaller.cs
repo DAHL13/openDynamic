@@ -12,8 +12,10 @@ namespace OpenDynamic.Core.AgentApprovals;
 public static class AntigravityHookInstaller
 {
     public const string HookKey = "openDynamic-approvals";
+    public const string StatusHookKey = "openDynamic-status";
     public const string DefaultMatcher = "run_command|write_to_file|replace_file_content|multi_replace_file_content";
     public const int DefaultHookTimeoutSeconds = 120;
+    public const int DefaultStatusHookTimeoutSeconds = 10;
 
     /// <summary>
     /// Gets default machine-global hooks file path: ~/.gemini/config/hooks.json
@@ -209,15 +211,26 @@ public static class AntigravityHookInstaller
                 return (false, $"El archivo hooks.json contiene JSON inválido. Se abortó la desinstalación: {ex.Message}");
             }
 
+            bool modified = false;
             if (rootNode.ContainsKey(HookKey))
             {
                 rootNode.Remove(HookKey);
+                modified = true;
+                logger?.Invoke($"Removed {HookKey} from {hooksFilePath}");
+            }
 
+            if (rootNode.ContainsKey(StatusHookKey))
+            {
+                rootNode.Remove(StatusHookKey);
+                modified = true;
+                logger?.Invoke($"Removed {StatusHookKey} from {hooksFilePath}");
+            }
+
+            if (modified)
+            {
                 var options = new JsonSerializerOptions { WriteIndented = true };
                 string outputJson = rootNode.ToJsonString(options);
-
                 File.WriteAllText(hooksFilePath, outputJson);
-                logger?.Invoke($"Removed {HookKey} from {hooksFilePath}");
             }
 
             return (true, "Hook desconectado exitosamente.");
@@ -250,6 +263,7 @@ public static class AntigravityHookInstaller
     {
         string command = FormatCommand(hookExePath);
 
+        // 1. PreToolUse Approval Hook
         var hookItem = new JsonObject
         {
             ["type"] = "command",
@@ -269,5 +283,20 @@ public static class AntigravityHookInstaller
         };
 
         rootNode[HookKey] = hookDefinition;
+
+        // 2. Stop Hook for Agent Status notifications (Task 8)
+        var statusHookItem = new JsonObject
+        {
+            ["type"] = "command",
+            ["command"] = $"{command} --event stop",
+            ["timeout"] = DefaultStatusHookTimeoutSeconds
+        };
+
+        var statusDefinition = new JsonObject
+        {
+            ["Stop"] = new JsonArray { statusHookItem }
+        };
+
+        rootNode[StatusHookKey] = statusDefinition;
     }
 }

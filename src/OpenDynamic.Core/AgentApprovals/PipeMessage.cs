@@ -87,6 +87,17 @@ public sealed record PipeMessage
     }
 
     /// <summary>
+    /// Creates an agent status envelope wrapping an <see cref="AgentStatusEvent"/>.
+    /// </summary>
+    public static PipeMessage CreateStatus(AgentStatusEvent statusEvent)
+    {
+        ArgumentNullException.ThrowIfNull(statusEvent);
+        var json = statusEvent.ToJson();
+        ValidatePayloadSize(json);
+        return new PipeMessage(CurrentProtocolVersion, "status", json);
+    }
+
+    /// <summary>
     /// Creates a ping heartbeat/liveness message.
     /// </summary>
     public static PipeMessage CreatePing() => new(CurrentProtocolVersion, "ping");

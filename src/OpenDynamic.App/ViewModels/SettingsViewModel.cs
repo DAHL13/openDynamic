@@ -67,6 +67,8 @@ public partial class SettingsViewModel : ObservableObject
     private readonly ITimerCollection? _timerCollection;
     private readonly ClipboardService? _clipboardService;
     private readonly Services.PrivacyAccessMonitor? _privacyMonitor;
+    private readonly ApprovalRuleStore? _ruleStore;
+    private readonly ApprovalHistoryTracker? _historyTracker;
 
     private readonly AppSettings _settings;
 
@@ -381,6 +383,30 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string _testRequestStatus = string.Empty;
 
+    [ObservableProperty]
+    private bool _enableAgentRuleAutoAllow;
+
+    [ObservableProperty]
+    private bool _enableAgentRuleAutoAllowNotification;
+
+    [ObservableProperty]
+    private bool _enableAgentSafePrefixRules;
+
+    [ObservableProperty]
+    private bool _enableAgentStatusNotifications;
+
+    [ObservableProperty]
+    private bool _enableAgentStatusSound;
+
+    [ObservableProperty]
+    private ObservableCollection<ApprovalRule> _approvalRules = new();
+
+    [ObservableProperty]
+    private ApprovalRule? _selectedApprovalRule;
+
+    [ObservableProperty]
+    private ObservableCollection<ApprovalHistoryItem> _approvalHistory = new();
+
     public SettingsViewModel(
         ISettingsService settingsService,
         IslandOrchestrator orchestrator,
@@ -392,7 +418,9 @@ public partial class SettingsViewModel : ObservableObject
         DeviceService? deviceService = null,
         ITimerCollection? timerCollection = null,
         ClipboardService? clipboardService = null,
-        Services.PrivacyAccessMonitor? privacyMonitor = null)
+        Services.PrivacyAccessMonitor? privacyMonitor = null,
+        ApprovalRuleStore? ruleStore = null,
+        ApprovalHistoryTracker? historyTracker = null)
     {
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _orchestrator = orchestrator ?? throw new ArgumentNullException(nameof(orchestrator));
@@ -405,6 +433,8 @@ public partial class SettingsViewModel : ObservableObject
         _timerCollection = timerCollection;
         _clipboardService = clipboardService;
         _privacyMonitor = privacyMonitor;
+        _ruleStore = ruleStore;
+        _historyTracker = historyTracker;
 
         _settings = _settingsService.CurrentSettings;
 
@@ -494,6 +524,14 @@ public partial class SettingsViewModel : ObservableObject
         _agentApprovalGracePeriodMs = _settings.AgentApprovalGracePeriodMs;
         _enableAgentApprovalSound = _settings.EnableAgentApprovalSound;
         _agentApprovalHighlightedOption = _settings.AgentApprovalHighlightedOption;
+        _enableAgentRuleAutoAllow = _settings.EnableAgentRuleAutoAllow;
+        _enableAgentRuleAutoAllowNotification = _settings.EnableAgentRuleAutoAllowNotification;
+        _enableAgentSafePrefixRules = _settings.EnableAgentSafePrefixRules;
+        _enableAgentStatusNotifications = _settings.EnableAgentStatusNotifications;
+        _enableAgentStatusSound = _settings.EnableAgentStatusSound;
+
+        ReloadApprovalRules();
+        ReloadApprovalHistory();
 
         _agentApprovalPredefinedDenyReasons = new ObservableCollection<string>(_settings.AgentApprovalPredefinedDenyReasons ?? Enumerable.Empty<string>());
         _hooksFilePath = AntigravityHookInstaller.GetDefaultGlobalHooksFilePath();
@@ -1181,6 +1219,17 @@ public partial class SettingsViewModel : ObservableObject
         OnPropertyChanged(nameof(SelectedMotionModeOption));
         UpdateSystemAnimationStatus();
 
+        EnableAgentApprovals = _settings.EnableAgentApprovals;
+        AgentApprovalTimeoutSeconds = _settings.AgentApprovalTimeoutSeconds;
+        AgentApprovalGracePeriodMs = _settings.AgentApprovalGracePeriodMs;
+        EnableAgentApprovalSound = _settings.EnableAgentApprovalSound;
+        AgentApprovalHighlightedOption = _settings.AgentApprovalHighlightedOption;
+        EnableAgentRuleAutoAllow = _settings.EnableAgentRuleAutoAllow;
+        EnableAgentRuleAutoAllowNotification = _settings.EnableAgentRuleAutoAllowNotification;
+        EnableAgentSafePrefixRules = _settings.EnableAgentSafePrefixRules;
+        EnableAgentStatusNotifications = _settings.EnableAgentStatusNotifications;
+        EnableAgentStatusSound = _settings.EnableAgentStatusSound;
+
         ApplyPositionLive();
         ApplyHotkey();
     }
@@ -1226,6 +1275,119 @@ public partial class SettingsViewModel : ObservableObject
     {
         _settings.AgentApprovalHighlightedOption = value;
         _settingsService.SaveDebounced();
+    }
+
+    partial void OnEnableAgentRuleAutoAllowChanged(bool value)
+    {
+        _settings.EnableAgentRuleAutoAllow = value;
+        _settingsService.SaveDebounced();
+    }
+
+    partial void OnEnableAgentRuleAutoAllowNotificationChanged(bool value)
+    {
+        _settings.EnableAgentRuleAutoAllowNotification = value;
+        _settingsService.SaveDebounced();
+    }
+
+    partial void OnEnableAgentSafePrefixRulesChanged(bool value)
+    {
+        _settings.EnableAgentSafePrefixRules = value;
+        _settingsService.SaveDebounced();
+    }
+
+    partial void OnEnableAgentStatusNotificationsChanged(bool value)
+    {
+        _settings.EnableAgentStatusNotifications = value;
+        _settingsService.SaveDebounced();
+    }
+
+    partial void OnEnableAgentStatusSoundChanged(bool value)
+    {
+        _settings.EnableAgentStatusSound = value;
+        _settingsService.SaveDebounced();
+    }
+
+    [RelayCommand]
+    public void DeleteApprovalRule(ApprovalRule? rule)
+    {
+        var target = rule ?? SelectedApprovalRule;
+        if (target != null && _ruleStore != null)
+        {
+            _ruleStore.RemoveRule(target.Id);
+            ReloadApprovalRules();
+        }
+    }
+
+    [RelayCommand]
+    public void ClearAllApprovalRules()
+    {
+        _ruleStore?.ClearRules();
+        ReloadApprovalRules();
+    }
+
+    [RelayCommand]
+    public void AddSuggestedRules()
+    {
+        if (_ruleStore == null) return;
+
+        var suggested = new[]
+        {
+            "git status",
+            "git diff --stat",
+            "git log --oneline"
+        };
+
+        foreach (var cmd in suggested)
+        {
+            var rule = new ApprovalRule
+            {
+                Scope = ApprovalRuleScope.Global,
+                ToolName = "run_command",
+                CommandPattern = cmd,
+                IsPrefixMatch = false
+            };
+            _ruleStore.AddRule(rule);
+        }
+
+        ReloadApprovalRules();
+    }
+
+    [RelayCommand]
+    public void ClearApprovalHistory()
+    {
+        _historyTracker?.Clear();
+        ReloadApprovalHistory();
+    }
+
+    [RelayCommand]
+    public void RefreshApprovalRules()
+    {
+        ReloadApprovalRules();
+        ReloadApprovalHistory();
+    }
+
+    public void ReloadApprovalRules()
+    {
+        ApprovalRules.Clear();
+        if (_ruleStore != null)
+        {
+            foreach (var r in _ruleStore.GetAllRules())
+            {
+                ApprovalRules.Add(r);
+            }
+        }
+    }
+
+    public void ReloadApprovalHistory()
+    {
+        ApprovalHistory.Clear();
+        if (_historyTracker != null)
+        {
+            foreach (var h in _historyTracker.GetRecent())
+            {
+                ApprovalHistory.Add(h);
+            }
+        }
     }
 
     [RelayCommand]

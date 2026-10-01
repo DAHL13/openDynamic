@@ -8,13 +8,13 @@
              Background="Transparent">
     <Grid Margin="12,6,12,8">
         <Grid.RowDefinitions>
-            <!-- Header: Title, Project folder, Risk Badge, Timer -->
+            <!-- Header: Title, Project folder, Queue Badge, Risk Badge, Timer -->
             <RowDefinition Height="Auto" />
             <!-- Command View / Code Box -->
             <RowDefinition Height="Auto" />
             <!-- Review confirmation bar (if required) -->
             <RowDefinition Height="Auto" />
-            <!-- Options list (1. Allow, 5. Deny, Decide in AGY) -->
+            <!-- 5 Options Container -->
             <RowDefinition Height="Auto" />
             <!-- Hotkey guide footer -->
             <RowDefinition Height="Auto" />
@@ -43,7 +43,7 @@
                            FontWeight="Bold"
                            Foreground="{DynamicResource AppTextPrimaryBrush}"
                            VerticalAlignment="Center"
-                           Margin="0,0,8,0" />
+                           Margin="0,0,6,0" />
 
                 <!-- Project Folder -->
                 <Border Background="#2C2C2E" CornerRadius="4" Padding="5,1" VerticalAlignment="Center">
@@ -51,6 +51,15 @@
                                FontSize="10"
                                FontWeight="Medium"
                                Foreground="{DynamicResource AppTextMutedBrush}" />
+                </Border>
+
+                <!-- Queue Position Badge (FIFO Multi-Request) -->
+                <Border Background="#3A3A3C" CornerRadius="4" Padding="5,1" Margin="5,0,0,0"
+                        Visibility="{Binding QueueBadgeVisibility}" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding QueuePositionText}"
+                               FontSize="10"
+                               FontWeight="Bold"
+                               Foreground="#FFD60A" />
                 </Border>
             </StackPanel>
 
@@ -74,7 +83,7 @@
 
         <!-- Command / Code Display Box -->
         <Border Grid.Row="1" Background="#141416" BorderBrush="#28282C" BorderThickness="1" CornerRadius="6" Padding="6" Margin="0,0,0,4">
-            <ScrollViewer MaxHeight="60" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+            <ScrollViewer MaxHeight="55" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
                 <TextBlock Text="{Binding FullSummary}"
                            FontFamily="Consolas, Cascadia Code, monospace"
                            FontSize="11"
@@ -110,7 +119,7 @@
             </Grid>
         </Border>
 
-        <!-- Options Container -->
+        <!-- Options Container (5 Structured Numbered Options) -->
         <StackPanel Grid.Row="3" Margin="0,2,0,4">
             <!-- Option 1: Allow this time -->
             <Button Command="{Binding AllowCommand}"
@@ -118,10 +127,10 @@
                     BorderThickness="{Binding Option1BorderThickness}"
                     BorderBrush="{Binding Option1BorderBrush}"
                     Background="#1C281E"
-                    Padding="8,5"
+                    Padding="8,4"
                     HorizontalContentAlignment="Left"
                     Cursor="Hand"
-                    Margin="0,0,0,3">
+                    Margin="0,0,0,2">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
@@ -143,8 +152,104 @@
                 </Grid>
             </Button>
 
+            <!-- Option 2: Allow always in this conversation (RAM) -->
+            <Button Command="{Binding AllowAlwaysConversationCommand}"
+                    IsEnabled="{Binding CanAllow}"
+                    Visibility="{Binding AlwaysOptionsVisibility}"
+                    BorderThickness="{Binding Option2BorderThickness}"
+                    BorderBrush="{Binding Option2BorderBrush}"
+                    Background="#1C281E"
+                    Padding="8,4"
+                    HorizontalContentAlignment="Left"
+                    Cursor="Hand"
+                    Margin="0,0,0,2">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding Option2ButtonLabel}"
+                               FontSize="11"
+                               FontWeight="SemiBold"
+                               Foreground="{Binding AllowButtonForeground}" />
+                    <TextBlock Grid.Column="1" Text="Ctrl+Alt+2" FontSize="10" Foreground="#636366" VerticalAlignment="Center" />
+                </Grid>
+            </Button>
+
+            <!-- Option 3: Allow always in this project (.antigravity/approval-rules.json) -->
+            <Button Command="{Binding AllowAlwaysProjectCommand}"
+                    IsEnabled="{Binding CanAllow}"
+                    Visibility="{Binding AlwaysOptionsVisibility}"
+                    BorderThickness="{Binding Option3BorderThickness}"
+                    BorderBrush="{Binding Option3BorderBrush}"
+                    Background="#1C281E"
+                    Padding="8,4"
+                    HorizontalContentAlignment="Left"
+                    Cursor="Hand"
+                    Margin="0,0,0,2">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding Option3ButtonLabel}"
+                               FontSize="11"
+                               FontWeight="SemiBold"
+                               Foreground="{Binding AllowButtonForeground}" />
+                    <TextBlock Grid.Column="1" Text="Ctrl+Alt+3" FontSize="10" Foreground="#636366" VerticalAlignment="Center" />
+                </Grid>
+            </Button>
+
+            <!-- Option 3b: Safe prefix candidate in project (Opt-in) -->
+            <Button Command="{Binding AllowSafePrefixProjectCommand}"
+                    IsEnabled="{Binding CanAllow}"
+                    Visibility="{Binding SafePrefixOptionVisibility}"
+                    Background="#1B2A22"
+                    BorderThickness="1"
+                    BorderBrush="#245032"
+                    Padding="8,3"
+                    HorizontalContentAlignment="Left"
+                    Cursor="Hand"
+                    Margin="0,0,0,2">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding SafePrefixOptionLabel}"
+                               FontSize="10"
+                               FontWeight="SemiBold"
+                               Foreground="#30D158" />
+                    <TextBlock Grid.Column="1" Text="Prefijo seguro" FontSize="9" Foreground="#8E8E93" VerticalAlignment="Center" />
+                </Grid>
+            </Button>
+
+            <!-- Option 4: Allow always globally (%USERPROFILE%/.antigravity/approval-rules.json) -->
+            <Button Command="{Binding AllowAlwaysGlobalCommand}"
+                    IsEnabled="{Binding CanAllow}"
+                    Visibility="{Binding AlwaysOptionsVisibility}"
+                    BorderThickness="{Binding Option4BorderThickness}"
+                    BorderBrush="{Binding Option4BorderBrush}"
+                    Background="#1C281E"
+                    Padding="8,4"
+                    HorizontalContentAlignment="Left"
+                    Cursor="Hand"
+                    Margin="0,0,0,2">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding Option4ButtonLabel}"
+                               FontSize="11"
+                               FontWeight="SemiBold"
+                               Foreground="{Binding AllowButtonForeground}" />
+                    <TextBlock Grid.Column="1" Text="Ctrl+Alt+4" FontSize="10" Foreground="#636366" VerticalAlignment="Center" />
+                </Grid>
+            </Button>
+
             <!-- Option 5: Deny with reason -->
-            <Border Background="#251C1D" BorderThickness="{Binding Option5BorderThickness}" BorderBrush="{Binding Option5BorderBrush}" CornerRadius="4" Padding="6,3" Margin="0,0,0,3">
+            <Border Background="#251C1D" BorderThickness="{Binding Option5BorderThickness}" BorderBrush="{Binding Option5BorderBrush}" CornerRadius="4" Padding="6,3" Margin="0,0,0,2">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
@@ -185,7 +290,7 @@
             <Button Command="{Binding DecideInAntigravityCommand}"
                     Background="#2C2C2E"
                     BorderThickness="0"
-                    Padding="8,4"
+                    Padding="8,3"
                     Cursor="Hand">
                 <Grid>
                     <Grid.ColumnDefinitions>
@@ -193,7 +298,7 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <TextBlock Text="Decidir en Antigravity (aviso nativo)"
-                               FontSize="11"
+                               FontSize="10"
                                FontWeight="Medium"
                                Foreground="{DynamicResource AppTextPrimaryBrush}" />
                     <TextBlock Grid.Column="1" Text="Ctrl+Alt+A" FontSize="10" Foreground="#8E8E93" VerticalAlignment="Center" />

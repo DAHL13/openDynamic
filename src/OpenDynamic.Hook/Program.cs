@@ -29,6 +29,7 @@ public static class Program
         int waitMs = DefaultWaitMs;
         int connectionTimeoutMs = DefaultConnectionTimeoutMs;
         string pipeName = DefaultPipeName;
+        string eventType = "pre-tool-use";
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -36,7 +37,7 @@ public static class Program
 
             if (arg.Equals("--version", StringComparison.OrdinalIgnoreCase))
             {
-                Console.WriteLine("{\"name\": \"openDynamic-hook\", \"version\": \"1.0.0\", \"protocol\": 1}");
+                Console.WriteLine("{\"name\": \"openDynamic-hook\", \"version\": \"1.1.0\", \"protocol\": 1}");
                 return 0;
             }
 
@@ -45,7 +46,16 @@ public static class Program
                 return RunSelfTest();
             }
 
-            if ((arg.Equals("--wait", StringComparison.OrdinalIgnoreCase) ||
+            if (arg.Equals("--event", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+            {
+                eventType = args[i + 1].Trim().ToLowerInvariant();
+                i++;
+            }
+            else if (arg.StartsWith("--event=", StringComparison.OrdinalIgnoreCase))
+            {
+                eventType = arg["--event=".Length..].Trim().ToLowerInvariant();
+            }
+            else if ((arg.Equals("--wait", StringComparison.OrdinalIgnoreCase) ||
                  arg.Equals("--timeout", StringComparison.OrdinalIgnoreCase)) &&
                 i + 1 < args.Length && int.TryParse(args[i + 1], out int parsedWaitSec))
             {
@@ -76,6 +86,13 @@ public static class Program
         // Read hook payload strictly from standard input with non-blocking line reading
         using var stdinCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(Math.Min(waitMs, 2000)));
         string? inputJson = await ReadStdinSafelyAsync(stdinCts.Token).ConfigureAwait(false);
+
+        // Branch for Stop hook event (Task 8)
+        if (eventType == "stop")
+        {
+            return await ExecuteStopHookAsync(inputJson, pipeName, connectionTimeoutMs).ConfigureAwait(false);
+        }
+
         if (string.IsNullOrWhiteSpace(inputJson))
         {
             EmitAsk("Entrada vacía o ausente recibida en stdin.");
@@ -144,6 +161,34 @@ public static class Program
         }
     }
 
+    private static async Task<int> ExecuteStopHookAsync(string? inputJson, string pipeName, int connectionTimeoutMs)
+    {
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(inputJson))
+            {
+                var statusEvent = AgentStatusEvent.FromHookPayload(inputJson);
+
+                using var clientStream = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.CurrentUserOnly | PipeOptions.Asynchronous);
+                using var connectCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(connectionTimeoutMs));
+                await clientStream.ConnectAsync(connectionTimeoutMs, connectCts.Token).ConfigureAwait(false);
+
+                var statusMsg = PipeMessage.CreateStatus(statusEvent);
+                var bytes = Encoding.UTF8.GetBytes(statusMsg.Serialize() + "\n");
+                await clientStream.WriteAsync(bytes.AsMemory(), connectCts.Token).ConfigureAwait(false);
+                await clientStream.FlushAsync(connectCts.Token).ConfigureAwait(false);
+            }
+        }
+        catch
+        {
+            // Non-blocking fire-and-forget: do not block or throw if pipe is absent or busy
+        }
+
+        // Return decision stop per Antigravity contract (any value other than 'continue' allows stopping)
+        Console.WriteLine("{\"decision\": \"stop\"}");
+        return 0;
+    }
+
     private static int RunSelfTest()
     {
         try
@@ -168,6 +213,16 @@ public static class Program
             if (deserialized.Version != 1 || deserialized.Type != "request")
             {
                 Console.WriteLine("{\"selftest\": \"failed\", \"reason\": \"PipeMessage protocol roundtrip mismatch\"}");
+                return 0;
+            }
+
+            // 3. Verify status event round-trip
+            var testStatus = new AgentStatusEvent { ConversationId = "conv", FullyIdle = true, TerminationReason = "completed" };
+            var statusMsg = PipeMessage.CreateStatus(testStatus);
+            var statusDeserialized = PipeMessage.Deserialize(statusMsg.Serialize());
+            if (statusDeserialized.Type != "status" || string.IsNullOrWhiteSpace(statusDeserialized.Payload))
+            {
+                Console.WriteLine("{\"selftest\": \"failed\", \"reason\": \"PipeMessage status mismatch\"}");
                 return 0;
             }
 

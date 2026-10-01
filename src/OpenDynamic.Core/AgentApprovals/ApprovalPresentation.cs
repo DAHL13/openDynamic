@@ -77,38 +77,30 @@ public sealed record ApprovalPresentation
             optionActionSummary: optionSummary);
     }
 
+    public static string GetFolderName(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return "Workspace";
+        try
+        {
+            var dirName = Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+            return string.IsNullOrWhiteSpace(dirName) ? "Workspace" : dirName;
+        }
+        catch
+        {
+            return "Workspace";
+        }
+    }
+
     private static string ResolveProjectFolder(ApprovalRequest request)
     {
         if (request.WorkspacePaths.Count > 0 && !string.IsNullOrWhiteSpace(request.WorkspacePaths[0]))
         {
-            try
-            {
-                var dirName = Path.GetFileName(request.WorkspacePaths[0].TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
-                if (!string.IsNullOrWhiteSpace(dirName))
-                {
-                    return dirName;
-                }
-            }
-            catch
-            {
-                // Fallback if path parsing fails
-            }
+            return GetFolderName(request.WorkspacePaths[0]);
         }
 
         if (!string.IsNullOrWhiteSpace(request.Cwd))
         {
-            try
-            {
-                var dirName = Path.GetFileName(request.Cwd.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
-                if (!string.IsNullOrWhiteSpace(dirName))
-                {
-                    return dirName;
-                }
-            }
-            catch
-            {
-                // Fallback
-            }
+            return GetFolderName(request.Cwd);
         }
 
         return "Workspace";
