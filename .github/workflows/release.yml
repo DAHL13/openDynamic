@@ -40,6 +40,15 @@ jobs:
         -p:PublishReadyToRun=true
         -o publish
 
+    - name: Publish OpenDynamic.Hook (ReadyToRun)
+      run: >
+        dotnet publish src/OpenDynamic.Hook/OpenDynamic.Hook.csproj
+        -c Release
+        -r win-x64
+        --self-contained false
+        -p:PublishReadyToRun=true
+        -o publish/hook
+
     - name: Package portable ZIP
       shell: pwsh
       run: |
