@@ -3,7 +3,30 @@
 Todas las modificaciones notables en este proyecto serán documentadas en este archivo.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y cumple con [SemVer](https://semver.org/).
 
-## [1.4.0-dev] - 2026-10-01 (Tarea R1: Retiro de Integración con Antigravity)
+## [1.4.0-dev] - 2026-10-02 (Fase 19: Reloj Ambiental en Reposo)
+
+### Añadido
+- **Widget de Reloj Ambiental en Reposo (`AmbientClockWidget`):**
+  - Activación por sobrevuelo del cursor (`ActivityActivationMode.OnHover`) y prioridad 5 (`ActivityPriority.AmbientClock`), la más baja del orquestador.
+  - Vistas compacta (`ClockCompactView`) y expandida (`ClockExpandedView`) diseñadas para la Upper Notch UI con esquinas asimétricas y fondo degradado oscuro.
+  - Visualización formateada de hora, fecha corta/larga y número de semana ISO 8601 (`ClockFormatter`).
+  - Ciclo de vida estricto del temporizador: `DispatcherTimer` solo existe y corre mientras el widget está visible en pantalla; se detiene y destruye al ocultarse la muesca (0% CPU en reposo).
+  - Alineación de precisión del temporizador al segundo cero del minuto (`:00.000`) mediante `ClockTickScheduler` con `TimeProvider`.
+  - Sincronización horaria reactiva mediante intercepción Win32 de `WM_TIMECHANGE` (0x001E) y `SystemEvents.TimeChanged` difundida vía `SystemTimeChangedMessage` con cero bucles de polling.
+  - Detección de sobrevuelo en la muesca con guarda antirrebote de 250 ms al entrar y 350 ms al salir en `IslandWindow.xaml.cs`.
+- **Soporte de Activación `OnHover` en `PriorityResolver`:**
+  - Incorporado `ActivityActivationMode` (`Event` vs `OnHover`) en `IActivitySource`.
+  - Las actividades `Event` prevalecen de forma absoluta; las actividades `OnHover` solo son elegibles cuando el sistema está en reposo e interactuando con el sensor (`isHovering == true`).
+  - Coexistencia pacífica: 100% de las pruebas preexistentes de `PriorityResolver` preservadas en verde.
+- **Ajustes y Configuración (Esquema v12):**
+  - `AppSettings.cs` promovido a `CurrentSchemaVersion = 12`.
+  - Nuevas propiedades: `EnableAmbientClock`, `ClockTimeFormat` (Auto, 12h AM/PM, 24h), `ClockShowSeconds`, `ClockShowDate`, `ClockShowWeekNumber` y `DefaultAmbientClockPriority`.
+  - Migración automática en `SettingsService.Load()` con preservación de configuraciones anteriores.
+  - Tarjeta de configuración "Reloj Ambiental" en `SettingsWindow.xaml` conectada reactivamente a `SettingsViewModel`.
+- **Pruebas Automatizadas:**
+  - 34 pruebas añadidas (426 pruebas totales en verde), cubriendo formateo cultural, calendarización de ticks con mock de tiempo, resolución de prioridades con activación `OnHover`, integración de widgets y migración de esquema v12.
+
+## [1.3.1-dev] - 2026-10-01 (Tarea R1: Retiro de Integración con Antigravity)
 
 ### Eliminado
 - **Retiro Completo de Integración con Antigravity (Fases 17 y 18):**

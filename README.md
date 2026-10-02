@@ -10,7 +10,7 @@
 [![CPU](https://img.shields.io/badge/CPU%20Idle-0.0%25-brightgreen)]()
 
 > **Dynamic Island / Upper Notch para Windows (WPF, .NET 10)**  
-> Una muesca rectangular superior interactiva y contextual (música, volumen, batería, hardware, temporizador) anclada al marco superior de la pantalla, con animaciones de física de resortes elásticos y consumo ultra bajo de recursos.
+> Una muesca rectangular superior interactiva y contextual (música, volumen, batería, hardware, temporizador, reloj ambiental) anclada al marco superior de la pantalla, con animaciones de física de resortes elásticos y consumo ultra bajo de recursos.
 
 Repositorio oficial: [https://github.com/DAHL13/openDynamic](https://github.com/DAHL13/openDynamic)
 
@@ -69,6 +69,7 @@ openDynamic adopta una estética de **muesca rectangular superior (Notch)** pega
 | **Fase 14** | **Portapapeles reciente y seguro en memoria RAM (Opt-in, privacidad, 0% leak) (v1.1)** | **Completada** |
 | **Fase 15** | **Indicador de micrófono y cámara en uso (ConsentStore pasivo, cero polling, notch UI) (v1.1)** | **Completada** |
 | **Fase 16** | **Visualizador de audio real (espectro FFT propia, WASAPI loopback, 0 heap alloc, <2% CPU) (v1.1)** | **Completada** |
+| **Fase 19** | **Reloj ambiental en reposo (OnHover, 0% CPU idle, WM_TIMECHANGE, alineación al minuto) (v1.4)** | **Completada** |
 
 ---
 
@@ -173,11 +174,23 @@ El widget multimedia incorpora un analizador de espectro reactivo en tiempo real
 
 ---
 
+## Reloj Ambiental en Reposo (Upper Notch UI)
+
+openDynamic incorpora un widget de reloj ambiental diseñado para consultar la hora y fecha de manera no intrusiva al interactuar con la Dynamic Island cuando no hay actividades prioritarias en curso:
+
+- **Activación por Sobrevuelo (`ActivationMode.OnHover`):** Al pasar el cursor sobre la muesca cuando la isla se encuentra en reposo (`Hidden`), se despliega suavemente mostrando la hora local, día de la semana y fecha completa.
+- **Presupuesto Estricto de Rendimiento (0% CPU en Reposo):** El temporizador de actualización interno (`DispatcherTimer`) solo se reserva y ejecuta mientras la isla se mantiene visible en pantalla; se detiene y destruye de forma instantánea al ocultarse la muesca.
+- **Alineación de Precisión al Minuto:** Sincronizado para disparar su primer tick exactamente en el segundo `:00.000` del minuto entrante, evitando ciclos de reloj innecesarios por segundo cuando los segundos no están habilitados.
+- **Sincronización Reactiva Win32 (`WM_TIMECHANGE`):** Escucha mensajes nativos del sistema y `SystemEvents.TimeChanged` para actualizarse de inmediato ante cambios manuales de hora o ajustes de zona horaria sin incurrir en bucles de sondeo continuo (cero polling).
+- **Formatos y Localización Cultural:** Respeta la configuración regional de Windows (`CultureInfo.CurrentCulture`) con soporte configurable para 12 horas (AM/PM), 24 horas, visualización opcional de segundos y número de semana según el estándar ISO 8601.
+
+---
+
 ## Documentación Técnica
 
 - **[Arquitectura y Guía para Desarrolladores (`docs/arquitectura.md`)](./docs/arquitectura.md):** Diagramas conceptuales de capas (Core vs. App), flujo del `IslandOrchestrator`, ciclo de vida de la FSM y la **Guía de 10 pasos** para crear e integrar nuevos widgets desde cero.
-- **[Registro de Decisiones de Arquitectura (`DECISIONS.md`)](./DECISIONS.md):** Registro histórico y justificación de las 24 decisiones técnicas (ADR-001 a ADR-024).
-- **[Matriz de Validación y Pruebas (`docs/pruebas.md`)](./docs/pruebas.md):** 389 pruebas unitarias automatizadas y casos de prueba manual de sistema (DPI, multimonitor, suspensión, pantalla completa, accesibilidad, portapapeles, privacidad de cámara/micrófono, espectro de audio).
+- **[Registro de Decisiones de Arquitectura (`DECISIONS.md`)](./DECISIONS.md):** Registro histórico y justificación de las 28 decisiones técnicas (ADR-001 a ADR-028).
+- **[Matriz de Validación y Pruebas (`docs/pruebas.md`)](./docs/pruebas.md):** 426 pruebas unitarias automatizadas y casos de prueba manual de sistema (DPI, multimonitor, suspensión, pantalla completa, accesibilidad, portapapeles, privacidad de cámara/micrófono, espectro de audio, reloj ambiental).
 
 ---
 

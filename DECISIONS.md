@@ -861,3 +861,41 @@
   - Pruebas eliminadas: 161 pruebas (13 archivos en `tests/OpenDynamic.Tests/AgentApprovals/`).
   - Nuevas pruebas de regresión añadidas: 2 pruebas en `SettingsServiceTests` (validación de carga retrocompatible ignorando campos obsoletos y eliminación segura de `approval-rules.json`).
   - Total de pruebas resultantes: 392 pruebas en verde (línea base original de 390 + 2 nuevas).
+
+---
+
+## ADR-028: Reloj Ambiental en Reposo (Fase 19)
+
+- **Estado:** Aceptado
+- **Fecha:** 2026-10-02
+- **Contexto:**
+  openDynamic carecía de un comportamiento contextual visual en la Dynamic Island cuando no existían actividades en curso (reproducción multimedia, hardware, temporizadores, volumen, etc.). El usuario solicitó la incorporación de un reloj ambiental discreto que se active al pasar el cursor sobre la muesca cuando la isla está en reposo (`Hidden`), mostrando la hora, fecha y opcionalmente la semana ISO, sin comprometer el presupuesto de 0% de uso de CPU en reposo ni interferir con la jerarquía de widgets existente.
+
+- **Decisiones Técnicas:**
+  1. **Modo de Activación `OnHover` y Prioridad Mínima (Regla de Oro 1):**
+     - Se introdujo `ActivityActivationMode` (`Event` vs `OnHover`) en `IActivitySource` y `IslandWidgetBase`.
+     - `AmbientClockWidget` se configura con `ActivationMode = ActivityActivationMode.OnHover` y prioridad 5 (`ActivityPriority.AmbientClock`), la más baja de la isla.
+     - `PriorityResolver` garantiza que las actividades de tipo `Event` prevalecen de forma absoluta. Las actividades `OnHover` solo son elegibles cuando no hay eventos activos y el cursor se encuentra sobre el sensor de la muesca (`isHovering == true`).
+     - El reloj nunca mantiene visible la isla de forma autónoma ni bloquea la transición al estado `Hidden`.
+  2. **Presupuesto de 0% CPU en Reposo y Ciclo de Vida del Temporizador (Reglas de Oro 1 y 11):**
+     - El temporizador de actualización (`DispatcherTimer`) solo existe y corre mientras el widget está visible en pantalla (`SetDisplayState(..., isVisible: true)`).
+     - Al ocultarse la muesca, el temporizador se detiene, desenlaza sus eventos y se destruye inmediatamente (`StopTimer()`), garantizando 0% de CPU en reposo.
+     - Mediante `ClockTickScheduler`, el primer tick se sincroniza exactamente al segundo cero del minuto entrante (`:00.000`), evitando llamadas innecesarias por segundo cuando los segundos están desactivados.
+  3. **Sincronización Reactiva con Win32 `WM_TIMECHANGE` (Cero Polling):**
+     - En `IslandWindow.xaml.cs`, el procedimiento de ventana nativo intercepta `WM_TIMECHANGE = 0x001E` y escucha `SystemEvents.TimeChanged`.
+     - Se despacha un mensaje reactivo desacoplado `SystemTimeChangedMessage` que refresca instantáneamente la hora y recalcula el retardo del scheduler si el widget está visible, sin bucles de polling en segundo plano.
+  4. **Localización y Formateo Cultural:**
+     - `ClockFormatter` utiliza `CultureInfo.CurrentCulture` para la obtención de nombres de días, meses y patrones horarios.
+     - Soporta modos `Auto` (obtenido del formato del sistema), `TwelveHour` (12 horas con AM/PM) y `TwentyFourHour` (24 horas), alternancia de segundos, fecha y cálculo ISO 8601 del número de semana (`CalendarWeekRule.FirstFourDayWeek`, `DayOfWeek.Monday`).
+  5. **Configuración, Migración y Ajustes (Esquema v12):**
+     - Se promovió `CurrentSchemaVersion` de 11 a 12 en `AppSettings.cs`.
+     - Opciones añadidas: `EnableAmbientClock`, `ClockTimeFormat`, `ClockShowSeconds`, `ClockShowDate`, `ClockShowWeekNumber` y `DefaultAmbientClockPriority`.
+     - Migración limpia en `SettingsService.Load()` manteniendo retrocompatibilidad y preservando configuraciones previas.
+     - Tarjeta moderna en `SettingsWindow.xaml` integrada con `SettingsViewModel`.
+  6. **Interacción y Umbral de Activación de Reposo:**
+     - En `IslandWindow.xaml.cs`, cuando la isla está en reposo (`Hidden`), se detecta el sobrevuelo del cursor en el área de la muesca con un retraso antirrebote intencional de 250 ms antes de desplegar el reloj, y un retardo de 350 ms al salir del sensor para evitar transiciones accidentales.
+
+- **Consecuencias y Verificación:**
+  - 426 pruebas unitarias automáticas en verde (100% de la suite).
+  - Pruebas existentes de `PriorityResolver` intactas y superadas al 100%.
+  - Compilación Release limpia con 0 advertencias (`TreatWarningsAsErrors`).
