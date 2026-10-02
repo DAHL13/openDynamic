@@ -190,7 +190,7 @@ openDynamic incorpora un widget de reloj ambiental diseñado para consultar la h
 
 - **[Arquitectura y Guía para Desarrolladores (`docs/arquitectura.md`)](./docs/arquitectura.md):** Diagramas conceptuales de capas (Core vs. App), flujo del `IslandOrchestrator`, ciclo de vida de la FSM y la **Guía de 10 pasos** para crear e integrar nuevos widgets desde cero.
 - **[Registro de Decisiones de Arquitectura (`DECISIONS.md`)](./DECISIONS.md):** Registro histórico y justificación de las 28 decisiones técnicas (ADR-001 a ADR-028).
-- **[Matriz de Validación y Pruebas (`docs/pruebas.md`)](./docs/pruebas.md):** 426 pruebas unitarias automatizadas y casos de prueba manual de sistema (DPI, multimonitor, suspensión, pantalla completa, accesibilidad, portapapeles, privacidad de cámara/micrófono, espectro de audio, reloj ambiental).
+- **[Matriz de Validación y Pruebas (`docs/pruebas.md`)](./docs/pruebas.md):** 440 pruebas unitarias automatizadas y casos de prueba manual de sistema (DPI, multimonitor, suspensión, pantalla completa, accesibilidad, portapapeles, privacidad de cámara/micrófono, espectro de audio, reloj ambiental).
 
 ---
 
