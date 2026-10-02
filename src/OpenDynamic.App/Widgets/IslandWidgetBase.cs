@@ -64,6 +64,8 @@ public abstract class IslandWidgetBase : ObservableObject, IIslandWidget
         }
     }
 
+    public virtual ActivityActivationMode ActivationMode { get; protected set; } = ActivityActivationMode.Event;
+
     public DateTimeOffset? LastActivatedUtc
     {
         get => _lastActivatedUtc;

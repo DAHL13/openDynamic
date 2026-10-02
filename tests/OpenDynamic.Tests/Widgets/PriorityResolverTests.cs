@@ -16,6 +16,7 @@ public class PriorityResolverTests
         public DateTimeOffset? LastActivatedUtc { get; init; }
         public TimeSpan? TransientDuration { get; init; }
         public IslandActivity? CurrentActivity { get; init; }
+        public ActivityActivationMode ActivationMode { get; init; } = ActivityActivationMode.Event;
 
         public event EventHandler? Changed;
 
@@ -380,6 +381,128 @@ public class PriorityResolverTests
 
         Assert.Same(longNotice, result.Primary);
         Assert.Equal(now.AddSeconds(2), result.NextExpirationUtc);
+    }
+
+    [Fact]
+    public void Resolve_OnHover_WhenNotHovering_ReturnsHiddenAndNoPrimary()
+    {
+        var clock = new MockActivitySource
+        {
+            Id = "clock",
+            Priority = ActivityPriority.AmbientClock,
+            IsActive = true,
+            ActivationMode = ActivityActivationMode.OnHover
+        };
+
+        var result = _resolver.Resolve(new[] { clock }, isHovering: false);
+
+        Assert.Null(result.Primary);
+        Assert.Null(result.Secondary);
+        Assert.False(result.HasActiveActivity);
+        Assert.Equal(IslandState.Hidden, result.SuggestedState);
+    }
+
+    [Fact]
+    public void Resolve_OnHover_WhenHovering_ReturnsCompactWithPrimary()
+    {
+        var clock = new MockActivitySource
+        {
+            Id = "clock",
+            Priority = ActivityPriority.AmbientClock,
+            IsActive = true,
+            ActivationMode = ActivityActivationMode.OnHover
+        };
+
+        var result = _resolver.Resolve(new[] { clock }, isHovering: true);
+
+        Assert.Same(clock, result.Primary);
+        Assert.Null(result.Secondary);
+        Assert.True(result.HasActiveActivity);
+        Assert.False(result.IsSplit);
+        Assert.Equal(IslandState.Compact, result.SuggestedState);
+    }
+
+    [Fact]
+    public void Resolve_OnHover_WithOtherEventActivity_EventActivityWinsAndOnHoverIgnored()
+    {
+        var clock = new MockActivitySource
+        {
+            Id = "clock",
+            Priority = ActivityPriority.AmbientClock, // 5
+            IsActive = true,
+            ActivationMode = ActivityActivationMode.OnHover
+        };
+
+        var media = new MockActivitySource
+        {
+            Id = "media",
+            Priority = ActivityPriority.Media, // 30
+            IsActive = true,
+            ActivationMode = ActivityActivationMode.Event
+        };
+
+        // Even when hovering, Event activity always wins and clock is not shown
+        var result = _resolver.Resolve(new[] { clock, media }, isHovering: true);
+
+        Assert.Same(media, result.Primary);
+        Assert.Null(result.Secondary);
+        Assert.False(result.IsSplit);
+        Assert.Equal(IslandState.Compact, result.SuggestedState);
+    }
+
+    [Fact]
+    public void Resolve_MultipleOnHover_WhenHovering_NeverEntersSplit_HighestPriorityWins()
+    {
+        var clock1 = new MockActivitySource
+        {
+            Id = "clock-low",
+            Priority = 3,
+            IsActive = true,
+            ActivationMode = ActivityActivationMode.OnHover
+        };
+
+        var clock2 = new MockActivitySource
+        {
+            Id = "clock-high",
+            Priority = 5,
+            IsActive = true,
+            ActivationMode = ActivityActivationMode.OnHover
+        };
+
+        var result = _resolver.Resolve(new[] { clock1, clock2 }, isHovering: true);
+
+        Assert.Same(clock2, result.Primary);
+        Assert.Null(result.Secondary); // NEVER enters Split mode
+        Assert.False(result.IsSplit);
+        Assert.Equal(IslandState.Compact, result.SuggestedState);
+    }
+
+    [Fact]
+    public void Resolve_EventActivityWithLowerPriorityThanOnHover_EventWinsUnconditionally()
+    {
+        // Event activity has priority 2, while OnHover has priority 5.
+        // Specification rule: "Si existe cualquier otra actividad, esa gana y el reloj no aparece."
+        var onHoverWidget = new MockActivitySource
+        {
+            Id = "clock",
+            Priority = 5,
+            IsActive = true,
+            ActivationMode = ActivityActivationMode.OnHover
+        };
+
+        var lowEvent = new MockActivitySource
+        {
+            Id = "low-event",
+            Priority = 2,
+            IsActive = true,
+            ActivationMode = ActivityActivationMode.Event
+        };
+
+        var result = _resolver.Resolve(new[] { onHoverWidget, lowEvent }, isHovering: true);
+
+        Assert.Same(lowEvent, result.Primary);
+        Assert.Null(result.Secondary);
+        Assert.Equal(IslandState.Compact, result.SuggestedState);
     }
 }
 

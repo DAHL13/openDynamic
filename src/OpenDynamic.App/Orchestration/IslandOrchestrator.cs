@@ -100,6 +100,19 @@ public sealed class IslandOrchestrator : IDisposable
     public bool IsSplitSwapped => _isSplitSwapped;
     public IReadOnlySet<string> QuarantinedWidgetIds => _quarantinedWidgetIds;
 
+    public bool IsHovering => _isHovering;
+    private bool _isHovering;
+
+    /// <summary>
+    /// Updates whether the cursor is hovering over the idle notch, activating OnHover ambient activities.
+    /// </summary>
+    public void SetHovering(bool isHovering)
+    {
+        if (_isHovering == isHovering) return;
+        _isHovering = isHovering;
+        Log.Debug("IslandOrchestrator: Hover state changed to {IsHovering}.", _isHovering);
+        DispatchToUIThread(UpdateOrchestration);
+    }
 
     /// <summary>
     /// Default idle state when no activities are active (defaults to <see cref="IslandState.Hidden"/>).
@@ -289,6 +302,7 @@ public sealed class IslandOrchestrator : IDisposable
     {
         _isFullscreenSuppressed = true;
         _userExpanded = false;
+        _isHovering = false;
 
         // Cancel transient expiration timer
         _transientTimer?.Stop();
@@ -334,6 +348,7 @@ public sealed class IslandOrchestrator : IDisposable
     public void SuspendForPower()
     {
         _isPowerSuspended = true;
+        _isHovering = false;
 
         // Cancel transient expiration timer
         _transientTimer?.Stop();
@@ -429,7 +444,7 @@ public sealed class IslandOrchestrator : IDisposable
                 .ToList();
         }
 
-        var result = _priorityResolver.Resolve(activeCandidates, DateTimeOffset.UtcNow);
+        var result = _priorityResolver.Resolve(activeCandidates, DateTimeOffset.UtcNow, _isHovering);
 
         var resolvedPrimary = result.Primary as IIslandWidget;
         var resolvedSecondary = result.Secondary as IIslandWidget;
@@ -788,6 +803,7 @@ public sealed class IslandOrchestrator : IDisposable
     /// </summary>
     public void RequestHide()
     {
+        _isHovering = false;
         _userExpanded = false;
         TransitionTo(IslandState.Hidden);
 

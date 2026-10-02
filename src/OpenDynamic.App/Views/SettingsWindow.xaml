@@ -1023,6 +1023,83 @@
                                 </ListBox>
                             </StackPanel>
                         </Border>
+
+                        <!-- Phase 19: Ambient Clock Widget Card -->
+                        <Border Style="{StaticResource SettingCard}">
+                            <StackPanel>
+                                <Grid>
+                                    <StackPanel>
+                                        <TextBlock Text="🕒 Reloj Ambiental" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Muestra la hora, fecha y semana al pasar el cursor sobre la muesca cuando no hay actividades activas." Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <CheckBox IsChecked="{Binding EnableAmbientClock}" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                              AutomationProperties.Name="Habilitar Reloj Ambiental"/>
+                                </Grid>
+
+                                <StackPanel Margin="0,12,0,0">
+                                    <Grid>
+                                        <TextBlock Text="Prioridad del Reloj" Style="{StaticResource SettingDesc}"/>
+                                        <TextBlock Text="{Binding DefaultAmbientClockPriority}" Style="{StaticResource ValueBadge}"/>
+                                    </Grid>
+                                    <Slider Minimum="1" Maximum="10" Value="{Binding DefaultAmbientClockPriority}" SmallChange="1"
+                                            IsEnabled="{Binding EnableAmbientClock}"
+                                            AutomationProperties.Name="Prioridad del Reloj"/>
+                                </StackPanel>
+
+                                <!-- Formato de Hora -->
+                                <Grid Margin="0,12,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="220"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Formato de Hora" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Estilo de visualización para la hora ambiental." Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <ComboBox Grid.Column="1"
+                                              ItemsSource="{Binding ClockTimeFormatOptions}"
+                                              SelectedItem="{Binding SelectedClockTimeFormatOption}"
+                                              DisplayMemberPath="DisplayName"
+                                              Height="32" VerticalContentAlignment="Center"
+                                              Background="#1C1C1E" Foreground="#FFFFFF" BorderBrush="#3B4252"
+                                              IsEnabled="{Binding EnableAmbientClock}"
+                                              AutomationProperties.Name="Formato de hora"/>
+                                </Grid>
+
+                                <!-- Mostrar Segundos -->
+                                <Grid Margin="0,12,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="Mostrar Segundos" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Actualiza cada segundo mientras la isla esté desplegada (mayor consumo temporal)." Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <CheckBox IsChecked="{Binding ClockShowSeconds}" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                              IsEnabled="{Binding EnableAmbientClock}"
+                                              AutomationProperties.Name="Mostrar Segundos"/>
+                                </Grid>
+
+                                <!-- Mostrar Fecha -->
+                                <Grid Margin="0,12,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="Mostrar Fecha" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Muestra el día de la semana y fecha en la vista expandida." Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <CheckBox IsChecked="{Binding ClockShowDate}" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                              IsEnabled="{Binding EnableAmbientClock}"
+                                              AutomationProperties.Name="Mostrar Fecha"/>
+                                </Grid>
+
+                                <!-- Mostrar Número de Semana ISO -->
+                                <Grid Margin="0,12,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="Mostrar Número de Semana (ISO)" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Incluye el indicador de semana del año (ej. 'Sem 40')." Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <CheckBox IsChecked="{Binding ClockShowWeekNumber}" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                              IsEnabled="{Binding EnableAmbientClock}"
+                                              AutomationProperties.Name="Mostrar Número de Semana"/>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>

@@ -22,6 +22,12 @@ public interface IActivitySource
     bool IsActive { get; }
 
     /// <summary>
+    /// Specifies the activation trigger mode for this source.
+    /// Defaults to <see cref="ActivityActivationMode.Event"/>.
+    /// </summary>
+    ActivityActivationMode ActivationMode => ActivityActivationMode.Event;
+
+    /// <summary>
     /// Indicates whether this source represents a transient, short-lived alert or overlay.
     /// </summary>
     bool IsTransient { get; }

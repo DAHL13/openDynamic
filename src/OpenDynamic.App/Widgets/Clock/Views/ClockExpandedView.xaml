@@ -1,0 +1,74 @@
+<UserControl x:Class="OpenDynamic.App.Widgets.Clock.Views.ClockExpandedView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             mc:Ignorable="d" 
+             Width="320"
+             Background="Transparent">
+    <Grid Margin="18,16,18,16"
+          AutomationProperties.Name="{Binding AccessibleDescription}">
+        <Grid.RowDefinitions>
+            <!-- Optional Header / Week Tag -->
+            <RowDefinition Height="Auto" />
+            <!-- Big Time -->
+            <RowDefinition Height="Auto" />
+            <!-- Long Date -->
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Week Number Badge (if enabled) -->
+        <Border Grid.Row="0"
+                HorizontalAlignment="Center"
+                Background="{DynamicResource AppControlBackgroundBrush}"
+                CornerRadius="6"
+                Padding="8,2"
+                Margin="0,0,0,6">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding ShowWeekNumber}" Value="True">
+                            <Setter Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <TextBlock Text="{Binding WeekNumberText}"
+                       FontSize="11"
+                       FontWeight="Medium"
+                       Foreground="{DynamicResource AppAccentBrush}"
+                       VerticalAlignment="Center" />
+        </Border>
+
+        <!-- Big Time Text -->
+        <TextBlock Grid.Row="1"
+                   Text="{Binding TimeText}"
+                   FontSize="34"
+                   FontWeight="SemiBold"
+                   Foreground="{DynamicResource AppTextPrimaryBrush}"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center"
+                   Margin="0,2,0,4"
+                   AutomationProperties.LiveSetting="Polite" />
+
+        <!-- Long Date Text -->
+        <TextBlock Grid.Row="2"
+                   Text="{Binding DateLongText}"
+                   FontSize="13"
+                   Foreground="{DynamicResource AppTextMutedBrush}"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center">
+            <TextBlock.Style>
+                <Style TargetType="TextBlock">
+                    <Setter Property="Visibility" Value="Visible" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding ShowDate}" Value="False">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </TextBlock.Style>
+        </TextBlock>
+    </Grid>
+</UserControl>

@@ -146,6 +146,7 @@ public partial class IslandWindow : Window
 
         _powerService?.RegisterWindowNotifications(_hwnd);
         SystemEvents.PowerModeChanged += OnPowerModeChanged;
+        SystemEvents.TimeChanged += OnSystemEventsTimeChanged;
         SystemParameters.StaticPropertyChanged += OnSystemParametersStaticPropertyChanged;
         UpdateMotionProfileLive();
 
@@ -344,6 +345,12 @@ public partial class IslandWindow : Window
                 _clipboardService?.HandleClipboardUpdate();
                 break;
 
+            // React to system time, timezone, or daylight saving changes
+            case NativeMethods.WM_TIMECHANGE:
+                Log.Information("IslandWindow WndProc received WM_TIMECHANGE: broadcasting SystemTimeChangedMessage...");
+                CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger.Default.Send(new Widgets.Messages.SystemTimeChangedMessage());
+                break;
+
             // React to horizontal mouse wheel or precision touchpad tilt/swipe
             case NativeMethods.WM_MOUSEHWHEEL:
                 if (_settings.EnableMediaGestures && IsPointerOverNotch())
@@ -487,6 +494,12 @@ public partial class IslandWindow : Window
         }
     }
 
+    private void OnSystemEventsTimeChanged(object? sender, EventArgs e)
+    {
+        Log.Information("SystemEvents.TimeChanged received: broadcasting SystemTimeChangedMessage...");
+        CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger.Default.Send(new Widgets.Messages.SystemTimeChangedMessage());
+    }
+
     private void OnForegroundWindowChanged(object? sender, IntPtr foregroundHwnd)
     {
         if (foregroundHwnd == _hwnd || _hwnd == IntPtr.Zero)
@@ -612,6 +625,11 @@ public partial class IslandWindow : Window
         {
             _hoverLeaveTimer.Stop();
 
+            if (_orchestrator.IsFullscreenSuppressed || _orchestrator.IsPowerSuspended)
+            {
+                return;
+            }
+
             var state = _orchestrator.StateMachine.CurrentState;
             if (state is IslandState.Compact or IslandState.Split)
             {
@@ -622,8 +640,17 @@ public partial class IslandWindow : Window
             }
             else if (state == IslandState.Hidden)
             {
-                Log.Information("MouseEnter detected on Hidden sensor notch. Restoring capsule.");
-                _orchestrator.RequestRestore();
+                if (_settings.EnableAmbientClock)
+                {
+                    if (!_hoverEnterTimer.IsEnabled)
+                    {
+                        _hoverEnterTimer.Start();
+                    }
+                }
+                else
+                {
+                    _orchestrator.RequestRestore();
+                }
             }
         }
 
@@ -639,7 +666,7 @@ public partial class IslandWindow : Window
             _hoverEnterTimer.Stop();
 
             var state = _orchestrator.StateMachine.CurrentState;
-            if (state == IslandState.Expanded)
+            if (state == IslandState.Expanded || _orchestrator.IsHovering)
             {
                 _hoverLeaveTimer.Stop();
                 _hoverLeaveTimer.Start();
@@ -648,6 +675,13 @@ public partial class IslandWindow : Window
 
         this.PreviewMouseDown += (s, e) =>
         {
+            if (_orchestrator.IsHovering && !IsPointerOverNotch())
+            {
+                Log.Debug("Click outside notch detected while hovering. Hiding ambient clock.");
+                _hoverLeaveTimer.Stop();
+                _orchestrator.SetHovering(false);
+            }
+
             if (_orchestrator.StateMachine.CurrentState == IslandState.Expanded && !IsPointerOverNotch())
             {
                 Log.Debug("Click outside notch detected within IslandWindow bounds. Collapsing capsule due to click-away.");
@@ -726,6 +760,7 @@ public partial class IslandWindow : Window
             if (e.Delta > 0)
             {
                 // Scroll Up: Collapse / Hide
+                _orchestrator.SetHovering(false);
                 if (_orchestrator.StateMachine.CurrentState == IslandState.Expanded)
                 {
                     Log.Information("MouseWheel Up detected on Expanded capsule. Collapsing.");
@@ -775,10 +810,18 @@ public partial class IslandWindow : Window
                            IslandHostView.SatelliteBubble.IsMouseOver;
         var state = _orchestrator.StateMachine.CurrentState;
 
-        if (isMouseOver && state is IslandState.Compact or IslandState.Split)
+        if (isMouseOver && !_orchestrator.IsFullscreenSuppressed && !_orchestrator.IsPowerSuspended)
         {
-            Log.Debug("Hover enter delay elapsed (250ms). Expanding capsule.");
-            _orchestrator.RequestExpand();
+            if (state == IslandState.Hidden && _settings.EnableAmbientClock)
+            {
+                Log.Debug("Hover enter delay elapsed (250ms) on Hidden sensor notch. Activating ambient clock.");
+                _orchestrator.SetHovering(true);
+            }
+            else if (state is IslandState.Compact or IslandState.Split)
+            {
+                Log.Debug("Hover enter delay elapsed (250ms). Expanding capsule.");
+                _orchestrator.RequestExpand();
+            }
         }
     }
 
@@ -790,10 +833,19 @@ public partial class IslandWindow : Window
                            IslandHostView.SatelliteBubble.IsMouseOver;
         var state = _orchestrator.StateMachine.CurrentState;
 
-        if (!isMouseOver && state == IslandState.Expanded)
+        if (!isMouseOver)
         {
-            Log.Debug("Hover leave delay elapsed (350ms). Collapsing capsule.");
-            _orchestrator.RequestCollapse();
+            if (_orchestrator.IsHovering)
+            {
+                Log.Debug("Hover leave delay elapsed (350ms). Deactivating ambient clock.");
+                _orchestrator.SetHovering(false);
+            }
+
+            if (state == IslandState.Expanded)
+            {
+                Log.Debug("Hover leave delay elapsed (350ms). Collapsing capsule.");
+                _orchestrator.RequestCollapse();
+            }
         }
     }
 
@@ -821,6 +873,7 @@ public partial class IslandWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         SystemEvents.PowerModeChanged -= OnPowerModeChanged;
+        SystemEvents.TimeChanged -= OnSystemEventsTimeChanged;
         SystemParameters.StaticPropertyChanged -= OnSystemParametersStaticPropertyChanged;
 
         _hoverEnterTimer.Stop();

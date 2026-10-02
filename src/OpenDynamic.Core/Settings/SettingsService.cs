@@ -1,4 +1,5 @@
 using System.Text.Json;
+using OpenDynamic.Core.Clock;
 
 namespace OpenDynamic.Core.Settings;
 
@@ -195,6 +196,17 @@ public sealed class SettingsService : ISettingsService
                     {
                         // Migration v10 -> v11: Legacy approval integration settings are cleanly omitted.
                         // System.Text.Json automatically drops unknown properties during deserialization.
+                    }
+
+                    if (loaded.SchemaVersion < 12)
+                    {
+                        // Migration v11 -> v12: Introduce Ambient Clock settings with defaults.
+                        loaded.EnableAmbientClock = true;
+                        loaded.ClockTimeFormat = ClockTimeFormat.Auto;
+                        loaded.ClockShowSeconds = false;
+                        loaded.ClockShowDate = true;
+                        loaded.ClockShowWeekNumber = false;
+                        loaded.DefaultAmbientClockPriority = 5;
                     }
 
                     loaded.IgnoredPrivacyApps ??= new List<string>();

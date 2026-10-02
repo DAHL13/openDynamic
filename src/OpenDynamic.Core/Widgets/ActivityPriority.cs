@@ -7,6 +7,7 @@ namespace OpenDynamic.Core.Widgets;
 public static class ActivityPriority
 {
     public const int Idle = 0;
+    public const int AmbientClock = 5;
     public const int Hardware = 10;
     public const int Low = 10;
     public const int Media = 30;
