@@ -204,7 +204,7 @@ public partial class IslandWindow : Window
         if (RestingSensorNotch != null)
         {
             RestingSensorNotch.Width = _settings.CapsuleWidth;
-            RestingSensorNotch.Height = 6.0;
+            RestingSensorNotch.Height = _settings.CapsuleHeight > 0 ? _settings.CapsuleHeight : 28.0;
         }
 
         if (_hwnd != IntPtr.Zero)
@@ -376,12 +376,12 @@ public partial class IslandWindow : Window
                     double windowWidthDip = this.ActualWidth > 0 ? this.ActualWidth : this.Width;
                     if (windowWidthDip <= 0) windowWidthDip = 640.0;
                     double notchWidthDip = _settings.CapsuleWidth > 0 ? _settings.CapsuleWidth : 200.0;
-                    const double sensorHeightDip = 6.0;
+                    double sensorHeightDip = _settings.CapsuleHeight > 0 ? _settings.CapsuleHeight : 28.0;
 
                     bool hit = Core.Positioning.IslandPositionCalculator.IsPointInRestingSensorZone(
                         clientPoint.X, clientPoint.Y, windowWidthDip, notchWidthDip, sensorHeightDip);
 
-                    if (clientPoint.Y < 20.0)
+                    if (clientPoint.Y < sensorHeightDip + 10.0)
                     {
                         double centerDip = windowWidthDip / 2.0;
                         double minX = centerDip - (notchWidthDip / 2.0);
@@ -742,12 +742,12 @@ public partial class IslandWindow : Window
             if (windowWidthDip <= 0) windowWidthDip = 640.0;
 
             double notchWidthDip = _settings.CapsuleWidth > 0 ? _settings.CapsuleWidth : 200.0;
-            const double sensorHeightDip = 6.0;
+            double sensorHeightDip = _settings.CapsuleHeight > 0 ? _settings.CapsuleHeight : 28.0;
 
             bool hit = Core.Positioning.IslandPositionCalculator.IsPointInRestingSensorZone(
                 clientPoint.X, clientPoint.Y, windowWidthDip, notchWidthDip, sensorHeightDip);
 
-            if (clientPoint.Y < 20.0)
+            if (clientPoint.Y < sensorHeightDip + 10.0)
             {
                 double centerDip = windowWidthDip / 2.0;
                 double minX = centerDip - (notchWidthDip / 2.0);

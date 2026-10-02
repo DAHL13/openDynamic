@@ -63,14 +63,14 @@ public static class IslandPositionCalculator
     /// <param name="mouseYDip">Vertical coordinate in DIP relative to window top.</param>
     /// <param name="windowWidthDip">Total window width in DIP (e.g. 640 DIP).</param>
     /// <param name="capsuleWidthDip">Nominal resting capsule width in DIP (e.g. 200 DIP).</param>
-    /// <param name="sensorHeightDip">Height of the sensor strip in DIP (defaults to 6.0 DIP).</param>
+    /// <param name="sensorHeightDip">Height of the sensor notch in DIP (defaults to 28.0 DIP).</param>
     /// <returns>True if the coordinate is within the sensor bounds; otherwise, false.</returns>
     public static bool IsPointInRestingSensorZone(
         double mouseXDip,
         double mouseYDip,
         double windowWidthDip = 640.0,
         double capsuleWidthDip = 200.0,
-        double sensorHeightDip = 6.0)
+        double sensorHeightDip = 28.0)
     {
         if (windowWidthDip <= 0 || capsuleWidthDip <= 0 || sensorHeightDip <= 0)
         {
