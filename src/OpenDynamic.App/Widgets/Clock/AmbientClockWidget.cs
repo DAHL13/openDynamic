@@ -131,6 +131,44 @@ public sealed class AmbientClockWidget : IslandWidgetBase
         }
     }
 
+    /// <summary>
+    /// Applies updated settings dynamically and refreshes display values, priority, and scheduling.
+    /// </summary>
+    public void UpdateFromSettings()
+    {
+        if (_settings.EnableAmbientClock)
+        {
+            Priority = _settings.DefaultAmbientClockPriority;
+            if (!IsActive)
+            {
+                CurrentActivity = new IslandActivity(
+                    Id: Id,
+                    Title: "Reloj",
+                    Subtitle: "Hora y fecha",
+                    Priority: Priority,
+                    IsTransient: false,
+                    Duration: null);
+                IsActive = true;
+            }
+            else if (CurrentActivity != null && CurrentActivity.Priority != Priority)
+            {
+                CurrentActivity = CurrentActivity with { Priority = Priority };
+            }
+
+            if (IsVisibleOnIsland)
+            {
+                UpdateClockValues();
+                StartOrRescheduleTimer();
+            }
+        }
+        else
+        {
+            IsActive = false;
+            CurrentActivity = null;
+            StopTimer();
+        }
+    }
+
     public override void SetDisplayState(WidgetDisplayMode mode, bool isVisible)
     {
         base.SetDisplayState(mode, isVisible);

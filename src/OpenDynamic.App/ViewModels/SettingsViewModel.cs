@@ -8,6 +8,7 @@ using OpenDynamic.App.Windowing;
 using OpenDynamic.Core.Animation;
 using OpenDynamic.Core.Audio.Spectrum;
 using OpenDynamic.Core.Autostart;
+using OpenDynamic.Core.Clock;
 using OpenDynamic.Core.Settings;
 using OpenDynamic.Core.Stopwatch;
 using OpenDynamic.Core.Timer;
@@ -308,6 +309,47 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string? _selectedIgnoredPrivacyApp;
 
+    // Ambient Clock (Phase 19)
+    [ObservableProperty]
+    private bool _enableAmbientClock;
+
+    [ObservableProperty]
+    private ClockTimeFormat _clockTimeFormat;
+
+    [ObservableProperty]
+    private bool _clockShowSeconds;
+
+    [ObservableProperty]
+    private bool _clockShowDate;
+
+    [ObservableProperty]
+    private bool _clockShowWeekNumber;
+
+    [ObservableProperty]
+    private int _defaultAmbientClockPriority;
+
+    public record ClockTimeFormatOption(ClockTimeFormat Value, string DisplayName);
+
+    public IReadOnlyList<ClockTimeFormatOption> ClockTimeFormatOptions { get; } = new List<ClockTimeFormatOption>
+    {
+        new(ClockTimeFormat.Auto, "Automático (según el sistema)"),
+        new(ClockTimeFormat.TwelveHour, "12 horas (AM/PM)"),
+        new(ClockTimeFormat.TwentyFourHour, "24 horas")
+    };
+
+    public ClockTimeFormatOption SelectedClockTimeFormatOption
+    {
+        get => ClockTimeFormatOptions.FirstOrDefault(o => o.Value == ClockTimeFormat) ?? ClockTimeFormatOptions[0];
+        set
+        {
+            if (value != null && ClockTimeFormat != value.Value)
+            {
+                ClockTimeFormat = value.Value;
+                OnPropertyChanged(nameof(SelectedClockTimeFormatOption));
+            }
+        }
+    }
+
     // Motion and Animations (Phase 10)
     [ObservableProperty]
     private MotionMode _motionMode;
@@ -436,6 +478,13 @@ public partial class SettingsViewModel : ObservableObject
         _defaultPrivacyPriority = _settings.DefaultPrivacyPriority;
         _privacyTransientDurationSeconds = _settings.PrivacyTransientDurationSeconds;
         _ignoredPrivacyApps = new ObservableCollection<string>(_settings.IgnoredPrivacyApps ?? Enumerable.Empty<string>());
+
+        _enableAmbientClock = _settings.EnableAmbientClock;
+        _clockTimeFormat = _settings.ClockTimeFormat;
+        _clockShowSeconds = _settings.ClockShowSeconds;
+        _clockShowDate = _settings.ClockShowDate;
+        _clockShowWeekNumber = _settings.ClockShowWeekNumber;
+        _defaultAmbientClockPriority = _settings.DefaultAmbientClockPriority;
 
         _hideOnFullscreen = _settings.HideOnFullscreen;
         _startWithWindows = _autostartService.IsEnabled();
@@ -941,6 +990,57 @@ public partial class SettingsViewModel : ObservableObject
         }
     }
 
+    partial void OnEnableAmbientClockChanged(bool value)
+    {
+        _settings.EnableAmbientClock = value;
+        _settingsService.SaveDebounced();
+        var clock = _orchestrator.RegisteredWidgets.OfType<Widgets.Clock.AmbientClockWidget>().FirstOrDefault();
+        clock?.UpdateFromSettings();
+        _orchestrator.UpdateOrchestration();
+    }
+
+    partial void OnClockTimeFormatChanged(ClockTimeFormat value)
+    {
+        _settings.ClockTimeFormat = value;
+        _settingsService.SaveDebounced();
+        OnPropertyChanged(nameof(SelectedClockTimeFormatOption));
+        var clock = _orchestrator.RegisteredWidgets.OfType<Widgets.Clock.AmbientClockWidget>().FirstOrDefault();
+        clock?.UpdateFromSettings();
+    }
+
+    partial void OnClockShowSecondsChanged(bool value)
+    {
+        _settings.ClockShowSeconds = value;
+        _settingsService.SaveDebounced();
+        var clock = _orchestrator.RegisteredWidgets.OfType<Widgets.Clock.AmbientClockWidget>().FirstOrDefault();
+        clock?.UpdateFromSettings();
+    }
+
+    partial void OnClockShowDateChanged(bool value)
+    {
+        _settings.ClockShowDate = value;
+        _settingsService.SaveDebounced();
+        var clock = _orchestrator.RegisteredWidgets.OfType<Widgets.Clock.AmbientClockWidget>().FirstOrDefault();
+        clock?.UpdateFromSettings();
+    }
+
+    partial void OnClockShowWeekNumberChanged(bool value)
+    {
+        _settings.ClockShowWeekNumber = value;
+        _settingsService.SaveDebounced();
+        var clock = _orchestrator.RegisteredWidgets.OfType<Widgets.Clock.AmbientClockWidget>().FirstOrDefault();
+        clock?.UpdateFromSettings();
+    }
+
+    partial void OnDefaultAmbientClockPriorityChanged(int value)
+    {
+        _settings.DefaultAmbientClockPriority = value;
+        _settingsService.SaveDebounced();
+        var clock = _orchestrator.RegisteredWidgets.OfType<Widgets.Clock.AmbientClockWidget>().FirstOrDefault();
+        clock?.UpdateFromSettings();
+        _orchestrator.UpdateOrchestration();
+    }
+
     partial void OnHideOnFullscreenChanged(bool value)
     {
         _settings.HideOnFullscreen = value;
@@ -1120,6 +1220,16 @@ public partial class SettingsViewModel : ObservableObject
         }
         _privacyMonitor?.Aggregator.UpdateIgnoredApps(_settings.IgnoredPrivacyApps);
         UpdatePrivacyMonitorLifecycle();
+
+        EnableAmbientClock = _settings.EnableAmbientClock;
+        ClockTimeFormat = _settings.ClockTimeFormat;
+        ClockShowSeconds = _settings.ClockShowSeconds;
+        ClockShowDate = _settings.ClockShowDate;
+        ClockShowWeekNumber = _settings.ClockShowWeekNumber;
+        DefaultAmbientClockPriority = _settings.DefaultAmbientClockPriority;
+        OnPropertyChanged(nameof(SelectedClockTimeFormatOption));
+        var clockWidget = _orchestrator.RegisteredWidgets.OfType<Widgets.Clock.AmbientClockWidget>().FirstOrDefault();
+        clockWidget?.UpdateFromSettings();
 
         HideOnFullscreen = _settings.HideOnFullscreen;
         StartWithWindows = _settings.StartWithWindows;
