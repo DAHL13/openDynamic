@@ -16,6 +16,7 @@ public static class NativeMethods
     public const int WS_EX_NOACTIVATE = 0x08000000;
 
     // Window Messages
+    public const int WM_TIMECHANGE = 0x001E;
     public const int WM_SETTINGCHANGE = 0x001A;
     public const int WM_MOUSEACTIVATE = 0x0021;
     public const int WM_DISPLAYCHANGE = 0x007E;
