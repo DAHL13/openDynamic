@@ -143,6 +143,9 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<Core.Privacy.IPrivacyAccessMonitor>(sp => sp.GetRequiredService<PrivacyAccessMonitor>());
         services.AddSingleton<Widgets.Privacy.PrivacyWidget>();
 
+        // Ambient Clock Widget (Priority 5, OnHover)
+        services.AddSingleton<Widgets.Clock.AmbientClockWidget>();
+
         // Settings Window & ViewModel
         services.AddSingleton<SettingsViewModel>(sp => new SettingsViewModel(
             sp.GetRequiredService<ISettingsService>(),

@@ -1,0 +1,30 @@
+<UserControl x:Class="OpenDynamic.App.Widgets.Clock.Views.ClockCompactView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             mc:Ignorable="d" 
+             Height="36"
+             Background="Transparent">
+    <Grid VerticalAlignment="Center" Margin="12,0,12,0"
+          AutomationProperties.Name="{Binding AccessibleDescription}">
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center">
+            <!-- Clock Icon -->
+            <Path Data="M 12,2 C 6.48,2 2,6.48 2,12 C 2,17.52 6.48,22 12,22 C 17.52,22 22,17.52 22,12 C 22,6.48 17.52,2 12,2 Z M 12,20 C 7.59,20 4,16.41 4,12 C 4,7.59 7.59,4 12,4 C 16.41,4 20,7.59 20,12 C 20,16.41 16.41,20 12,20 Z M 12.5,7 H 11 V 13 L 16.2,16.2 L 17,14.9 L 12.5,12.2 Z"
+                  Fill="{DynamicResource AppTextMutedBrush}"
+                  Width="13"
+                  Height="13"
+                  Stretch="Uniform"
+                  VerticalAlignment="Center"
+                  Margin="0,0,6,0" />
+
+            <!-- Time Text -->
+            <TextBlock Text="{Binding TimeText}"
+                       FontSize="13.5"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource AppTextPrimaryBrush}"
+                       VerticalAlignment="Center"
+                       AutomationProperties.LiveSetting="Polite" />
+        </StackPanel>
+    </Grid>
+</UserControl>

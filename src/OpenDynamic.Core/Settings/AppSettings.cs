@@ -1,12 +1,13 @@
 using System.Text.Json.Serialization;
 using OpenDynamic.Core.Animation;
 using OpenDynamic.Core.Audio.Spectrum;
+using OpenDynamic.Core.Clock;
 
 namespace OpenDynamic.Core.Settings;
 
 /// <summary>
 /// Application settings for openDynamic.
-/// Holds configuration values for window placement, widgets, audio, power, hardware monitoring, timer, hotkeys, and motion.
+/// Holds configuration values for window placement, widgets, audio, power, hardware monitoring, timer, hotkeys, motion, and ambient clock.
 /// </summary>
 public sealed class AppSettings
 {
@@ -20,8 +21,9 @@ public sealed class AppSettings
     /// Version 8 introduces Microphone & Camera indicators, privacy transient alerts, priority (85), and ignored privacy apps.
     /// Version 9 introduces Audio Spectrum Visualizer mode (Disabled, Simulated, Real).
     /// Version 10/11 maintained schema stability across integration retirements (Task R1).
+    /// Version 12 introduces Ambient Clock settings (enabled by default, Auto format, priority 5).
     /// </summary>
-    public const int CurrentSchemaVersion = 11;
+    public const int CurrentSchemaVersion = 12;
 
     /// <summary>
     /// Configuration schema version. Defaults to <see cref="CurrentSchemaVersion"/>.
@@ -455,6 +457,47 @@ public sealed class AppSettings
 
     #endregion
 
+    #region Ambient Clock Settings
+
+    /// <summary>
+    /// Flag to enable or disable the ambient clock widget on hover in idle mode.
+    /// Default is true.
+    /// </summary>
+    public bool EnableAmbientClock { get; set; } = true;
+
+    /// <summary>
+    /// Preferred time format for the clock (Auto, TwelveHour, TwentyFourHour).
+    /// Default is Auto (follows system culture).
+    /// </summary>
+    [JsonConverter(typeof(JsonStringEnumConverter<ClockTimeFormat>))]
+    public ClockTimeFormat ClockTimeFormat { get; set; } = ClockTimeFormat.Auto;
+
+    /// <summary>
+    /// Flag to show or hide seconds in the time display.
+    /// Default is false (aligns to minute boundary for 0% CPU).
+    /// </summary>
+    public bool ClockShowSeconds { get; set; } = false;
+
+    /// <summary>
+    /// Flag to show or hide the date display in expanded mode.
+    /// Default is true.
+    /// </summary>
+    public bool ClockShowDate { get; set; } = true;
+
+    /// <summary>
+    /// Flag to show or hide the ISO week number in expanded mode.
+    /// Default is false.
+    /// </summary>
+    public bool ClockShowWeekNumber { get; set; } = false;
+
+    /// <summary>
+    /// Default priority for the ambient clock widget.
+    /// Default is 5 (ActivityPriority.AmbientClock).
+    /// </summary>
+    public int DefaultAmbientClockPriority { get; set; } = 5;
+
+    #endregion
+
     /// <summary>
     /// Creates a deep copy of the current settings instance.
     /// </summary>
@@ -522,7 +565,13 @@ public sealed class AppSettings
             EnablePrivacyAlerts = this.EnablePrivacyAlerts,
             DefaultPrivacyPriority = this.DefaultPrivacyPriority,
             PrivacyTransientDurationSeconds = this.PrivacyTransientDurationSeconds,
-            IgnoredPrivacyApps = new List<string>(this.IgnoredPrivacyApps)
+            IgnoredPrivacyApps = new List<string>(this.IgnoredPrivacyApps),
+            EnableAmbientClock = this.EnableAmbientClock,
+            ClockTimeFormat = this.ClockTimeFormat,
+            ClockShowSeconds = this.ClockShowSeconds,
+            ClockShowDate = this.ClockShowDate,
+            ClockShowWeekNumber = this.ClockShowWeekNumber,
+            DefaultAmbientClockPriority = this.DefaultAmbientClockPriority
         };
     }
 
@@ -594,5 +643,11 @@ public sealed class AppSettings
         DefaultPrivacyPriority = other.DefaultPrivacyPriority;
         PrivacyTransientDurationSeconds = other.PrivacyTransientDurationSeconds;
         IgnoredPrivacyApps = new List<string>(other.IgnoredPrivacyApps ?? Enumerable.Empty<string>());
+        EnableAmbientClock = other.EnableAmbientClock;
+        ClockTimeFormat = other.ClockTimeFormat;
+        ClockShowSeconds = other.ClockShowSeconds;
+        ClockShowDate = other.ClockShowDate;
+        ClockShowWeekNumber = other.ClockShowWeekNumber;
+        DefaultAmbientClockPriority = other.DefaultAmbientClockPriority;
     }
 }

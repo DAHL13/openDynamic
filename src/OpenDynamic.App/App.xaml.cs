@@ -95,6 +95,10 @@ public partial class App : Application
         var privacyWidget = Services.GetRequiredService<Widgets.Privacy.PrivacyWidget>();
         orchestrator.RegisterWidget(privacyWidget);
 
+        // Register AmbientClockWidget (Priority 5, OnHover)
+        var clockWidget = Services.GetRequiredService<Widgets.Clock.AmbientClockWidget>();
+        orchestrator.RegisterWidget(clockWidget);
+
         // Initialize System Tray Icon Manager (H.NotifyIcon.Wpf) stored in class field to prevent GC collection
         _trayIconManager = Services.GetRequiredService<TrayIconManager>();
         _trayIconManager.Initialize();
