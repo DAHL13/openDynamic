@@ -121,6 +121,7 @@ public partial class IslandWindow : Window
 
                     _hoverEnterTimer.Stop();
                     _hoverLeaveTimer.Stop();
+                    _orchestrator.SetHovering(false);
 
                     CheckAndApplyHiddenVisibility();
                 }
@@ -307,13 +308,10 @@ public partial class IslandWindow : Window
             _orchestrator.StateMachine.TryTransitionTo(IslandState.Hidden);
         }
 
-        // Clean reset of timers and hover state upon settling in Hidden state (Task 2)
+        // Clean reset of timers and hover state upon settling in Hidden state
         _hoverEnterTimer.Stop();
         _hoverLeaveTimer.Stop();
-        if (_orchestrator.IsHovering)
-        {
-            _orchestrator.SetHovering(false);
-        }
+        _orchestrator.SetHovering(false);
 
         if (RestingSensorNotch != null)
         {
@@ -352,85 +350,26 @@ public partial class IslandWindow : Window
                 handled = true;
                 return new IntPtr(NativeMethods.MA_NOACTIVATE);
 
-            // Non-client hit test: when in Hidden state, ensure the resting sensor notch at Y=0 receives hits (HTCLIENT),
-            // while all other transparent space passes through to windows underneath (HTTRANSPARENT).
+            // Non-client hit test: pure geometry evaluation without side effects (Task 2)
             case NativeMethods.WM_NCHITTEST:
             {
-                var state = _orchestrator.StateMachine.CurrentState;
-                if (state == IslandState.Hidden)
+                if (IsPhysicalCursorOverInteractiveZone())
                 {
-                    int screenX = NativeMethods.GetXFromLParam(lParam);
-                    int screenY = NativeMethods.GetYFromLParam(lParam);
-
-                    Point screenPoint = new Point(screenX, screenY);
-                    Point clientPoint;
-                    try
-                    {
-                        clientPoint = this.PointFromScreen(screenPoint);
-                    }
-                    catch (InvalidOperationException)
-                    {
-                        handled = true;
-                        return new IntPtr(NativeMethods.HTTRANSPARENT);
-                    }
-
-                    double windowWidthDip = this.ActualWidth > 0 ? this.ActualWidth : this.Width;
-                    if (windowWidthDip <= 0) windowWidthDip = 640.0;
-                    double notchWidthDip = _settings.CapsuleWidth > 0 ? _settings.CapsuleWidth : 200.0;
-                    double sensorHeightDip = _settings.CapsuleHeight > 0 ? _settings.CapsuleHeight : 28.0;
-
-                    bool hit = Core.Positioning.IslandPositionCalculator.IsPointInRestingSensorZone(
-                        clientPoint.X, clientPoint.Y, windowWidthDip, notchWidthDip, sensorHeightDip);
-
-                    if (clientPoint.Y < sensorHeightDip + 10.0)
-                    {
-                        double centerDip = windowWidthDip / 2.0;
-                        double minX = centerDip - (notchWidthDip / 2.0);
-                        double maxX = centerDip + (notchWidthDip / 2.0);
-                        Log.Debug("WM_NCHITTEST: Screen=({ScreenX},{ScreenY}) -> Client=({ClientX:F1},{ClientY:F1}), Bounds=[{MinX:F1}..{MaxX:F1}, 0..{SensorHeight:F1}], Hit={Hit}",
-                            screenX, screenY, clientPoint.X, clientPoint.Y, minX, maxX, sensorHeightDip, hit);
-                    }
-
-                    if (hit)
-                    {
-                        if (_hoverLeaveTimer.IsEnabled)
-                        {
-                            _hoverLeaveTimer.Stop();
-                        }
-
-                        if (!_hoverEnterTimer.IsEnabled && !_orchestrator.IsHovering && _settings.EnableAmbientClock)
-                        {
-                            _hoverEnterTimer.Start();
-                            Log.Debug("[Hover] Enter Timer Started");
-                        }
-
-                        handled = true;
-                        return new IntPtr(NativeMethods.HTCLIENT); // (IntPtr)1
-                    }
-                    else
-                    {
-                        if (_hoverEnterTimer.IsEnabled)
-                        {
-                            _hoverEnterTimer.Stop();
-                        }
-
-                        handled = true;
-                        return new IntPtr(NativeMethods.HTTRANSPARENT); // (IntPtr)(-1)
-                    }
+                    handled = true;
+                    return new IntPtr(NativeMethods.HTCLIENT); // (IntPtr)1
                 }
-                break;
+                else
+                {
+                    handled = true;
+                    return new IntPtr(NativeMethods.HTTRANSPARENT); // (IntPtr)(-1)
+                }
             }
 
-            // Mouse move: ensure pointer enter logic triggers when moving over the resting sensor in Hidden state
+            // React to cursor movement and hover presence deterministically
             case NativeMethods.WM_MOUSEMOVE:
+            case NativeMethods.WM_SETCURSOR:
             {
-                if (_orchestrator.StateMachine.CurrentState == IslandState.Hidden && _settings.EnableAmbientClock)
-                {
-                    if (NativeMethods.GetCursorPos(out var cursorPos) && IsScreenPointInHiddenSensorZone(cursorPos.X, cursorPos.Y))
-                    {
-                        OnPointerEnter();
-                    }
-                }
+                OnPhysicalCursorPresence();
                 break;
             }
 
@@ -481,7 +420,7 @@ public partial class IslandWindow : Window
 
             // React to horizontal mouse wheel or precision touchpad tilt/swipe
             case NativeMethods.WM_MOUSEHWHEEL:
-                if (_settings.EnableMediaGestures && IsPointerOverNotch())
+                if (_settings.EnableMediaGestures && IsPhysicalCursorOverInteractiveZone())
                 {
                     var mediaWidget = _orchestrator.RegisteredWidgets.OfType<Widgets.Media.MediaWidget>().FirstOrDefault();
                     if (mediaWidget != null && mediaWidget.IsActive)
@@ -781,62 +720,104 @@ public partial class IslandWindow : Window
         }
     }
 
-    private bool IsPointerOverNotch()
+    /// <summary>
+    /// Evaluates whether the physical mouse cursor (queried directly via Win32 GetCursorPos)
+    /// falls within the interactive zone of the island, without relying on WPF IsMouseOver.
+    /// </summary>
+    private bool IsPhysicalCursorOverInteractiveZone()
     {
-        bool inRestingSensor = NativeMethods.GetCursorPos(out var cursorPos) &&
-                               IsScreenPointInHiddenSensorZone(cursorPos.X, cursorPos.Y);
-
-        bool inActiveView = IslandHostView.Visibility == Visibility.Visible &&
-                            (IslandHostView.IsMouseOver ||
-                             IslandHostView.CapsuleBorder.IsMouseOver ||
-                             IslandHostView.SatelliteBubble.IsMouseOver);
-
-        return inRestingSensor || inActiveView;
-    }
-
-    private void OnPointerEnter()
-    {
-        if (_hoverLeaveTimer.IsEnabled)
+        if (!NativeMethods.GetCursorPos(out var cursorPos))
         {
-            _hoverLeaveTimer.Stop();
+            return false;
         }
 
+        try
+        {
+            Point clientPoint = this.PointFromScreen(new Point(cursorPos.X, cursorPos.Y));
+            double windowWidth = this.ActualWidth > 0 ? this.ActualWidth : 640.0;
+            double center = windowWidth / 2.0;
+
+            // When Island is Hidden: the interactive zone is the resting sensor notch at top edge
+            if (_orchestrator.StateMachine.CurrentState == IslandState.Hidden)
+            {
+                double notchWidth = _settings.CapsuleWidth > 0 ? _settings.CapsuleWidth : 200.0;
+                double sensorHeight = _settings.CapsuleHeight > 0 ? _settings.CapsuleHeight : 28.0;
+                return (clientPoint.X >= (center - notchWidth / 2.0) &&
+                        clientPoint.X <= (center + notchWidth / 2.0) &&
+                        clientPoint.Y >= 0.0 && clientPoint.Y <= sensorHeight);
+            }
+            // When Island is active (Compact, Expanded, Split): the interactive zone is the physical capsule
+            else
+            {
+                double capsuleWidth = IslandHostView.CapsuleBorder.ActualWidth > 0 ? IslandHostView.CapsuleBorder.ActualWidth : 200.0;
+                double capsuleHeight = IslandHostView.CapsuleBorder.ActualHeight > 0 ? IslandHostView.CapsuleBorder.ActualHeight : 32.0;
+
+                // Ensure initial spring expansion does not drop below resting notch dimensions
+                double notchWidth = _settings.CapsuleWidth > 0 ? _settings.CapsuleWidth : 200.0;
+                double effectiveWidth = Math.Max(capsuleWidth, notchWidth);
+                double effectiveHeight = Math.Max(capsuleHeight, 28.0);
+
+                if (_orchestrator.StateMachine.CurrentState == IslandState.Split &&
+                    IslandHostView.SatelliteBubble.Visibility == Visibility.Visible &&
+                    IslandHostView.SatelliteBubble.ActualWidth > 0)
+                {
+                    effectiveWidth += IslandHostView.SatelliteBubble.ActualWidth + 10.0;
+                }
+
+                return (clientPoint.X >= (center - effectiveWidth / 2.0) &&
+                        clientPoint.X <= (center + effectiveWidth / 2.0) &&
+                        clientPoint.Y >= 0.0 && clientPoint.Y <= effectiveHeight + 4.0);
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
+    }
+
+    private void OnPhysicalCursorPresence()
+    {
         if (_orchestrator.IsFullscreenSuppressed || _orchestrator.IsPowerSuspended)
         {
             return;
         }
 
-        var state = _orchestrator.StateMachine.CurrentState;
-        if (state is IslandState.Compact or IslandState.Split)
+        if (IsPhysicalCursorOverInteractiveZone())
         {
-            if (_orchestrator.ActivePrimaryWidget is not Widgets.Clock.AmbientClockWidget && !_hoverEnterTimer.IsEnabled && !_orchestrator.IsHovering)
+            if (_hoverLeaveTimer.IsEnabled)
             {
-                _hoverEnterTimer.Start();
+                _hoverLeaveTimer.Stop();
+            }
+
+            if (!_orchestrator.IsHovering && !_hoverEnterTimer.IsEnabled)
+            {
                 Log.Debug("[Hover] Enter Timer Started");
+                _hoverEnterTimer.Start();
             }
         }
-        else if (state == IslandState.Hidden)
+        else
         {
-            if (_settings.EnableAmbientClock)
+            if (_hoverEnterTimer.IsEnabled)
             {
-                if (!_hoverEnterTimer.IsEnabled && !_orchestrator.IsHovering)
-                {
-                    _hoverEnterTimer.Start();
-                    Log.Debug("[Hover] Enter Timer Started");
-                }
+                _hoverEnterTimer.Stop();
             }
-            else
+
+            if ((_orchestrator.IsHovering || _orchestrator.StateMachine.CurrentState == IslandState.Expanded) && !_hoverLeaveTimer.IsEnabled)
             {
-                _orchestrator.RequestRestore();
+                Log.Debug("[Hover] Leave Timer Started");
+                _hoverLeaveTimer.Start();
             }
         }
     }
 
+    private void OnPointerEnter()
+    {
+        OnPhysicalCursorPresence();
+    }
+
     private void OnPointerLeave()
     {
-        // CRITICAL: If cursor is still physically within the notch boundary,
-        // ignore internal boundary transitions across borders/child controls.
-        if (IsPointerOverNotch())
+        if (IsPhysicalCursorOverInteractiveZone())
         {
             return;
         }
@@ -847,13 +828,10 @@ public partial class IslandWindow : Window
         }
 
         var state = _orchestrator.StateMachine.CurrentState;
-        if (state == IslandState.Expanded || _orchestrator.IsHovering)
+        if ((state == IslandState.Expanded || _orchestrator.IsHovering) && !_hoverLeaveTimer.IsEnabled)
         {
-            if (!_hoverLeaveTimer.IsEnabled)
-            {
-                _hoverLeaveTimer.Start();
-                Log.Debug("[Hover] Leave Timer Started");
-            }
+            Log.Debug("[Hover] Leave Timer Started");
+            _hoverLeaveTimer.Start();
         }
     }
 
@@ -864,17 +842,7 @@ public partial class IslandWindow : Window
 
         RestingSensorNotch.MouseEnter += (s, e) => OnPointerEnter();
         RestingSensorNotch.MouseLeave += (s, e) => OnPointerLeave();
-        RestingSensorNotch.PreviewMouseMove += (s, e) =>
-        {
-            if (_hoverLeaveTimer.IsEnabled)
-            {
-                _hoverLeaveTimer.Stop();
-            }
-            if (!_hoverEnterTimer.IsEnabled && !_orchestrator.IsHovering && _orchestrator.StateMachine.CurrentState == IslandState.Hidden)
-            {
-                OnPointerEnter();
-            }
-        };
+        RestingSensorNotch.PreviewMouseMove += (s, e) => OnPhysicalCursorPresence();
         RestingSensorNotch.MouseLeftButtonUp += (s, e) =>
         {
             _hoverEnterTimer.Stop();
@@ -899,14 +867,14 @@ public partial class IslandWindow : Window
 
         this.PreviewMouseDown += (s, e) =>
         {
-            if (_orchestrator.IsHovering && !IsPointerOverNotch())
+            if (_orchestrator.IsHovering && !IsPhysicalCursorOverInteractiveZone())
             {
                 Log.Debug("Click outside notch detected while hovering. Hiding ambient clock.");
                 _hoverLeaveTimer.Stop();
                 _orchestrator.SetHovering(false);
             }
 
-            if (_orchestrator.StateMachine.CurrentState == IslandState.Expanded && !IsPointerOverNotch())
+            if (_orchestrator.StateMachine.CurrentState == IslandState.Expanded && !IsPhysicalCursorOverInteractiveZone())
             {
                 Log.Debug("Click outside notch detected within IslandWindow bounds. Collapsing capsule due to click-away.");
                 _hoverLeaveTimer.Stop();
@@ -916,27 +884,9 @@ public partial class IslandWindow : Window
 
         IslandHostView.MouseEnter += (s, e) => OnPointerEnter();
         IslandHostView.MouseLeave += (s, e) => OnPointerLeave();
-        IslandHostView.PreviewMouseMove += (s, e) =>
-        {
-            if (_hoverLeaveTimer.IsEnabled)
-            {
-                _hoverLeaveTimer.Stop();
-            }
-        };
-        IslandHostView.PreviewMouseWheel += (s, e) =>
-        {
-            if (_hoverLeaveTimer.IsEnabled)
-            {
-                _hoverLeaveTimer.Stop();
-            }
-        };
-        IslandHostView.PreviewMouseDown += (s, e) =>
-        {
-            if (_hoverLeaveTimer.IsEnabled)
-            {
-                _hoverLeaveTimer.Stop();
-            }
-        };
+        IslandHostView.PreviewMouseMove += (s, e) => OnPhysicalCursorPresence();
+        IslandHostView.PreviewMouseWheel += (s, e) => OnPhysicalCursorPresence();
+        IslandHostView.PreviewMouseDown += (s, e) => OnPhysicalCursorPresence();
 
         mainCapsule.MouseEnter += (s, e) => OnPointerEnter();
         mainCapsule.MouseLeave += (s, e) => OnPointerLeave();
@@ -952,13 +902,7 @@ public partial class IslandWindow : Window
             _orchestrator.RequestToggleExpand();
         };
 
-        mainCapsule.PreviewMouseMove += (s, e) =>
-        {
-            if (_hoverLeaveTimer.IsEnabled)
-            {
-                _hoverLeaveTimer.Stop();
-            }
-        };
+        mainCapsule.PreviewMouseMove += (s, e) => OnPhysicalCursorPresence();
 
         mainCapsule.MouseWheel += (s, e) =>
         {
@@ -1029,10 +973,9 @@ public partial class IslandWindow : Window
     private void OnHoverEnterTimerTick(object? sender, EventArgs e)
     {
         _hoverEnterTimer.Stop();
-        bool isMouseOver = IsPointerOverNotch();
         var state = _orchestrator.StateMachine.CurrentState;
 
-        if (isMouseOver && !_orchestrator.IsFullscreenSuppressed && !_orchestrator.IsPowerSuspended)
+        if (IsPhysicalCursorOverInteractiveZone() && !_orchestrator.IsFullscreenSuppressed && !_orchestrator.IsPowerSuspended)
         {
             Log.Debug("[Hover] Enter Timer Fired -> Deploying");
 
@@ -1055,10 +998,9 @@ public partial class IslandWindow : Window
     private void OnHoverLeaveTimerTick(object? sender, EventArgs e)
     {
         _hoverLeaveTimer.Stop();
-        bool isMouseOver = IsPointerOverNotch();
         var state = _orchestrator.StateMachine.CurrentState;
 
-        if (!isMouseOver)
+        if (!IsPhysicalCursorOverInteractiveZone())
         {
             Log.Debug("[Hover] Leave Timer Fired -> Collapsing");
 

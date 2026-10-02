@@ -19,6 +19,7 @@ public static class NativeMethods
     public const int WM_TIMECHANGE = 0x001E;
     public const int WM_SETTINGCHANGE = 0x001A;
     public const int WM_MOUSEACTIVATE = 0x0021;
+    public const int WM_SETCURSOR = 0x0020;
     public const int WM_NCHITTEST = 0x0084;
     public const int WM_MOUSEMOVE = 0x0200;
     public const int WM_DISPLAYCHANGE = 0x007E;

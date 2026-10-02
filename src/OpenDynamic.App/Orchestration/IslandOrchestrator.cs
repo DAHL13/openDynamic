@@ -108,9 +108,31 @@ public sealed class IslandOrchestrator : IDisposable
     /// </summary>
     public void SetHovering(bool isHovering)
     {
-        if (_isHovering == isHovering) return;
+        if (_isHovering == isHovering && !(!isHovering && _activePrimaryWidget?.ActivationMode == ActivityActivationMode.OnHover)) return;
         _isHovering = isHovering;
         Log.Debug("IslandOrchestrator: SetHovering changed to {IsHovering}.", _isHovering);
+
+        if (!_isHovering)
+        {
+            if (_activePrimaryWidget != null && _activePrimaryWidget.ActivationMode == ActivityActivationMode.OnHover)
+            {
+                Log.Debug("IslandOrchestrator: Clearing OnHover primary widget '{WidgetId}'.", _activePrimaryWidget.Id);
+                _activePrimaryWidget = null;
+                _currentPrimaryView = null;
+                _currentPrimaryWidgetId = null;
+                _currentPrimaryMode = null;
+            }
+
+            if (_activeSecondaryWidget != null && _activeSecondaryWidget.ActivationMode == ActivityActivationMode.OnHover)
+            {
+                Log.Debug("IslandOrchestrator: Clearing OnHover secondary widget '{WidgetId}'.", _activeSecondaryWidget.Id);
+                _activeSecondaryWidget = null;
+                _currentSecondaryView = null;
+                _currentSecondaryWidgetId = null;
+                _currentSecondaryMode = null;
+            }
+        }
+
         DispatchToUIThread(UpdateOrchestration);
     }
 
@@ -806,6 +828,15 @@ public sealed class IslandOrchestrator : IDisposable
     {
         _isHovering = false;
         _userExpanded = false;
+
+        if (_activePrimaryWidget != null && _activePrimaryWidget.ActivationMode == ActivityActivationMode.OnHover)
+        {
+            _activePrimaryWidget = null;
+            _currentPrimaryView = null;
+            _currentPrimaryWidgetId = null;
+            _currentPrimaryMode = null;
+        }
+
         TransitionTo(IslandState.Hidden);
 
         lock (_widgets)
