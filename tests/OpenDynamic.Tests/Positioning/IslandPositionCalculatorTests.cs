@@ -242,19 +242,19 @@ public class IslandPositionCalculatorTests
     [Theory]
     [InlineData(320.0, 2.0, true)]    // Exact center, Y=2
     [InlineData(220.0, 0.0, true)]    // Left edge, Y=0
-    [InlineData(420.0, 4.0, true)]    // Right edge, Y=4
+    [InlineData(420.0, 6.0, true)]    // Right edge, Y=6
     [InlineData(218.5, 2.0, true)]    // Just within left tolerance (-2.0)
     [InlineData(421.5, 2.0, true)]    // Just within right tolerance (+2.0)
     [InlineData(320.0, -0.5, true)]   // Sub-pixel top bezel rounding (-1.0)
-    [InlineData(320.0, 4.8, true)]    // Sub-pixel bottom border rounding (+1.0)
+    [InlineData(320.0, 6.8, true)]    // Sub-pixel bottom border rounding (+1.0)
     [InlineData(215.0, 2.0, false)]   // Too far left
     [InlineData(425.0, 2.0, false)]   // Too far right
-    [InlineData(320.0, 6.5, false)]   // Too far down (Y > 5.0)
+    [InlineData(320.0, 8.5, false)]   // Too far down (Y > 7.0)
     [InlineData(320.0, -2.5, false)]  // Too far up (Y < -1.0)
     [InlineData(0.0, 100.0, false)]   // Far away
     public void IsPointInRestingSensorZone_WithDefaultDimensions_EvaluatesCorrectly(double x, double y, bool expected)
     {
-        bool result = IslandPositionCalculator.IsPointInRestingSensorZone(x, y, windowWidthDip: 640.0, capsuleWidthDip: 200.0, sensorHeightDip: 4.0);
+        bool result = IslandPositionCalculator.IsPointInRestingSensorZone(x, y, windowWidthDip: 640.0, capsuleWidthDip: 200.0, sensorHeightDip: 6.0);
         Assert.Equal(expected, result);
     }
 

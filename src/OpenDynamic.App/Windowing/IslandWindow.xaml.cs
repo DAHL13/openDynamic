@@ -186,6 +186,7 @@ public partial class IslandWindow : Window
         if (RestingSensorNotch != null)
         {
             RestingSensorNotch.Width = _settings.CapsuleWidth;
+            RestingSensorNotch.Height = 6.0;
         }
 
         if (_hwnd != IntPtr.Zero)
@@ -322,15 +323,44 @@ public partial class IslandWindow : Window
                     int screenX = NativeMethods.GetXFromLParam(lParam);
                     int screenY = NativeMethods.GetYFromLParam(lParam);
 
-                    if (IsScreenPointInHiddenSensorZone(screenX, screenY))
+                    Point screenPoint = new Point(screenX, screenY);
+                    Point clientPoint;
+                    try
+                    {
+                        clientPoint = this.PointFromScreen(screenPoint);
+                    }
+                    catch (InvalidOperationException)
                     {
                         handled = true;
-                        return new IntPtr(NativeMethods.HTCLIENT);
+                        return new IntPtr(NativeMethods.HTTRANSPARENT);
+                    }
+
+                    double windowWidthDip = this.ActualWidth > 0 ? this.ActualWidth : this.Width;
+                    if (windowWidthDip <= 0) windowWidthDip = 640.0;
+                    double notchWidthDip = _settings.CapsuleWidth > 0 ? _settings.CapsuleWidth : 200.0;
+                    const double sensorHeightDip = 6.0;
+
+                    bool hit = Core.Positioning.IslandPositionCalculator.IsPointInRestingSensorZone(
+                        clientPoint.X, clientPoint.Y, windowWidthDip, notchWidthDip, sensorHeightDip);
+
+                    if (clientPoint.Y < 20.0)
+                    {
+                        double centerDip = windowWidthDip / 2.0;
+                        double minX = centerDip - (notchWidthDip / 2.0);
+                        double maxX = centerDip + (notchWidthDip / 2.0);
+                        Log.Debug("WM_NCHITTEST: Screen=({ScreenX},{ScreenY}) -> Client=({ClientX:F1},{ClientY:F1}), Bounds=[{MinX:F1}..{MaxX:F1}, 0..{SensorHeight:F1}], Hit={Hit}",
+                            screenX, screenY, clientPoint.X, clientPoint.Y, minX, maxX, sensorHeightDip, hit);
+                    }
+
+                    if (hit)
+                    {
+                        handled = true;
+                        return new IntPtr(NativeMethods.HTCLIENT); // (IntPtr)1
                     }
                     else
                     {
                         handled = true;
-                        return new IntPtr(NativeMethods.HTTRANSPARENT);
+                        return new IntPtr(NativeMethods.HTTRANSPARENT); // (IntPtr)(-1)
                     }
                 }
                 break;
@@ -655,60 +685,75 @@ public partial class IslandWindow : Window
     /// <summary>
     /// Evaluates if a physical screen coordinate falls within the resting notch sensor strip
     /// at the top edge of the screen when the island is in Hidden state.
+    /// Converts physical screen coordinates to WPF device-independent pixels (DIPs)
+    /// using <see cref="Visual.PointFromScreen"/> taking display DPI scaling into account.
     /// </summary>
     public bool IsScreenPointInHiddenSensorZone(int screenX, int screenY)
     {
-        var pt = new NativeMethods.POINT { X = screenX, Y = screenY };
-        if (_hwnd != IntPtr.Zero && !NativeMethods.ScreenToClient(_hwnd, ref pt))
+        if (!this.IsLoaded || PresentationSource.FromVisual(this) == null)
         {
             return false;
         }
 
-        double scaleX = 1.0;
-        double scaleY = 1.0;
         try
         {
-            var dpi = VisualTreeHelper.GetDpi(this);
-            if (dpi.DpiScaleX > 0) scaleX = dpi.DpiScaleX;
-            if (dpi.DpiScaleY > 0) scaleY = dpi.DpiScaleY;
+            Point screenPoint = new Point(screenX, screenY);
+            Point clientPoint = this.PointFromScreen(screenPoint);
+
+            double windowWidthDip = this.ActualWidth > 0 ? this.ActualWidth : this.Width;
+            if (windowWidthDip <= 0) windowWidthDip = 640.0;
+
+            double notchWidthDip = _settings.CapsuleWidth > 0 ? _settings.CapsuleWidth : 200.0;
+            const double sensorHeightDip = 6.0;
+
+            bool hit = Core.Positioning.IslandPositionCalculator.IsPointInRestingSensorZone(
+                clientPoint.X, clientPoint.Y, windowWidthDip, notchWidthDip, sensorHeightDip);
+
+            if (clientPoint.Y < 20.0)
+            {
+                double centerDip = windowWidthDip / 2.0;
+                double minX = centerDip - (notchWidthDip / 2.0);
+                double maxX = centerDip + (notchWidthDip / 2.0);
+                Log.Debug("IsScreenPointInHiddenSensorZone: Screen=({ScreenX},{ScreenY}) -> Client=({ClientX:F1},{ClientY:F1}), Bounds=[{MinX:F1}..{MaxX:F1}, 0..{SensorHeight:F1}], Hit={Hit}",
+                    screenX, screenY, clientPoint.X, clientPoint.Y, minX, maxX, sensorHeightDip, hit);
+            }
+
+            return hit;
         }
-        catch
+        catch (InvalidOperationException)
         {
-            // Fallback to 1.0 if VisualTreeHelper is unavailable
+            return false;
         }
-
-        double mouseXDip = pt.X / scaleX;
-        double mouseYDip = pt.Y / scaleY;
-
-        double windowWidthDip = this.ActualWidth > 0 ? this.ActualWidth : this.Width;
-        if (windowWidthDip <= 0) windowWidthDip = 640.0;
-
-        double notchWidthDip = _settings.CapsuleWidth > 0 ? _settings.CapsuleWidth : 200.0;
-
-        return Core.Positioning.IslandPositionCalculator.IsPointInRestingSensorZone(
-            mouseXDip, mouseYDip, windowWidthDip, notchWidthDip, sensorHeightDip: 4.0);
     }
 
     private bool IsPointerOverNotch()
     {
+        if (_orchestrator.StateMachine.CurrentState == IslandState.Hidden)
+        {
+            if (RestingSensorNotch != null && RestingSensorNotch.IsMouseOver)
+            {
+                return true;
+            }
+
+            if (NativeMethods.GetCursorPos(out var cursorPos))
+            {
+                return IsScreenPointInHiddenSensorZone(cursorPos.X, cursorPos.Y);
+            }
+
+            return false;
+        }
+
         if (RestingSensorNotch != null && RestingSensorNotch.IsMouseOver)
         {
             return true;
         }
 
-        if (IslandHostView.IsMouseOver ||
-            IslandHostView.CapsuleBorder.IsMouseOver ||
-            IslandHostView.SatelliteBubble.IsMouseOver)
+        if (IslandHostView.Visibility == Visibility.Visible &&
+            (IslandHostView.IsMouseOver ||
+             IslandHostView.CapsuleBorder.IsMouseOver ||
+             IslandHostView.SatelliteBubble.IsMouseOver))
         {
             return true;
-        }
-
-        if (_orchestrator.StateMachine.CurrentState == IslandState.Hidden)
-        {
-            if (NativeMethods.GetCursorPos(out var cursorPos))
-            {
-                return IsScreenPointInHiddenSensorZone(cursorPos.X, cursorPos.Y);
-            }
         }
 
         return false;
