@@ -581,7 +581,13 @@ public sealed class SettingsServiceTests : IDisposable
             EnablePrivacyAlerts = false,
             DefaultPrivacyPriority = 85,
             PrivacyTransientDurationSeconds = 4.0,
-            IgnoredPrivacyApps = new List<string> { "TestApp" }
+            IgnoredPrivacyApps = new List<string> { "TestApp" },
+            EnableAmbientClock = false,
+            ClockTimeFormat = OpenDynamic.Core.Clock.ClockTimeFormat.TwentyFourHour,
+            ClockShowSeconds = true,
+            ClockShowDate = false,
+            ClockShowWeekNumber = true,
+            DefaultAmbientClockPriority = 8
         };
 
         var cloned = original.Clone();
@@ -625,6 +631,12 @@ public sealed class SettingsServiceTests : IDisposable
         Assert.Equal(original.PrivacyTransientDurationSeconds, cloned.PrivacyTransientDurationSeconds);
         Assert.Single(cloned.IgnoredPrivacyApps);
         Assert.Equal("TestApp", cloned.IgnoredPrivacyApps[0]);
+        Assert.Equal(original.EnableAmbientClock, cloned.EnableAmbientClock);
+        Assert.Equal(original.ClockTimeFormat, cloned.ClockTimeFormat);
+        Assert.Equal(original.ClockShowSeconds, cloned.ClockShowSeconds);
+        Assert.Equal(original.ClockShowDate, cloned.ClockShowDate);
+        Assert.Equal(original.ClockShowWeekNumber, cloned.ClockShowWeekNumber);
+        Assert.Equal(original.DefaultAmbientClockPriority, cloned.DefaultAmbientClockPriority);
 
         var destination = new AppSettings();
         destination.CopyFrom(original);
@@ -642,6 +654,12 @@ public sealed class SettingsServiceTests : IDisposable
         Assert.Equal(original.DefaultPrivacyPriority, destination.DefaultPrivacyPriority);
         Assert.Single(destination.IgnoredPrivacyApps);
         Assert.Equal("TestApp", destination.IgnoredPrivacyApps[0]);
+        Assert.Equal(original.EnableAmbientClock, destination.EnableAmbientClock);
+        Assert.Equal(original.ClockTimeFormat, destination.ClockTimeFormat);
+        Assert.Equal(original.ClockShowSeconds, destination.ClockShowSeconds);
+        Assert.Equal(original.ClockShowDate, destination.ClockShowDate);
+        Assert.Equal(original.ClockShowWeekNumber, destination.ClockShowWeekNumber);
+        Assert.Equal(original.DefaultAmbientClockPriority, destination.DefaultAmbientClockPriority);
     }
 
     [Fact]
@@ -707,5 +725,48 @@ public sealed class SettingsServiceTests : IDisposable
         Assert.False(File.Exists(rulesPath));
         Assert.False(File.Exists(rulesBakPath));
         Assert.NotNull(warningMessage);
+    }
+
+    [Fact]
+    public void Load_WhenSchemaVersionIs11_MigratesToSchemaVersion12WithAmbientClockDefaults()
+    {
+        string filePath = Path.Combine(_testDirectory, "settings.json");
+        const string v11Json = """
+        {
+          "SchemaVersion": 11,
+          "CapsuleWidth": 210.0,
+          "CapsuleHeight": 40.0,
+          "EnableMicrophoneIndicator": true,
+          "EnableCameraIndicator": true
+        }
+        """;
+
+        File.WriteAllText(filePath, v11Json);
+
+        string? loggedNotice = null;
+        using var service = new SettingsService(
+            filePath,
+            warningLogger: (msg, _) => loggedNotice = msg,
+            debounceMilliseconds: 100);
+
+        service.Load();
+
+        Assert.NotNull(service.CurrentSettings);
+        Assert.Equal(12, service.CurrentSettings.SchemaVersion);
+        Assert.Equal(210.0, service.CurrentSettings.CapsuleWidth);
+        Assert.Equal(40.0, service.CurrentSettings.CapsuleHeight);
+        Assert.True(service.CurrentSettings.EnableMicrophoneIndicator);
+        Assert.True(service.CurrentSettings.EnableCameraIndicator);
+
+        // Ambient clock defaults for schema v12
+        Assert.True(service.CurrentSettings.EnableAmbientClock);
+        Assert.Equal(OpenDynamic.Core.Clock.ClockTimeFormat.Auto, service.CurrentSettings.ClockTimeFormat);
+        Assert.False(service.CurrentSettings.ClockShowSeconds);
+        Assert.True(service.CurrentSettings.ClockShowDate);
+        Assert.False(service.CurrentSettings.ClockShowWeekNumber);
+        Assert.Equal(5, service.CurrentSettings.DefaultAmbientClockPriority);
+
+        Assert.NotNull(loggedNotice);
+        Assert.Contains("v11 to v12", loggedNotice);
     }
 }
