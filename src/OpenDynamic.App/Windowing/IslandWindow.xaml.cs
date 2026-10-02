@@ -103,10 +103,11 @@ public partial class IslandWindow : Window
                         this.Visibility = Visibility.Visible;
                     }
 
-                    // Disable resting sensor hit-testing while active view is presenting
+                    // Keep resting sensor hit-testable to eliminate transition dead zones
                     if (RestingSensorNotch != null)
                     {
-                        RestingSensorNotch.IsHitTestVisible = false;
+                        RestingSensorNotch.Visibility = Visibility.Visible;
+                        RestingSensorNotch.IsHitTestVisible = true;
                     }
                 }
                 else
@@ -392,11 +393,27 @@ public partial class IslandWindow : Window
 
                     if (hit)
                     {
+                        if (_hoverLeaveTimer.IsEnabled)
+                        {
+                            _hoverLeaveTimer.Stop();
+                        }
+
+                        if (!_hoverEnterTimer.IsEnabled && !_orchestrator.IsHovering && _settings.EnableAmbientClock)
+                        {
+                            _hoverEnterTimer.Start();
+                            Log.Debug("[Hover] Enter Timer Started");
+                        }
+
                         handled = true;
                         return new IntPtr(NativeMethods.HTCLIENT); // (IntPtr)1
                     }
                     else
                     {
+                        if (_hoverEnterTimer.IsEnabled)
+                        {
+                            _hoverEnterTimer.Stop();
+                        }
+
                         handled = true;
                         return new IntPtr(NativeMethods.HTTRANSPARENT); // (IntPtr)(-1)
                     }
@@ -766,30 +783,23 @@ public partial class IslandWindow : Window
 
     private bool IsPointerOverNotch()
     {
-        if (_orchestrator.StateMachine.CurrentState == IslandState.Hidden)
-        {
-            if (NativeMethods.GetCursorPos(out var cursorPos))
-            {
-                return IsScreenPointInHiddenSensorZone(cursorPos.X, cursorPos.Y);
-            }
+        bool inRestingSensor = NativeMethods.GetCursorPos(out var cursorPos) &&
+                               IsScreenPointInHiddenSensorZone(cursorPos.X, cursorPos.Y);
 
-            return false;
-        }
+        bool inActiveView = IslandHostView.Visibility == Visibility.Visible &&
+                            (IslandHostView.IsMouseOver ||
+                             IslandHostView.CapsuleBorder.IsMouseOver ||
+                             IslandHostView.SatelliteBubble.IsMouseOver);
 
-        if (IslandHostView.Visibility == Visibility.Visible &&
-            (IslandHostView.IsMouseOver ||
-             IslandHostView.CapsuleBorder.IsMouseOver ||
-             IslandHostView.SatelliteBubble.IsMouseOver))
-        {
-            return true;
-        }
-
-        return false;
+        return inRestingSensor || inActiveView;
     }
 
     private void OnPointerEnter()
     {
-        _hoverLeaveTimer.Stop();
+        if (_hoverLeaveTimer.IsEnabled)
+        {
+            _hoverLeaveTimer.Stop();
+        }
 
         if (_orchestrator.IsFullscreenSuppressed || _orchestrator.IsPowerSuspended)
         {
@@ -799,18 +809,20 @@ public partial class IslandWindow : Window
         var state = _orchestrator.StateMachine.CurrentState;
         if (state is IslandState.Compact or IslandState.Split)
         {
-            if (_orchestrator.ActivePrimaryWidget is not Widgets.Clock.AmbientClockWidget && !_hoverEnterTimer.IsEnabled)
+            if (_orchestrator.ActivePrimaryWidget is not Widgets.Clock.AmbientClockWidget && !_hoverEnterTimer.IsEnabled && !_orchestrator.IsHovering)
             {
                 _hoverEnterTimer.Start();
+                Log.Debug("[Hover] Enter Timer Started");
             }
         }
         else if (state == IslandState.Hidden)
         {
             if (_settings.EnableAmbientClock)
             {
-                if (!_hoverEnterTimer.IsEnabled)
+                if (!_hoverEnterTimer.IsEnabled && !_orchestrator.IsHovering)
                 {
                     _hoverEnterTimer.Start();
+                    Log.Debug("[Hover] Enter Timer Started");
                 }
             }
             else
@@ -829,13 +841,19 @@ public partial class IslandWindow : Window
             return;
         }
 
-        _hoverEnterTimer.Stop();
+        if (_hoverEnterTimer.IsEnabled)
+        {
+            _hoverEnterTimer.Stop();
+        }
 
         var state = _orchestrator.StateMachine.CurrentState;
         if (state == IslandState.Expanded || _orchestrator.IsHovering)
         {
-            _hoverLeaveTimer.Stop();
-            _hoverLeaveTimer.Start();
+            if (!_hoverLeaveTimer.IsEnabled)
+            {
+                _hoverLeaveTimer.Start();
+                Log.Debug("[Hover] Leave Timer Started");
+            }
         }
     }
 
@@ -852,19 +870,30 @@ public partial class IslandWindow : Window
             {
                 _hoverLeaveTimer.Stop();
             }
+            if (!_hoverEnterTimer.IsEnabled && !_orchestrator.IsHovering && _orchestrator.StateMachine.CurrentState == IslandState.Hidden)
+            {
+                OnPointerEnter();
+            }
         };
         RestingSensorNotch.MouseLeftButtonUp += (s, e) =>
         {
             _hoverEnterTimer.Stop();
             _hoverLeaveTimer.Stop();
 
-            if (_settings.EnableAmbientClock)
+            if (_orchestrator.StateMachine.CurrentState == IslandState.Hidden)
             {
-                _orchestrator.SetHovering(true);
+                if (_settings.EnableAmbientClock)
+                {
+                    _orchestrator.SetHovering(true);
+                }
+                else
+                {
+                    _orchestrator.RequestRestore();
+                }
             }
-            else
+            else if (_orchestrator.StateMachine.CurrentState is IslandState.Compact or IslandState.Split)
             {
-                _orchestrator.RequestRestore();
+                _orchestrator.RequestToggleExpand();
             }
         };
 
@@ -1005,6 +1034,8 @@ public partial class IslandWindow : Window
 
         if (isMouseOver && !_orchestrator.IsFullscreenSuppressed && !_orchestrator.IsPowerSuspended)
         {
+            Log.Debug("[Hover] Enter Timer Fired -> Deploying");
+
             if (state == IslandState.Hidden && _settings.EnableAmbientClock)
             {
                 Log.Debug("Hover enter delay elapsed (250ms) on Hidden sensor notch. Activating ambient clock.");
@@ -1029,6 +1060,8 @@ public partial class IslandWindow : Window
 
         if (!isMouseOver)
         {
+            Log.Debug("[Hover] Leave Timer Fired -> Collapsing");
+
             if (_orchestrator.IsHovering)
             {
                 Log.Debug("Hover leave delay elapsed (350ms). Deactivating ambient clock.");
