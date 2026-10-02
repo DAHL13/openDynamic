@@ -278,5 +278,21 @@ public class IslandPositionCalculatorTests
         Assert.False(IslandPositionCalculator.IsPointInRestingSensorZone(320.0, 2.0, capsuleWidthDip: 0));
         Assert.False(IslandPositionCalculator.IsPointInRestingSensorZone(320.0, 2.0, sensorHeightDip: 0));
     }
+
+    [Theory]
+    [InlineData(320.0, 0.0, true)]      // Top bezel
+    [InlineData(320.0, 36.0, true)]     // Nominal capsule height
+    [InlineData(320.0, 44.0, true)]     // Bottom edge of expanded sensor
+    [InlineData(200.0, 20.0, true)]     // Left edge of 240-wide notch (320 - 120 = 200)
+    [InlineData(440.0, 20.0, true)]     // Right edge of 240-wide notch (320 + 120 = 440)
+    [InlineData(195.0, 20.0, false)]    // Outside left
+    [InlineData(445.0, 20.0, false)]    // Outside right
+    [InlineData(320.0, 48.0, false)]    // Below bottom edge
+    public void IsPointInRestingSensorZone_WithExpandedDimensions_EvaluatesCorrectly(double x, double y, bool expected)
+    {
+        bool result = IslandPositionCalculator.IsPointInRestingSensorZone(x, y, windowWidthDip: 640.0, capsuleWidthDip: 240.0, sensorHeightDip: 44.0);
+        Assert.Equal(expected, result);
+    }
 }
+
 

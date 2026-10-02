@@ -72,7 +72,7 @@ public partial class IslandWindow : Window
 
         _hoverEnterTimer = new DispatcherTimer
         {
-            Interval = TimeSpan.FromMilliseconds(250)
+            Interval = TimeSpan.FromMilliseconds(200)
         };
         _hoverEnterTimer.Tick += OnHoverEnterTimerTick;
 
@@ -119,9 +119,21 @@ public partial class IslandWindow : Window
                         RestingSensorNotch.IsHitTestVisible = true;
                     }
 
-                    _hoverEnterTimer.Stop();
-                    _hoverLeaveTimer.Stop();
-                    _orchestrator.SetHovering(false);
+                    if (!IsPhysicalCursorOverInteractiveZone())
+                    {
+                        _hoverEnterTimer.Stop();
+                        _hoverLeaveTimer.Stop();
+                        _orchestrator.SetHovering(false);
+                    }
+                    else
+                    {
+                        _hoverLeaveTimer.Stop();
+                        if (!_hoverEnterTimer.IsEnabled && !_orchestrator.IsHovering)
+                        {
+                            Log.Debug("[Hover] Enter Timer Started (Retained on State Change)");
+                            _hoverEnterTimer.Start();
+                        }
+                    }
 
                     CheckAndApplyHiddenVisibility();
                 }
@@ -205,8 +217,8 @@ public partial class IslandWindow : Window
 
         if (RestingSensorNotch != null)
         {
-            RestingSensorNotch.Width = _settings.CapsuleWidth;
-            RestingSensorNotch.Height = _settings.CapsuleHeight > 0 ? _settings.CapsuleHeight : 28.0;
+            RestingSensorNotch.Width = Math.Max(_settings.CapsuleWidth > 0 ? _settings.CapsuleWidth : 200.0, 240.0);
+            RestingSensorNotch.Height = Math.Max(_settings.CapsuleHeight > 0 ? _settings.CapsuleHeight : 28.0, 44.0);
         }
 
         if (_hwnd != IntPtr.Zero)
@@ -308,10 +320,22 @@ public partial class IslandWindow : Window
             _orchestrator.StateMachine.TryTransitionTo(IslandState.Hidden);
         }
 
-        // Clean reset of timers and hover state upon settling in Hidden state
-        _hoverEnterTimer.Stop();
-        _hoverLeaveTimer.Stop();
-        _orchestrator.SetHovering(false);
+        // Clean reset of timers and hover state upon settling in Hidden state ONLY if cursor is outside interactive zone
+        if (!IsPhysicalCursorOverInteractiveZone())
+        {
+            _hoverEnterTimer.Stop();
+            _hoverLeaveTimer.Stop();
+            _orchestrator.SetHovering(false);
+        }
+        else
+        {
+            _hoverLeaveTimer.Stop();
+            if (!_hoverEnterTimer.IsEnabled && !_orchestrator.IsHovering)
+            {
+                Log.Debug("[Hover] Enter Timer Started (Retained on Settle)");
+                _hoverEnterTimer.Start();
+            }
+        }
 
         if (RestingSensorNotch != null)
         {
@@ -697,18 +721,19 @@ public partial class IslandWindow : Window
             double windowWidthDip = this.ActualWidth > 0 ? this.ActualWidth : this.Width;
             if (windowWidthDip <= 0) windowWidthDip = 640.0;
 
-            double notchWidthDip = _settings.CapsuleWidth > 0 ? _settings.CapsuleWidth : 200.0;
-            double sensorHeightDip = _settings.CapsuleHeight > 0 ? _settings.CapsuleHeight : 28.0;
+            double notchWidthDip = Math.Max(_settings.CapsuleWidth > 0 ? _settings.CapsuleWidth : 200.0, 240.0);
+            double sensorHeightDip = Math.Max(_settings.CapsuleHeight > 0 ? _settings.CapsuleHeight : 28.0, 44.0);
 
-            bool hit = Core.Positioning.IslandPositionCalculator.IsPointInRestingSensorZone(
-                clientPoint.X, clientPoint.Y, windowWidthDip, notchWidthDip, sensorHeightDip);
+            bool hit = (clientPoint.X >= ((windowWidthDip / 2.0) - (notchWidthDip / 2.0) - 2.0) &&
+                        clientPoint.X <= ((windowWidthDip / 2.0) + (notchWidthDip / 2.0) + 2.0) &&
+                        clientPoint.Y >= -5.0 && clientPoint.Y <= (sensorHeightDip + 2.0));
 
             if (clientPoint.Y < sensorHeightDip + 10.0)
             {
                 double centerDip = windowWidthDip / 2.0;
                 double minX = centerDip - (notchWidthDip / 2.0);
                 double maxX = centerDip + (notchWidthDip / 2.0);
-                Log.Debug("IsScreenPointInHiddenSensorZone: Screen=({ScreenX},{ScreenY}) -> Client=({ClientX:F1},{ClientY:F1}), Bounds=[{MinX:F1}..{MaxX:F1}, 0..{SensorHeight:F1}], Hit={Hit}",
+                Log.Debug("IsScreenPointInHiddenSensorZone: Screen=({ScreenX},{ScreenY}) -> Client=({ClientX:F1},{ClientY:F1}), Bounds=[{MinX:F1}..{MaxX:F1}, -5.0..{SensorHeight:F1}], Hit={Hit}",
                     screenX, screenY, clientPoint.X, clientPoint.Y, minX, maxX, sensorHeightDip, hit);
             }
 
@@ -740,11 +765,11 @@ public partial class IslandWindow : Window
             // When Island is Hidden: the interactive zone is the resting sensor notch at top edge
             if (_orchestrator.StateMachine.CurrentState == IslandState.Hidden)
             {
-                double notchWidth = _settings.CapsuleWidth > 0 ? _settings.CapsuleWidth : 200.0;
-                double sensorHeight = _settings.CapsuleHeight > 0 ? _settings.CapsuleHeight : 28.0;
+                double notchWidth = Math.Max(_settings.CapsuleWidth > 0 ? _settings.CapsuleWidth : 200.0, 240.0);
+                double sensorHeight = Math.Max(_settings.CapsuleHeight > 0 ? _settings.CapsuleHeight : 28.0, 44.0);
                 return (clientPoint.X >= (center - notchWidth / 2.0) &&
                         clientPoint.X <= (center + notchWidth / 2.0) &&
-                        clientPoint.Y >= 0.0 && clientPoint.Y <= sensorHeight);
+                        clientPoint.Y >= -5.0 && clientPoint.Y <= sensorHeight);
             }
             // When Island is active (Compact, Expanded, Split): the interactive zone is the physical capsule
             else
@@ -753,9 +778,9 @@ public partial class IslandWindow : Window
                 double capsuleHeight = IslandHostView.CapsuleBorder.ActualHeight > 0 ? IslandHostView.CapsuleBorder.ActualHeight : 32.0;
 
                 // Ensure initial spring expansion does not drop below resting notch dimensions
-                double notchWidth = _settings.CapsuleWidth > 0 ? _settings.CapsuleWidth : 200.0;
+                double notchWidth = Math.Max(_settings.CapsuleWidth > 0 ? _settings.CapsuleWidth : 200.0, 240.0);
                 double effectiveWidth = Math.Max(capsuleWidth, notchWidth);
-                double effectiveHeight = Math.Max(capsuleHeight, 28.0);
+                double effectiveHeight = Math.Max(capsuleHeight, 44.0);
 
                 if (_orchestrator.StateMachine.CurrentState == IslandState.Split &&
                     IslandHostView.SatelliteBubble.Visibility == Visibility.Visible &&
@@ -766,7 +791,7 @@ public partial class IslandWindow : Window
 
                 return (clientPoint.X >= (center - effectiveWidth / 2.0) &&
                         clientPoint.X <= (center + effectiveWidth / 2.0) &&
-                        clientPoint.Y >= 0.0 && clientPoint.Y <= effectiveHeight + 4.0);
+                        clientPoint.Y >= -5.0 && clientPoint.Y <= effectiveHeight + 4.0);
             }
         }
         catch (InvalidOperationException)
@@ -979,16 +1004,16 @@ public partial class IslandWindow : Window
         {
             Log.Debug("[Hover] Enter Timer Fired -> Deploying");
 
-            if (state == IslandState.Hidden && _settings.EnableAmbientClock)
+            if ((state == IslandState.Hidden || _orchestrator.ActivePrimaryWidget == null) && _settings.EnableAmbientClock)
             {
-                Log.Debug("Hover enter delay elapsed (250ms) on Hidden sensor notch. Activating ambient clock.");
+                Log.Debug("Hover enter delay elapsed on sensor notch. Activating ambient clock.");
                 _orchestrator.SetHovering(true);
             }
             else if (state is IslandState.Compact or IslandState.Split)
             {
                 if (_orchestrator.ActivePrimaryWidget is not Widgets.Clock.AmbientClockWidget)
                 {
-                    Log.Debug("Hover enter delay elapsed (250ms). Expanding capsule.");
+                    Log.Debug("Hover enter delay elapsed. Expanding capsule.");
                     _orchestrator.RequestExpand();
                 }
             }
@@ -1014,6 +1039,15 @@ public partial class IslandWindow : Window
             {
                 Log.Debug("Hover leave delay elapsed (350ms). Collapsing capsule.");
                 _orchestrator.RequestCollapse();
+            }
+        }
+        else
+        {
+            // Cursor re-entered the interactive zone before leave timer expired: preserve or re-trigger hover
+            if (!_orchestrator.IsHovering && !_hoverEnterTimer.IsEnabled)
+            {
+                Log.Debug("[Hover] Enter Timer Started (Re-entered during leave grace period)");
+                _hoverEnterTimer.Start();
             }
         }
     }

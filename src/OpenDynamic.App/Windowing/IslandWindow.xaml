@@ -18,8 +18,8 @@
         <Border x:Name="RestingSensorNotch"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Top"
-                Width="200"
-                Height="28"
+                Width="240"
+                Height="44"
                 Background="Transparent"
                 Focusable="False"
                 IsHitTestVisible="True" />
