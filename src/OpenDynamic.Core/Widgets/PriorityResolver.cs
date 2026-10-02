@@ -14,8 +14,12 @@ public sealed class PriorityResolver
     /// </summary>
     /// <param name="sources">The available activity sources to evaluate.</param>
     /// <param name="currentTime">Optional timestamp for deterministic evaluation; defaults to <see cref="DateTimeOffset.UtcNow"/>.</param>
+    /// <param name="isHovering">Indicates whether the user's cursor is currently hovering over the island notch.</param>
     /// <returns>A <see cref="PriorityResult"/> describing the active primary/secondary sources and recommended state.</returns>
-    public PriorityResult Resolve(IEnumerable<IActivitySource>? sources, DateTimeOffset? currentTime = null)
+    public PriorityResult Resolve(
+        IEnumerable<IActivitySource>? sources,
+        DateTimeOffset? currentTime = null,
+        bool isHovering = false)
     {
         if (sources == null)
         {
@@ -23,7 +27,8 @@ public sealed class PriorityResolver
         }
 
         var now = currentTime ?? DateTimeOffset.UtcNow;
-        var validCandidates = new List<IActivitySource>();
+        var eventCandidates = new List<IActivitySource>();
+        var onHoverCandidates = new List<IActivitySource>();
         DateTimeOffset? nextExpirationUtc = null;
 
         foreach (var source in sources)
@@ -53,19 +58,57 @@ public sealed class PriorityResolver
                 }
             }
 
-            validCandidates.Add(source);
+            if (source.ActivationMode == ActivityActivationMode.OnHover)
+            {
+                onHoverCandidates.Add(source);
+            }
+            else
+            {
+                eventCandidates.Add(source);
+            }
         }
 
-        if (validCandidates.Count == 0)
+        // Rule: Event-driven activities always preempt OnHover ambient widgets.
+        // If any event activity is active, it wins unconditionally and ambient widgets are suppressed.
+        if (eventCandidates.Count > 0)
         {
-            return new PriorityResult(null, null, IslandState.Hidden);
+            SortCandidates(eventCandidates);
+
+            var primary = eventCandidates[0];
+
+            // Transient activities preempt as exclusive spotlight (no split allowed while transient alert is active)
+            if (primary.IsTransient)
+            {
+                return new PriorityResult(primary, null, IslandState.Compact, nextExpirationUtc);
+            }
+
+            // When multiple persistent activities are active, show top 2 in Split mode
+            if (eventCandidates.Count > 1)
+            {
+                var secondary = eventCandidates[1];
+                return new PriorityResult(primary, secondary, IslandState.Split, nextExpirationUtc);
+            }
+
+            // Single persistent activity
+            return new PriorityResult(primary, null, IslandState.Compact, nextExpirationUtc);
         }
 
-        // Sort candidates:
-        // 1. Priority descending (higher number wins)
-        // 2. LastActivatedUtc descending (more recently activated wins)
-        // 3. Deterministic tie-breaker: Id ascending
-        validCandidates.Sort((a, b) =>
+        // No event activities are active (island is at rest / idle).
+        // OnHover widgets only appear when hovering is actively reported, and NEVER keep the island visible persistently.
+        if (onHoverCandidates.Count > 0 && isHovering)
+        {
+            SortCandidates(onHoverCandidates);
+            var primary = onHoverCandidates[0];
+            // OnHover ambient widgets never enter Split mode with other widgets
+            return new PriorityResult(primary, null, IslandState.Compact, nextExpirationUtc);
+        }
+
+        return new PriorityResult(null, null, IslandState.Hidden);
+    }
+
+    private static void SortCandidates(List<IActivitySource> candidates)
+    {
+        candidates.Sort((a, b) =>
         {
             int priorityComparison = b.Priority.CompareTo(a.Priority);
             if (priorityComparison != 0)
@@ -97,23 +140,5 @@ public sealed class PriorityResolver
             // Deterministic string tie-breaker
             return string.Compare(a.Id, b.Id, StringComparison.Ordinal);
         });
-
-        var primary = validCandidates[0];
-
-        // Transient activities preempt as exclusive spotlight (no split allowed while transient alert is active)
-        if (primary.IsTransient)
-        {
-            return new PriorityResult(primary, null, IslandState.Compact, nextExpirationUtc);
-        }
-
-        // When multiple persistent activities are active, show top 2 in Split mode
-        if (validCandidates.Count > 1)
-        {
-            var secondary = validCandidates[1];
-            return new PriorityResult(primary, secondary, IslandState.Split, nextExpirationUtc);
-        }
-
-        // Single persistent activity
-        return new PriorityResult(primary, null, IslandState.Compact, nextExpirationUtc);
     }
 }
