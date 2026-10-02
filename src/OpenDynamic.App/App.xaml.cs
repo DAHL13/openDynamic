@@ -37,10 +37,31 @@ public partial class App : Application
         _singleInstance = Services.GetRequiredService<SingleInstanceManager>();
         if (!_singleInstance.TryAcquire())
         {
-            Log.Information("Another instance of openDynamic is already running. Exiting silently.");
+            _singleInstance.SignalExistingInstance();
+            Log.Information("Another instance of openDynamic is already running. Signaled existing instance and exiting.");
             Shutdown();
             return;
         }
+
+        _singleInstance.InstanceActivated += () =>
+        {
+            Dispatcher.InvokeAsync(() =>
+            {
+                Log.Information("Secondary instance launch detected. Activating island.");
+                var orch = Services.GetService<Orchestration.IslandOrchestrator>();
+                if (orch != null)
+                {
+                    if (orch.StateMachine.CurrentState == Core.State.IslandState.Hidden)
+                    {
+                        orch.SetHovering(true);
+                    }
+                    else
+                    {
+                        orch.RequestToggleExpand();
+                    }
+                }
+            });
+        };
 
         Log.Information("openDynamic initialized successfully (Single instance acquired, ShutdownMode=OnExplicitShutdown).");
 
@@ -150,6 +171,27 @@ public partial class App : Application
         orchestrator.RegisterWidget(demoA);
         orchestrator.RegisterWidget(demoB);
 #endif
+
+        // Perform initial brief reveal (3 seconds) on startup so the user visually confirms that openDynamic is running
+        var appSettings = Services.GetRequiredService<Core.Settings.AppSettings>();
+        if (orchestrator.StateMachine.CurrentState == Core.State.IslandState.Hidden && appSettings.EnableAmbientClock)
+        {
+            Log.Information("App startup: performing initial ambient clock reveal (3s).");
+            orchestrator.SetHovering(true);
+            var startupTimer = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(3)
+            };
+            startupTimer.Tick += (s, ev) =>
+            {
+                startupTimer.Stop();
+                if (orchestrator.ActivePrimaryWidget is Widgets.Clock.AmbientClockWidget && !islandWindow.IsPhysicalCursorOverInteractiveZone())
+                {
+                    orchestrator.SetHovering(false);
+                }
+            };
+            startupTimer.Start();
+        }
 
         ProcessCommandLineArgs(e.Args);
     }

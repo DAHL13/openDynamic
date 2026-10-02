@@ -749,7 +749,7 @@ public partial class IslandWindow : Window
     /// Evaluates whether the physical mouse cursor (queried directly via Win32 GetCursorPos)
     /// falls within the interactive zone of the island, without relying on WPF IsMouseOver.
     /// </summary>
-    private bool IsPhysicalCursorOverInteractiveZone()
+    public bool IsPhysicalCursorOverInteractiveZone()
     {
         if (!NativeMethods.GetCursorPos(out var cursorPos))
         {
