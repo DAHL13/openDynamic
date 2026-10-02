@@ -14,6 +14,16 @@
         Height="240"
         Title="openDynamic Island">
     <Grid Background="{x:Null}" VerticalAlignment="Top" Margin="0,0,0,0">
+        <!-- Sensor strip at Y=0 for resting hover detection in Hidden state -->
+        <Border x:Name="RestingSensorNotch"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Top"
+                Width="200"
+                Height="4"
+                Background="Transparent"
+                Focusable="False"
+                IsHitTestVisible="True" />
+
         <views:IslandView x:Name="IslandHostView"
                           HorizontalAlignment="Center"
                           VerticalAlignment="Top"

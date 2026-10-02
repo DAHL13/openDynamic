@@ -19,10 +19,16 @@ public static class NativeMethods
     public const int WM_TIMECHANGE = 0x001E;
     public const int WM_SETTINGCHANGE = 0x001A;
     public const int WM_MOUSEACTIVATE = 0x0021;
+    public const int WM_NCHITTEST = 0x0084;
+    public const int WM_MOUSEMOVE = 0x0200;
     public const int WM_DISPLAYCHANGE = 0x007E;
     public const int WM_DPICHANGED = 0x02E0;
     public const int WM_MOUSEHWHEEL = 0x020E;
     public const int WHEEL_DELTA = 120;
+
+    // Hit Test Return Values
+    public const int HTTRANSPARENT = -1;
+    public const int HTCLIENT = 1;
 
     public static short GetWheelDelta(IntPtr wParam) => (short)((wParam.ToInt64() >> 16) & 0xFFFF);
     public static short GetXFromLParam(IntPtr lParam) => (short)(lParam.ToInt64() & 0xFFFF);
@@ -251,6 +257,10 @@ public static class NativeMethods
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool ScreenToClient(IntPtr hWnd, ref POINT lpPoint);
 
     [DllImport("user32.dll")]
     public static extern IntPtr GetShellWindow();

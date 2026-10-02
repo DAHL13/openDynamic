@@ -54,4 +54,42 @@ public static class IslandPositionCalculator
 
         return new CalculatedWindowPlacement(physicalX, physicalY, physicalWidth, physicalHeight);
     }
+
+    /// <summary>
+    /// Evaluates if a device-independent pixel (DIP) coordinate within the window falls inside the resting notch sensor zone.
+    /// Used for hit-testing in Hidden state to detect cursor hover over the idle notch.
+    /// </summary>
+    /// <param name="mouseXDip">Horizontal coordinate in DIP relative to window left.</param>
+    /// <param name="mouseYDip">Vertical coordinate in DIP relative to window top.</param>
+    /// <param name="windowWidthDip">Total window width in DIP (e.g. 640 DIP).</param>
+    /// <param name="capsuleWidthDip">Nominal resting capsule width in DIP (e.g. 200 DIP).</param>
+    /// <param name="sensorHeightDip">Height of the sensor strip in DIP (defaults to 4.0 DIP).</param>
+    /// <returns>True if the coordinate is within the sensor bounds; otherwise, false.</returns>
+    public static bool IsPointInRestingSensorZone(
+        double mouseXDip,
+        double mouseYDip,
+        double windowWidthDip = 640.0,
+        double capsuleWidthDip = 200.0,
+        double sensorHeightDip = 4.0)
+    {
+        if (windowWidthDip <= 0 || capsuleWidthDip <= 0 || sensorHeightDip <= 0)
+        {
+            return false;
+        }
+
+        double centerDip = windowWidthDip / 2.0;
+        double halfWidthDip = capsuleWidthDip / 2.0;
+
+        double minXDip = centerDip - halfWidthDip;
+        double maxXDip = centerDip + halfWidthDip;
+
+        const double minYDip = 0.0;
+        double maxYDip = sensorHeightDip;
+
+        // Tolerances for sub-pixel boundary rounding
+        bool inX = mouseXDip >= (minXDip - 2.0) && mouseXDip <= (maxXDip + 2.0);
+        bool inY = mouseYDip >= (minYDip - 1.0) && mouseYDip <= (maxYDip + 1.0);
+
+        return inX && inY;
+    }
 }
