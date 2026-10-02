@@ -137,4 +137,47 @@ public class PriorityResolverPhase19Tests
         Assert.True(result.IsSplit);
         Assert.Equal(IslandState.Split, result.SuggestedState);
     }
+
+    [Fact]
+    public void AmbientClock_MultipleConsecutiveHoverCycles_DeploysAndHidesDeterministically()
+    {
+        var resolver = new PriorityResolver();
+        var stateMachine = new IslandStateMachine(IslandState.Hidden);
+        var clockSource = new MockSource
+        {
+            Id = "clock",
+            Priority = ActivityPriority.AmbientClock, // 5
+            IsActive = true,
+            ActivationMode = ActivityActivationMode.OnHover
+        };
+        var sources = new[] { clockSource };
+
+        // Cycle 1: Enter hover -> Clock resolved -> Transition to Compact
+        var cycle1Enter = resolver.Resolve(sources, isHovering: true);
+        Assert.Equal("clock", cycle1Enter.Primary?.Id);
+        Assert.Equal(IslandState.Compact, cycle1Enter.SuggestedState);
+        Assert.True(stateMachine.TryTransitionTo(cycle1Enter.SuggestedState));
+        Assert.Equal(IslandState.Compact, stateMachine.CurrentState);
+
+        // Cycle 1: Leave hover -> Null resolved -> Transition to Hidden
+        var cycle1Leave = resolver.Resolve(sources, isHovering: false);
+        Assert.Null(cycle1Leave.Primary);
+        Assert.Equal(IslandState.Hidden, cycle1Leave.SuggestedState);
+        Assert.True(stateMachine.TryTransitionTo(cycle1Leave.SuggestedState));
+        Assert.Equal(IslandState.Hidden, stateMachine.CurrentState);
+
+        // Cycle 2: Enter hover again -> Clock resolved identically -> Transition to Compact
+        var cycle2Enter = resolver.Resolve(sources, isHovering: true);
+        Assert.Equal("clock", cycle2Enter.Primary?.Id);
+        Assert.Equal(IslandState.Compact, cycle2Enter.SuggestedState);
+        Assert.True(stateMachine.TryTransitionTo(cycle2Enter.SuggestedState));
+        Assert.Equal(IslandState.Compact, stateMachine.CurrentState);
+
+        // Cycle 2: Leave hover again -> Null resolved identically -> Transition to Hidden
+        var cycle2Leave = resolver.Resolve(sources, isHovering: false);
+        Assert.Null(cycle2Leave.Primary);
+        Assert.Equal(IslandState.Hidden, cycle2Leave.SuggestedState);
+        Assert.True(stateMachine.TryTransitionTo(cycle2Leave.SuggestedState));
+        Assert.Equal(IslandState.Hidden, stateMachine.CurrentState);
+    }
 }

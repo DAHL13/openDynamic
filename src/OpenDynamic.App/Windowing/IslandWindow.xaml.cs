@@ -90,6 +90,8 @@ public partial class IslandWindow : Window
         {
             Dispatcher.InvokeAsync(() =>
             {
+                Log.Debug("IslandWindow: StateChanged: {OldState} -> {NewState}", msg.PreviousState, msg.NewState);
+
                 if (msg.NewState != IslandState.Hidden)
                 {
                     if (IslandHostView.Visibility != Visibility.Visible)
@@ -100,9 +102,25 @@ public partial class IslandWindow : Window
                     {
                         this.Visibility = Visibility.Visible;
                     }
+
+                    // Disable resting sensor hit-testing while active view is presenting
+                    if (RestingSensorNotch != null)
+                    {
+                        RestingSensorNotch.IsHitTestVisible = false;
+                    }
                 }
                 else
                 {
+                    // Re-enable resting sensor notch for hover detection in Hidden state
+                    if (RestingSensorNotch != null)
+                    {
+                        RestingSensorNotch.Visibility = Visibility.Visible;
+                        RestingSensorNotch.IsHitTestVisible = true;
+                    }
+
+                    _hoverEnterTimer.Stop();
+                    _hoverLeaveTimer.Stop();
+
                     CheckAndApplyHiddenVisibility();
                 }
             });
@@ -280,6 +298,26 @@ public partial class IslandWindow : Window
         {
             IslandHostView.Visibility = Visibility.Collapsed;
             Log.Debug("IslandWindow: Exit animations completed. View collapsed.");
+        }
+
+        // Reconfirm StateMachine is strictly Hidden when settled
+        if (_orchestrator.StateMachine.CurrentState != IslandState.Hidden)
+        {
+            _orchestrator.StateMachine.TryTransitionTo(IslandState.Hidden);
+        }
+
+        // Clean reset of timers and hover state upon settling in Hidden state (Task 2)
+        _hoverEnterTimer.Stop();
+        _hoverLeaveTimer.Stop();
+        if (_orchestrator.IsHovering)
+        {
+            _orchestrator.SetHovering(false);
+        }
+
+        if (RestingSensorNotch != null)
+        {
+            RestingSensorNotch.Visibility = Visibility.Visible;
+            RestingSensorNotch.IsHitTestVisible = true;
         }
     }
 
@@ -730,22 +768,12 @@ public partial class IslandWindow : Window
     {
         if (_orchestrator.StateMachine.CurrentState == IslandState.Hidden)
         {
-            if (RestingSensorNotch != null && RestingSensorNotch.IsMouseOver)
-            {
-                return true;
-            }
-
             if (NativeMethods.GetCursorPos(out var cursorPos))
             {
                 return IsScreenPointInHiddenSensorZone(cursorPos.X, cursorPos.Y);
             }
 
             return false;
-        }
-
-        if (RestingSensorNotch != null && RestingSensorNotch.IsMouseOver)
-        {
-            return true;
         }
 
         if (IslandHostView.Visibility == Visibility.Visible &&

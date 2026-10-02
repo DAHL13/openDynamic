@@ -110,7 +110,7 @@ public sealed class IslandOrchestrator : IDisposable
     {
         if (_isHovering == isHovering) return;
         _isHovering = isHovering;
-        Log.Debug("IslandOrchestrator: Hover state changed to {IsHovering}.", _isHovering);
+        Log.Debug("IslandOrchestrator: SetHovering changed to {IsHovering}.", _isHovering);
         DispatchToUIThread(UpdateOrchestration);
     }
 
@@ -722,6 +722,7 @@ public sealed class IslandOrchestrator : IDisposable
         bool transitioned = _animator.AnimateTo(targetState);
         if (transitioned)
         {
+            Log.Debug("IslandOrchestrator: StateChanged: {OldState} -> {NewState}", previousState, targetState);
             Log.Information("Orchestrator transitioned IslandState: {Previous} -> {Current}", previousState, targetState);
             WeakReferenceMessenger.Default.Send(new IslandStateChangedMessage(previousState, targetState));
         }
