@@ -1,4 +1,5 @@
 using System.Windows.Threading;
+using CommunityToolkit.Mvvm.Messaging;
 using OpenDynamic.Core.EnergySaver;
 using OpenDynamic.Core.Settings;
 using Serilog;
@@ -77,6 +78,18 @@ public sealed class EnergySaverService : IResourceProfileProvider, IDisposable
             _settingsService.SettingsChanged += OnSettingsChanged;
         }
 
+        WeakReferenceMessenger.Default.Register<Widgets.Messages.EnergySaverStatusChangedMessage>(this, (_, msg) =>
+        {
+            if (_dispatcher.CheckAccess())
+            {
+                HandleStatusChanged(msg.State);
+            }
+            else
+            {
+                _dispatcher.InvokeAsync(() => HandleStatusChanged(msg.State));
+            }
+        });
+
         Initialize();
     }
 
@@ -124,14 +137,16 @@ public sealed class EnergySaverService : IResourceProfileProvider, IDisposable
         }
         else
         {
-            _dispatcher.InvokeAsync(HandleStatusChanged);
+            _dispatcher.InvokeAsync(() => HandleStatusChanged());
         }
     }
 
     /// <summary>
     /// Evaluates current platform energy saver status and updates active profiles.
+    /// Accepts an explicit state from Win32 WM_POWERBROADCAST notifications,
+    /// falling back to querying platform status if not provided.
     /// </summary>
-    public void HandleStatusChanged()
+    public void HandleStatusChanged(EnergySaverState? explicitState = null)
     {
         EnergySaverState newState;
         ResourceProfile newProfile;
@@ -142,7 +157,7 @@ public sealed class EnergySaverService : IResourceProfileProvider, IDisposable
         {
             if (_isDisposed) return;
 
-            newState = QueryPlatformEnergySaverState();
+            newState = explicitState ?? QueryPlatformEnergySaverState();
             if (newState != _currentState)
             {
                 _currentState = newState;
@@ -171,6 +186,14 @@ public sealed class EnergySaverService : IResourceProfileProvider, IDisposable
                 newProfile.IsEfficientModeActive, newProfile.MotionProfile.Stiffness, newProfile.VisualizerMode, newProfile.HardwareSamplingInterval.TotalSeconds);
             ResourceProfileChanged?.Invoke(this, newProfile);
         }
+    }
+
+    /// <summary>
+    /// Explicitly updates the energy saver state from a native notification (e.g. Win32 WM_POWERBROADCAST).
+    /// </summary>
+    public void UpdateEnergySaverState(EnergySaverState newState)
+    {
+        HandleStatusChanged(newState);
     }
 
     private void OnAlertPolicyTriggered(object? sender, EnergySaverState state)
@@ -301,6 +324,8 @@ public sealed class EnergySaverService : IResourceProfileProvider, IDisposable
             }
 
             _alertPolicy.AlertTriggered -= OnAlertPolicyTriggered;
+
+            WeakReferenceMessenger.Default.Unregister<Widgets.Messages.EnergySaverStatusChangedMessage>(this);
 
             if (_settingsService != null)
             {

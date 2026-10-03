@@ -221,6 +221,15 @@ public static class NativeMethods
 
     public static readonly Guid GUID_ACDC_POWER_SOURCE = new("5d3e4eb2-ee30-4726-ac55-d0f930e41497");
     public static readonly Guid GUID_BATTERY_PERCENTAGE_REMAINING = new("a7ad8041-b45a-4cae-87a3-eecbb468a9e1");
+    public static readonly Guid GUID_POWER_SAVING_STATUS = new("E00958C0-C213-4ACE-AC77-B78D78560846");
+
+    [StructLayout(LayoutKind.Sequential, Pack = 4)]
+    public struct POWERBROADCAST_SETTING
+    {
+        public Guid PowerSetting;
+        public int DataLength;
+        public byte Data;
+    }
 
     [StructLayout(LayoutKind.Sequential)]
     public struct SYSTEM_POWER_STATUS
@@ -239,6 +248,9 @@ public static class NativeMethods
 
     [DllImport("user32.dll", SetLastError = true)]
     public static extern IntPtr RegisterPowerSettingNotification(IntPtr hRecipient, ref Guid PowerSettingGuid, uint Flags);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern IntPtr RegisterPowerSettingNotification(IntPtr hRecipient, ref Guid PowerSettingGuid, int Flags);
 
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

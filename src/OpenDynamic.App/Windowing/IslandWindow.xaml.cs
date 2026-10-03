@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -10,6 +11,7 @@ using OpenDynamic.App.Animation;
 using OpenDynamic.App.Native;
 using OpenDynamic.App.Orchestration;
 using OpenDynamic.App.Widgets.Hardware;
+using OpenDynamic.Core.EnergySaver;
 using OpenDynamic.Core.State;
 using Serilog;
 
@@ -41,6 +43,7 @@ public partial class IslandWindow : Window
 
     private IntPtr _hwnd = IntPtr.Zero;
     private HwndSource? _hwndSource;
+    private IntPtr _energySaverNotificationHandle = IntPtr.Zero;
 
 #if DEBUG
     private IslandDebugWindow? _debugWindow;
@@ -201,6 +204,25 @@ public partial class IslandWindow : Window
         _foregroundWatcher.Start();
 
         _powerService?.RegisterWindowNotifications(_hwnd);
+
+        if (_hwnd != IntPtr.Zero)
+        {
+            try
+            {
+                Guid energySaverGuid = NativeMethods.GUID_POWER_SAVING_STATUS;
+                _energySaverNotificationHandle = NativeMethods.RegisterPowerSettingNotification(
+                    _hwnd,
+                    ref energySaverGuid,
+                    (int)NativeMethods.DEVICE_NOTIFY_WINDOW_HANDLE);
+                Log.Information("IslandWindow registered power setting notification for GUID_POWER_SAVING_STATUS (Handle: {Handle}).",
+                    _energySaverNotificationHandle);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Failed to register power setting notification for GUID_POWER_SAVING_STATUS.");
+            }
+        }
+
         SystemEvents.PowerModeChanged += OnPowerModeChanged;
         SystemEvents.TimeChanged += OnSystemEventsTimeChanged;
         SystemParameters.StaticPropertyChanged += OnSystemParametersStaticPropertyChanged;
@@ -598,9 +620,39 @@ public partial class IslandWindow : Window
                 _energySaverService?.NotifyResumed();
                 break;
 
+            case NativeMethods.PBT_POWERSETTINGCHANGE:
+                HandlePowerSettingChange(lParam);
+                _powerService?.HandlePowerBroadcast(wParam, lParam);
+                break;
+
             default:
                 _powerService?.HandlePowerBroadcast(wParam, lParam);
                 break;
+        }
+    }
+
+    private void HandlePowerSettingChange(IntPtr lParam)
+    {
+        if (lParam == IntPtr.Zero) return;
+
+        try
+        {
+            var setting = Marshal.PtrToStructure<NativeMethods.POWERBROADCAST_SETTING>(lParam);
+            if (setting.PowerSetting == NativeMethods.GUID_POWER_SAVING_STATUS)
+            {
+                // In Windows 10/11, Data is a DWORD: 0 = Off / Disabled, 1 = On.
+                int stateInt = setting.DataLength >= 4 ? Marshal.ReadInt32(lParam, 20) : setting.Data;
+                var state = stateInt == 1 ? EnergySaverState.On : EnergySaverState.Off;
+                Log.Information("IslandWindow WndProc WM_POWERBROADCAST PBT_POWERSETTINGCHANGE: GUID_POWER_SAVING_STATUS={State} (raw={Raw})",
+                    state, stateInt);
+
+                _energySaverService?.HandleStatusChanged(state);
+                WeakReferenceMessenger.Default.Send(new Widgets.Messages.EnergySaverStatusChangedMessage(state));
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Error processing PBT_POWERSETTINGCHANGE in IslandWindow.");
         }
     }
 
@@ -1179,6 +1231,12 @@ public partial class IslandWindow : Window
         if (_energySaverService != null)
         {
             _energySaverService.ResourceProfileChanged -= OnResourceProfileChanged;
+        }
+
+        if (_energySaverNotificationHandle != IntPtr.Zero)
+        {
+            NativeMethods.UnregisterPowerSettingNotification(_energySaverNotificationHandle);
+            _energySaverNotificationHandle = IntPtr.Zero;
         }
 
         if (_hwndSource != null)

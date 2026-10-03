@@ -6,10 +6,12 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 ## [1.5.0-dev] - 2026-10-02 (Fase 20: Ahorro de Energía)
 
 ### Añadido
-- **Monitoreo Reactivo de Energía de Windows (`EnergySaverService`):**
-  - Suscripción reactiva nativa al evento WinRT `Windows.System.Power.PowerManager.EnergySaverStatusChanged` con cero bucles de polling (0% CPU en reposo).
+- **Monitoreo Reactivo de Energía de Windows (`EnergySaverService` / `IslandWindow`):**
+  - Registro infalible Win32 en `IslandWindow` mediante `RegisterPowerSettingNotification` con `GUID_POWER_SAVING_STATUS` (`E00958C0-C213-4ACE-AC77-B78D78560846`).
+  - Intercepción en tiempo real de `WM_POWERBROADCAST` con `PBT_POWERSETTINGCHANGE` (0x8013) y `POWERBROADCAST_SETTING` con cero bucles de sondeo (0% CPU en reposo).
+  - Suscripción y fallback complementario WinRT (`Windows.System.Power.PowerManager.EnergySaverStatusChanged`).
   - Manejo transparente y sin excepciones de PCs de escritorio y entornos sin batería (`EnergySaverState.NotSupported`).
-  - Mapeo desacoplado de estados WinRT a Core mediante `EnergySaverStateMapper`.
+  - Mapeo desacoplado de estados WinRT/Win32 a Core mediante `EnergySaverStateMapper`.
 - **Política Pura de Alertas (`EnergySaverAlertPolicy`):**
   - Supresión automática de alertas visuales espurias durante el arranque de la aplicación.
   - Supresión de 10 segundos tras reanudación de suspensión/hibernación (`NotifySuspended`, `NotifyResumedFromSuspend`) para amortiguar transiciones ACPI.

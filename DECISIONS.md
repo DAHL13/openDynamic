@@ -915,8 +915,10 @@
   5. Interfaz de usuario integrada con widget transitorio en la muesca (`EnergySaverWidget`, prioridad 88, 3 segundos) y controles completos en Ajustes con migración limpia a esquema v13 en `AppSettings`.
 
 - **Decisiones Técnicas:**
-  1. **Monitoreo Reactivo de Energía vía WinRT (Reglas de Oro 1 y 11):**
-     - Se utiliza el evento nativo `Windows.System.Power.PowerManager.EnergySaverStatusChanged` para escuchar transiciones del sistema de manera reactiva, eliminando cualquier temporizador de sondeo periódico.
+  1. **Monitoreo Reactivo de Energía vía Win32 `RegisterPowerSettingNotification` y Fallback WinRT (Reglas de Oro 1 y 11):**
+     - En aplicaciones de escritorio Win32 desempaquetadas, el evento WinRT `PowerManager.EnergySaverStatusChanged` no se despacha al carecer de infraestructura `CoreWindow`.
+     - La detección infalible y reactiva se realiza registrando el HWND de `IslandWindow` mediante `RegisterPowerSettingNotification` con `GUID_POWER_SAVING_STATUS` (`E00958C0-C213-4ACE-AC77-B78D78560846`).
+     - Al alternarse el ahorro de batería en Windows, se intercepta `WM_POWERBROADCAST` con `PBT_POWERSETTINGCHANGE` (0x8013) y la estructura `POWERBROADCAST_SETTING`, despachando el estado (0 = Off, 1 = On) inmediatamente y sin ningún tipo de sondeo (*zero polling*).
      - En equipos de escritorio o entornos virtuales sin batería, la API reporta `Disabled`, el cual es mapeado cleanly a `EnergySaverState.NotSupported` mediante `EnergySaverStateMapper`. Si la suscripción falla por restricciones de plataforma, se degrada a `NotSupported` de forma segura.
   2. **Política Pura de Alertas (`EnergySaverAlertPolicy`) con `TimeProvider` (Regla de Oro 5):**
      - Ubicada en `OpenDynamic.Core.EnergySaver`, sin referencias a UI.
