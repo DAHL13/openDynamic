@@ -73,7 +73,7 @@ public sealed class EnergySaverService : IResourceProfileProvider, IDisposable
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _settingsService = settingsService;
         _dispatcher = dispatcher ?? (System.Windows.Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher);
-        _alertPolicy = new EnergySaverAlertPolicy(timeProvider ?? TimeProvider.System);
+        _alertPolicy = new EnergySaverAlertPolicy(timeProvider ?? TimeProvider.System, cooldownDuration: TimeSpan.FromMilliseconds(500));
 
         _alertPolicy.AlertTriggered += OnAlertPolicyTriggered;
 
@@ -338,8 +338,8 @@ public sealed class EnergySaverService : IResourceProfileProvider, IDisposable
 
     /// <summary>
     /// Live query of Windows energy saver (battery saver) status via WNF (Windows 11) and Win32 GetSystemPowerStatus (Windows 10/11).
-    /// WNF_PO_ENERGY_SAVER_OVERRIDE == 2 indicates user explicitly activated Energy Saver via Quick Settings / Settings.
-    /// WNF_PO_ENERGY_SAVER_OVERRIDE == 1 indicates user explicitly turned Energy Saver off.
+    /// WNF_PO_ENERGY_SAVER_OVERRIDE == 1 indicates user explicitly activated Energy Saver via Quick Settings / Settings.
+    /// WNF_PO_ENERGY_SAVER_OVERRIDE == 2 indicates user explicitly turned Energy Saver off.
     /// WNF_PO_ENERGY_SAVER_STATE == 2 or SystemStatusFlag == 1 indicates automatic Battery Saver engagement.
     /// </summary>
     public static EnergySaverState QueryLiveEnergySaverState()

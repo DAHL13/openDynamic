@@ -902,6 +902,14 @@ public partial class IslandWindow : Window
                 double effectiveWidth = Math.Max(capsuleWidth, notchWidth);
                 double effectiveHeight = Math.Max(capsuleHeight, 44.0);
 
+                if (_orchestrator.StateMachine.CurrentState == IslandState.Expanded)
+                {
+                    double targetW = _animator.TargetDimensions.Width;
+                    double targetH = _animator.TargetDimensions.Height;
+                    if (targetW > 0) effectiveWidth = Math.Max(effectiveWidth, targetW);
+                    if (targetH > 0) effectiveHeight = Math.Max(effectiveHeight, targetH);
+                }
+
                 if (_orchestrator.StateMachine.CurrentState == IslandState.Split &&
                     IslandHostView.SatelliteBubble.Visibility == Visibility.Visible &&
                     IslandHostView.SatelliteBubble.ActualWidth > 0)
@@ -1043,8 +1051,18 @@ public partial class IslandWindow : Window
             _hoverEnterTimer.Stop();
             _hoverLeaveTimer.Stop();
 
-            Log.Information("Capsule clicked. Delegating toggle expand to Orchestrator.");
-            _orchestrator.RequestToggleExpand();
+            if (_orchestrator.ActivePrimaryWidget?.IsTransient == true ||
+                _orchestrator.ActivePrimaryWidget is Widgets.EnergySaver.EnergySaverWidget ||
+                _orchestrator.ActivePrimaryWidget is Widgets.Battery.BatteryWidget)
+            {
+                Log.Information("Transient alert capsule clicked. Expanding and keeping deployed until exit.");
+                _orchestrator.RequestExpand();
+            }
+            else
+            {
+                Log.Information("Capsule clicked. Delegating toggle expand to Orchestrator.");
+                _orchestrator.RequestToggleExpand();
+            }
         };
 
         mainCapsule.PreviewMouseMove += (s, e) => OnPhysicalCursorPresence();

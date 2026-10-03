@@ -148,4 +148,35 @@ public class PriorityResolverPhase20Tests
         Assert.Null(result.Secondary);
         Assert.False(result.IsSplit);
     }
+
+    [Fact]
+    public void EnergySaver_WhenExpanded_DoesNotExpireUntilCollapsed()
+    {
+        var resolver = new PriorityResolver();
+        var activatedAt = DateTimeOffset.UtcNow;
+
+        // When expanded by user click, IsTransient becomes false and TransientDuration is null
+        var expandedEnergySaverSource = new MockSource
+        {
+            Id = "energy-saver",
+            Priority = ActivityPriority.EnergySaver, // 88
+            IsActive = true,
+            IsTransient = false,
+            LastActivatedUtc = activatedAt,
+            TransientDuration = null
+        };
+
+        var mediaSource = new MockSource
+        {
+            Id = "media",
+            Priority = ActivityPriority.Media, // 30
+            IsActive = true
+        };
+
+        // Even 15 seconds later (well past the 3s transient timeout), it remains the primary activity while expanded
+        var result = resolver.Resolve(new[] { mediaSource, expandedEnergySaverSource }, currentTime: activatedAt.AddSeconds(15), isHovering: true);
+
+        Assert.Equal("energy-saver", result.Primary?.Id);
+        Assert.Null(result.NextExpirationUtc);
+    }
 }

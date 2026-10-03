@@ -75,6 +75,8 @@ public sealed class EnergySaverWidget : IslandWidgetBase
         }
     }
 
+    private bool _wasExpanded;
+
     private void OnEnergySaverAlertTriggered(object? sender, EnergySaverState state)
     {
         _dispatcher.InvokeAsync(() =>
@@ -102,6 +104,15 @@ public sealed class EnergySaverWidget : IslandWidgetBase
                 return;
             }
 
+            if (DisplayMode == WidgetDisplayMode.Expanded || _wasExpanded)
+            {
+                _transientTimer?.Stop();
+                _transientTimer = null;
+                IsTransient = false;
+                TransientDuration = null;
+                return;
+            }
+
             double durationSecs = _settings.EnergySaverTransientDurationSeconds > 0
                 ? _settings.EnergySaverTransientDurationSeconds
                 : 3.0;
@@ -115,6 +126,43 @@ public sealed class EnergySaverWidget : IslandWidgetBase
         });
     }
 
+    public override void SetDisplayState(WidgetDisplayMode mode, bool isVisible)
+    {
+        base.SetDisplayState(mode, isVisible);
+
+        if (mode == WidgetDisplayMode.Expanded)
+        {
+            // Immediately stop any transient timer and pause transient status while expanded
+            _transientTimer?.Stop();
+            _transientTimer = null;
+            IsTransient = false;
+            TransientDuration = null;
+            _wasExpanded = true;
+        }
+    }
+
+    public override void OnExpand()
+    {
+        base.OnExpand();
+        _transientTimer?.Stop();
+        _transientTimer = null;
+        IsTransient = false;
+        TransientDuration = null;
+        _wasExpanded = true;
+        Log.Debug("EnergySaverWidget: Expanded by user. Transient auto-close paused until user exits.");
+    }
+
+    public override void OnCollapse()
+    {
+        base.OnCollapse();
+        if (_wasExpanded)
+        {
+            _wasExpanded = false;
+            Log.Debug("EnergySaverWidget: Collapsed after user exit. Deactivating transient alert.");
+            Deactivate();
+        }
+    }
+
     private void ResetTransientTimer(TimeSpan duration)
     {
         _transientTimer?.Stop();
@@ -126,6 +174,13 @@ public sealed class EnergySaverWidget : IslandWidgetBase
         {
             _transientTimer.Stop();
             _transientTimer = null;
+
+            if (DisplayMode == WidgetDisplayMode.Expanded || !IsTransient || _wasExpanded)
+            {
+                Log.Debug("EnergySaverWidget: Transient lifespan expired while in Expanded mode; keeping open.");
+                return;
+            }
+
             Log.Debug("EnergySaverWidget: Transient lifespan expired. Deactivating.");
             Deactivate();
         };

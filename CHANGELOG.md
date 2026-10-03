@@ -29,14 +29,17 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
   - `AppSettings.cs` promovido a `CurrentSchemaVersion = 13` con migración automática y limpia en `SettingsService.cs`.
   - Nueva tarjeta "🌱 Ahorro de Energía de Windows" en `SettingsWindow.xaml` con estado del sistema en vivo e interruptores para alertas, modo eficiente y sub-optimizaciones.
 - **Pruebas Automatizadas:**
-  - 61 nuevas pruebas unitarias en `OpenDynamic.Tests` (totalizando 524 pruebas en verde al 100%), cubriendo políticas puras, mapeador WNF (`FromWnf`), mapeadores WinRT/Win32/SystemStatusFlag, presencia de batería, resolución de prioridades y migración v13.
+  - 62 nuevas pruebas unitarias en `OpenDynamic.Tests` (totalizando 525 pruebas en verde al 100%), cubriendo políticas puras, mapeador WNF (`FromWnf`), mapeadores WinRT/Win32/SystemStatusFlag, presencia de batería, retención en modo expandido, resolución de prioridades y migración v13.
 
 ### Corregido
 - **Detección Dinámica de Ahorro de Energía en Windows 11 (24H2) vía WNF (`ntdll.dll`):**
   - **Diagnóstico y causa raíz:** En Windows 11 24H2, el mosaico de configuración rápida "Ahorro de energía" (`SettingsHandlers_OneCore_BatterySaver.dll`) no modifica `SYSTEM_POWER_STATUS.SystemStatusFlag` ni emite `WM_POWERBROADCAST` si el nivel de batería supera el umbral de disparo automático. Windows gestiona las conmutaciones manuales a través de Windows Notification Facility (WNF).
-  - **Suscripción Reactiva WNF:** Suscripción 100% reactiva en `EnergySaverService` con `RtlSubscribeWnfStateChangeNotification` para `WNF_PO_ENERGY_SAVER_OVERRIDE` (`0x41C6013DA3BC3075`: 2 = manual On, 1 = manual Off) y `WNF_PO_ENERGY_SAVER_STATE` (`0x41C6013DA3BC2075`: 2 = auto On, 1 = auto Off).
+  - **Suscripción Reactiva WNF:** Suscripción 100% reactiva en `EnergySaverService` con `RtlSubscribeWnfStateChangeNotification` para `WNF_PO_ENERGY_SAVER_OVERRIDE` (`0x41C6013DA3BC3075`: `1` = manual On / *Enabled*, `2` = manual Off / *Disabled*) y `WNF_PO_ENERGY_SAVER_STATE` (`0x41C6013DA3BC2075`: `2` = auto On, `1` = auto Off).
   - **Corrección de GUID Win32:** Corrección del GUID de registro en `NativeMethods.cs` a `E00958C0-C213-4ACE-AC77-FECCED2EEEA5` (oficial de `winnt.h`) y añadido `GUID_ENERGY_SAVER_POLICY` (`5C5BB349-AD29-4EE2-9D0B-2B25270F7A81`).
-  - **Mapeador Puro Multicapa (`EnergySaverStateMapper.FromWnf`):** Fusión determinista de WNF Override, WNF State y fallback a `SystemStatusFlag` manteniendo `OpenDynamic.Core` completamente puro.
+  - **Mapeador Puro Multicapa (`EnergySaverStateMapper.FromWnf`):** Fusión determinista de WNF Override (`1` $\rightarrow$ `On`, `2` $\rightarrow$ `Off`), WNF State y fallback a `SystemStatusFlag` manteniendo `OpenDynamic.Core` completamente puro.
+- **Retención Persistente de Notificación al Desplegar el Notch (`EnergySaverWidget` / `BatteryWidget` / `IslandWindow`):**
+  - Al hacer clic sobre la notificación y desplegarse a modo `Expanded`, se detiene el temporizador de auto-cierre de 3 segundos (`_transientTimer?.Stop()`) y se suspende la expiración transitoria (`IsTransient = false`, `TransientDuration = null`).
+  - La tarjeta desplegada permanece abierta de forma indefinida mientras el cursor permanezca dentro del notch desplegado, cerrándose y desactivándose únicamente cuando el usuario sale del área interactiva (`OnCollapse()` -> `Deactivate()`).
 - **Detección Fidedigna de Batería Física vs Estado Desactivado en AC (`GetSystemPowerStatus`):**
   - Corrección del falso positivo donde una laptop conectada a corriente alterna (ACLineStatus == 1, WinRT `Disabled` / Win32 `0`) reportaba erróneamente "No compatible (Equipo sin batería)".
   - Verificación física mediante `GetSystemPowerStatus`: sólo se clasifica como `NotSupported` si el hardware carece de batería (`BatteryFlag == 128` o `BatteryLifePercent == 255`).

@@ -157,6 +157,15 @@ public sealed class BatteryWidget : IslandWidgetBase
                     break;
             }
 
+            if (DisplayMode == OpenDynamic.Core.Widgets.WidgetDisplayMode.Expanded || _wasExpanded)
+            {
+                _transientTimer?.Stop();
+                _transientTimer = null;
+                IsTransient = false;
+                TransientDuration = null;
+                return;
+            }
+
             Log.Information("BatteryWidget triggered transient alert: '{Title}' ({Subtitle}, Duration: {Duration}s)",
                 Title, Subtitle, duration.TotalSeconds);
 
@@ -164,6 +173,44 @@ public sealed class BatteryWidget : IslandWidgetBase
             Activate(transientDuration: duration, priorityOverride: _settings.DefaultBatteryPriority);
             ResetTransientTimer(duration);
         });
+    }
+
+    private bool _wasExpanded;
+
+    public override void SetDisplayState(OpenDynamic.Core.Widgets.WidgetDisplayMode mode, bool isVisible)
+    {
+        base.SetDisplayState(mode, isVisible);
+
+        if (mode == OpenDynamic.Core.Widgets.WidgetDisplayMode.Expanded)
+        {
+            _transientTimer?.Stop();
+            _transientTimer = null;
+            IsTransient = false;
+            TransientDuration = null;
+            _wasExpanded = true;
+        }
+    }
+
+    public override void OnExpand()
+    {
+        base.OnExpand();
+        _transientTimer?.Stop();
+        _transientTimer = null;
+        IsTransient = false;
+        TransientDuration = null;
+        _wasExpanded = true;
+        Log.Debug("BatteryWidget: Expanded by user. Transient auto-close paused until user exits.");
+    }
+
+    public override void OnCollapse()
+    {
+        base.OnCollapse();
+        if (_wasExpanded)
+        {
+            _wasExpanded = false;
+            Log.Debug("BatteryWidget: Collapsed after user exit. Deactivating transient alert.");
+            Deactivate();
+        }
     }
 
     private void ResetTransientTimer(TimeSpan duration)
@@ -177,6 +224,13 @@ public sealed class BatteryWidget : IslandWidgetBase
         {
             _transientTimer.Stop();
             _transientTimer = null;
+
+            if (DisplayMode == OpenDynamic.Core.Widgets.WidgetDisplayMode.Expanded || !IsTransient || _wasExpanded)
+            {
+                Log.Debug("BatteryWidget: Transient lifespan expired while in Expanded mode; keeping open.");
+                return;
+            }
+
             Log.Debug("BatteryWidget transient lifespan expired. Deactivating.");
             Deactivate();
         };

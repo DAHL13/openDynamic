@@ -916,7 +916,7 @@
 
 - **Decisiones Técnicas:**
   1. **Monitoreo Reactivo Multicapa de Energía (WNF `ntdll.dll` + Win32 `WM_POWERBROADCAST` + `GetSystemPowerStatus`) (Reglas de Oro 1 y 11):**
-     - En Windows 11 (24H2), el mosaico de Configuración Rápida "Ahorro de energía" (`SettingsHandlers_OneCore_BatterySaver.dll`) publica las conmutaciones manuales del usuario a través de **Windows Notification Facility (WNF)** en `ntdll.dll` sobre el estado `WNF_PO_ENERGY_SAVER_OVERRIDE` (`0x41C6013DA3BC3075`: `2` = Forzado Activo, `1` = Forzado Inactivo, `0` = Automático por política) y el estado automático en `WNF_PO_ENERGY_SAVER_STATE` (`0x41C6013DA3BC2075`: `2` = Activo, `1` = Inactivo), sin modificar `SYSTEM_POWER_STATUS.SystemStatusFlag` ni `PowerManager.EnergySaverStatus` cuando el nivel de batería supera el umbral automático.
+     - En Windows 11 (24H2), el mosaico de Configuración Rápida "Ahorro de energía" (`SettingsHandlers_OneCore_BatterySaver.dll`) publica las conmutaciones manuales del usuario a través de **Windows Notification Facility (WNF)** en `ntdll.dll` sobre el estado `WNF_PO_ENERGY_SAVER_OVERRIDE` (`0x41C6013DA3BC3075`: `1` = Forzado Activo / *Enabled*, `2` = Forzado Inactivo / *Disabled*, `0` = Automático por política) y el estado automático en `WNF_PO_ENERGY_SAVER_STATE` (`0x41C6013DA3BC2075`: `2` = Activo, `1` = Inactivo), sin modificar `SYSTEM_POWER_STATUS.SystemStatusFlag` ni `PowerManager.EnergySaverStatus` cuando el nivel de batería supera el umbral automático.
      - `EnergySaverService` se suscribe de forma 100% reactiva (cero polling) mediante `RtlSubscribeWnfStateChangeNotification` a `WNF_PO_ENERGY_SAVER_OVERRIDE` y `WNF_PO_ENERGY_SAVER_STATE`, manteniendo el delegado fijado en memoria y liberando las suscripciones con `RtlUnsubscribeWnfStateChangeNotification` en `Dispose()`.
      - Adicionalmente, `IslandWindow` registra `GUID_POWER_SAVING_STATUS` oficial de `winnt.h` (`E00958C0-C213-4ACE-AC77-FECCED2EEEA5`) y `GUID_ENERGY_SAVER_POLICY` (`5C5BB349-AD29-4EE2-9D0B-2B25270F7A81`), e intercepta `WM_POWERBROADCAST` (`PBT_APMPOWERSTATUSCHANGE` y `PBT_POWERSETTINGCHANGE`).
      - `EnergySaverService.QueryLiveEnergySaverState()` consulta en vivo `NtQueryWnfStateData` y `GetSystemPowerStatus`, resolviendo el estado mediante el mapeador puro `EnergySaverStateMapper.FromWnf(wnfOverride, wnfState, systemStatusFlag, hasBattery)`.
@@ -925,7 +925,7 @@
      - Ubicada en `OpenDynamic.Core.EnergySaver`, sin referencias a UI.
      - Implementa supresión en el arranque (`Initialize`), impidiendo notificaciones flotantes al iniciar openDynamic.
      - Implementa ventana de supresión de 10 segundos tras reanudación de suspensión/hibernación (`NotifySuspended()`, `NotifyResumedFromSuspend()`), amortiguando lecturas inestables transitorias del subsistema ACPI de Windows.
-     - Implementa un periodo de enfriamiento (*cooldown*) de 5 segundos entre transiciones válidas para evitar saturación de la isla ante conmutaciones rápidas.
+     - Implementa enfriamiento reactivo antirrebote (*cooldown*) para evitar saturación de la isla ante fluctuaciones rápidas de hardware.
   3. **Política Determinista de Recursos (`ResourceProfilePolicy`):**
      - Resuelve el `ResourceProfile` activo combinando el estado de energía, las opciones globales de modo eficiente y las preferencias explícitas del usuario.
      - Reglas de precedencia estrictas:
@@ -936,10 +936,10 @@
      - `IslandWindow.xaml.cs`: Escucha `ResourceProfileChanged` del `EnergySaverService` y reconfigura los resortes elásticos en vivo; intercepta `WM_POWERBROADCAST` (`PBT_APMPOWERSTATUSCHANGE`, `PBT_APMSUSPEND`, `PBT_APMRESUMEAUTOMATIC`, `PBT_APMRESUMESUSPEND`) para notificar transiciones, suspensión y reanudación.
      - `HardwareWidget`: Recibe `IResourceProfileProvider` e intercambia su cadencia de muestreo en tiempo real ante cambios de perfil.
      - `MediaWidget`: Recibe `IResourceProfileProvider` y conmuta el modo visualizador dinámicamente entre reactivo y simulado según el perfil activo.
-  5. **Widget de Muesca Transitorio (`EnergySaverWidget`):**
-     - Prioridad 88 (`ActivityPriority.EnergySaver`), con duración transitoria de 3 segundos.
+  5. **Widget de Muesca Transitorio (`EnergySaverWidget`) y Retención al Desplegar:**
+     - Prioridad 88 (`ActivityPriority.EnergySaver`), con duración transitoria base de 3 segundos en modo compacto.
      - Vistas XAML `EnergySaverCompactView`, `EnergySaverExpandedView` y `EnergySaverSplitView` adaptadas al Upper Notch UI con esquinas asimétricas, icono de batería/hoja y acentos verdes (#34D399).
-     - En `PriorityResolver`, la alerta transitoria asume foco exclusivo en modo compacto durante su ciclo de vida y restaura la actividad persistente subyacente (ej. reproducción multimedia) al expirar.
+     - **Comportamiento al Desplegar por Clic:** Al hacer clic sobre la notificación transitoria en la muesca, `IslandWindow` invoca `RequestExpand()`. El widget entra en `OnExpand()`, detiene el temporizador de auto-expiración (`_transientTimer?.Stop()`) y limpia `TransientDuration = null`. La tarjeta expandida permanece abierta de forma persistente mientras el cursor del usuario se encuentre sobre el notch interactivo expandido. Al salir del área (`OnPointerLeave` / `_hoverLeaveTimer`), `OnCollapse()` se ejecuta y desactiva la alerta limpiamente retornando al reposo.
   6. **Ajustes y Migración de Esquema v13 (Regla de Oro 9):**
      - Se promovió `CurrentSchemaVersion` de 12 a 13 en `AppSettings.cs`.
      - Nuevas opciones persistidas: `EnableEnergySaverAlerts`, `DefaultEnergySaverPriority`, `EnergySaverTransientDurationSeconds`, `EnableEnergySaverEfficientMode`, `EnergySaverReduceAnimations`, `EnergySaverCapAudioVisualizer`, `EnergySaverThrottleHardwareSampling` y `EnergySaverHardwareSamplingIntervalSeconds`.
@@ -947,7 +947,7 @@
      - Tarjeta "🌱 Ahorro de Energía de Windows" en `SettingsWindow.xaml` con indicador de estado en tiempo real (`EnergySaverStateSummaryText`) suscrito a `EnergySaverStatusChangedMessage`.
 
 - **Consecuencias y Verificación:**
-  - 524 pruebas unitarias automáticas en verde (100% de la suite; 71 nuevas pruebas incorporadas en la fase).
+  - 525 pruebas unitarias automáticas en verde (100% de la suite; 72 nuevas pruebas incorporadas en la fase).
   - Cero bucles de sondeo; consumo de CPU estrictamente del 0% en reposo.
   - Compilación Release limpia con 0 errores y 0 advertencias (`TreatWarningsAsErrors`).
 
