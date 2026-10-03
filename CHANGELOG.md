@@ -29,14 +29,17 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
   - `AppSettings.cs` promovido a `CurrentSchemaVersion = 13` con migración automática y limpia en `SettingsService.cs`.
   - Nueva tarjeta "🌱 Ahorro de Energía de Windows" en `SettingsWindow.xaml` con estado del sistema en vivo e interruptores para alertas, modo eficiente y sub-optimizaciones.
 - **Pruebas Automatizadas:**
-  - 43 nuevas pruebas unitarias en `OpenDynamic.Tests` (totalizando 506 pruebas en verde al 100%), cubriendo políticas puras, mapeador WinRT/Win32, presencia de batería, resolución de prioridades y migración v13.
+  - 49 nuevas pruebas unitarias en `OpenDynamic.Tests` (totalizando 512 pruebas en verde al 100%), cubriendo políticas puras, mapeador WinRT/Win32/SystemStatusFlag, presencia de batería, resolución de prioridades y migración v13.
 
 ### Corregido
 - **Detección Fidedigna de Batería Física vs Estado Desactivado en AC (`GetSystemPowerStatus`):**
   - Corrección del falso positivo donde una laptop conectada a corriente alterna (ACLineStatus == 1, WinRT `Disabled` / Win32 `0`) reportaba erróneamente "No compatible (Equipo sin batería)".
   - Verificación física mediante `GetSystemPowerStatus`: sólo se clasifica como `NotSupported` si el hardware carece de batería (`BatteryFlag == 128` o `BatteryLifePercent == 255`).
   - Mapeo fidedigno en `EnergySaverStateMapper.FromWinRt` y `FromWin32`: con batería presente, `Disabled` (0) se resuelve como `EnergySaverState.Off` ("Desactivado (Rendimiento estándar)").
-  - Sincronización inmediata del estado en la ventana de Configuración al invocar `RefreshEnergySaverStatus()`.
+- **Detección Dinámica de Activación/Desactivación de Ahorro de Energía con `PBT_APMPOWERSTATUSCHANGE`:**
+  - Intercepción en `IslandWindow.xaml.cs` del mensaje Win32 universal `PBT_APMPOWERSTATUSCHANGE` (0x000A) emitido por Windows al pulsar el mosaico de ahorro de batería.
+  - Consulta en vivo mediante `SystemStatusFlag` de `SYSTEM_POWER_STATUS` (`SystemStatusFlag == 1` -> `On`, `0` -> `Off`) vía `EnergySaverService.QueryLiveEnergySaverState()` y `EnergySaverStateMapper.FromSystemStatusFlag()`.
+  - Suscripción reactiva de `SettingsViewModel` a `EnergySaverStatusChangedMessage` para refresco instantáneo del indicador de estado en la ventana de Ajustes en tiempo real.
 
 ## [1.4.0-dev] - 2026-10-02 (Fase 19: Reloj Ambiental en Reposo)
 

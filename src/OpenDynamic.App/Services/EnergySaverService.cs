@@ -120,10 +120,13 @@ public sealed class EnergySaverService : IResourceProfileProvider, IDisposable
         }
         catch (Exception ex)
         {
-            Log.Warning(ex, "Failed to subscribe to WinRT PowerManager.EnergySaverStatusChanged. Energy saver monitoring disabled.");
-            _currentState = EnergySaverState.NotSupported;
-            _alertPolicy.ProcessState(EnergySaverState.NotSupported);
-            _currentProfile = ComputeCurrentProfile(EnergySaverState.NotSupported);
+            Log.Warning(ex, "Failed to subscribe to WinRT PowerManager.EnergySaverStatusChanged. Relying on Win32 power notifications.");
+            if (!CheckHasSystemBattery())
+            {
+                _currentState = EnergySaverState.NotSupported;
+                _alertPolicy.ProcessState(EnergySaverState.NotSupported);
+                _currentProfile = ComputeCurrentProfile(EnergySaverState.NotSupported);
+            }
         }
     }
 
@@ -284,28 +287,27 @@ public sealed class EnergySaverService : IResourceProfileProvider, IDisposable
     }
 
     /// <summary>
-    /// Queries the native WinRT PowerManager for current energy saver status,
-    /// cross-referencing with physical battery presence.
+    /// Live query of Windows energy saver (battery saver) status via Win32 GetSystemPowerStatus.
+    /// SystemStatusFlag == 1 indicates Battery Saver is active.
+    /// SystemStatusFlag == 0 indicates Battery Saver is inactive.
+    /// </summary>
+    public static EnergySaverState QueryLiveEnergySaverState()
+    {
+        if (!CheckHasSystemBattery()) return EnergySaverState.NotSupported;
+        if (NativeMethods.GetSystemPowerStatus(out var status))
+        {
+            return EnergySaverStateMapper.FromSystemStatusFlag(status.SystemStatusFlag, hasBattery: true);
+        }
+        return EnergySaverState.Off;
+    }
+
+    /// <summary>
+    /// Queries current energy saver status, cross-referencing with physical battery presence.
     /// Safe against exceptions and desktop hardware without battery.
     /// </summary>
     public static EnergySaverState QueryPlatformEnergySaverState()
     {
-        bool hasBattery = CheckHasSystemBattery();
-        if (!hasBattery)
-        {
-            return EnergySaverState.NotSupported;
-        }
-
-        try
-        {
-            var status = Windows.System.Power.PowerManager.EnergySaverStatus;
-            return EnergySaverStateMapper.FromWinRt((int)status, hasBattery: true);
-        }
-        catch (Exception ex)
-        {
-            Log.Debug(ex, "Failed to query PowerManager.EnergySaverStatus. Falling back to Off (battery detected).");
-            return EnergySaverState.Off;
-        }
+        return QueryLiveEnergySaverState();
     }
 
     private ResourceProfile ComputeCurrentProfile(EnergySaverState state)

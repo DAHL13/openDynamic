@@ -915,11 +915,11 @@
   5. Interfaz de usuario integrada con widget transitorio en la muesca (`EnergySaverWidget`, prioridad 88, 3 segundos) y controles completos en Ajustes con migración limpia a esquema v13 en `AppSettings`.
 
 - **Decisiones Técnicas:**
-  1. **Monitoreo Reactivo de Energía vía Win32 `RegisterPowerSettingNotification`, `GetSystemPowerStatus` y Fallback WinRT (Reglas de Oro 1 y 11):**
+  1. **Monitoreo Reactivo de Energía vía Win32 `PBT_APMPOWERSTATUSCHANGE` + `GetSystemPowerStatus` (`SystemStatusFlag`) (Reglas de Oro 1 y 11):**
      - En aplicaciones de escritorio Win32 desempaquetadas, el evento WinRT `PowerManager.EnergySaverStatusChanged` no se despacha al carecer de infraestructura `CoreWindow`.
-     - La detección infalible y reactiva se realiza registrando el HWND de `IslandWindow` mediante `RegisterPowerSettingNotification` con `GUID_POWER_SAVING_STATUS` (`E00958C0-C213-4ACE-AC77-B78D78560846`).
-     - Al alternarse el ahorro de batería en Windows, se intercepta `WM_POWERBROADCAST` con `PBT_POWERSETTINGCHANGE` (0x8013) y la estructura `POWERBROADCAST_SETTING`, despachando el estado (0 = Off, 1 = On) inmediatamente y sin ningún tipo de sondeo (*zero polling*).
-     - **Detección Fidedigna de Hardware con Batería:** Para evitar falsos positivos en laptops conectadas a la corriente (donde Windows devuelve `Disabled` / 0), se realiza una comprobación física con `GetSystemPowerStatus`. `EnergySaverState.NotSupported` solo se emite si el hardware no tiene batería (`BatteryFlag == 128` o `BatteryLifePercent == 255`). En caso de haber batería física, `Disabled` se mapea limpiamente a `EnergySaverState.Off` ("Desactivado (Rendimiento estándar)").
+     - La detección estándar y universal en Win32 se realiza interceptando `WM_POWERBROADCAST` con `wParam == PBT_APMPOWERSTATUSCHANGE` (0x000A) en el procedimiento de ventana de `IslandWindow`.
+     - Al recibir el evento, se consulta `GetSystemPowerStatus(out SYSTEM_POWER_STATUS status)` y se evalúa el byte oficial `status.SystemStatusFlag` (`1` = Battery Saver activado / `On`, `0` = Battery Saver desactivado / `Off`) mediante `EnergySaverService.QueryLiveEnergySaverState()` y `EnergySaverStateMapper.FromSystemStatusFlag()`, despachando el cambio de forma 100% reactiva sin sondeo (*zero polling*).
+     - **Detección Fidedigna de Hardware con Batería:** Para evitar falsos positivos en laptops conectadas a la corriente, se comprueba la presencia física de batería con `GetSystemPowerStatus`. `EnergySaverState.NotSupported` solo se emite si el hardware carece de batería (`BatteryFlag == 128` o `BatteryLifePercent == 255`).
   2. **Política Pura de Alertas (`EnergySaverAlertPolicy`) con `TimeProvider` (Regla de Oro 5):**
      - Ubicada en `OpenDynamic.Core.EnergySaver`, sin referencias a UI.
      - Implementa supresión en el arranque (`Initialize`), impidiendo notificaciones flotantes al iniciar openDynamic.
@@ -932,7 +932,7 @@
        - Si el visualizador de audio está en `Reactive` y `EnergySaverCapAudioVisualizer == true`, se reduce a `Simulated` para liberar la captura de bucle loopback y el procesamiento FFT. Si el usuario configuró `Off`, se mantiene en `Off`.
        - Si `EnergySaverThrottleHardwareSampling == true`, el intervalo de muestreo de hardware se espacia al valor configurado (por defecto 5.0 s en lugar de 2.0 s).
   4. **Adaptación en Caliente en App y Widgets:**
-     - `IslandWindow.xaml.cs`: Escucha `ResourceProfileChanged` del `EnergySaverService` y reconfigura los resortes elásticos en vivo; intercepta `WM_POWERBROADCAST` (`PBT_APMSUSPEND`, `PBT_APMRESUMEAUTOMATIC`, `PBT_APMRESUMESUSPEND`) para notificar suspensión y reanudación a la política de alertas.
+     - `IslandWindow.xaml.cs`: Escucha `ResourceProfileChanged` del `EnergySaverService` y reconfigura los resortes elásticos en vivo; intercepta `WM_POWERBROADCAST` (`PBT_APMPOWERSTATUSCHANGE`, `PBT_APMSUSPEND`, `PBT_APMRESUMEAUTOMATIC`, `PBT_APMRESUMESUSPEND`) para notificar transiciones, suspensión y reanudación.
      - `HardwareWidget`: Recibe `IResourceProfileProvider` e intercambia su cadencia de muestreo en tiempo real ante cambios de perfil.
      - `MediaWidget`: Recibe `IResourceProfileProvider` y conmuta el modo visualizador dinámicamente entre reactivo y simulado según el perfil activo.
   5. **Widget de Muesca Transitorio (`EnergySaverWidget`):**
@@ -943,10 +943,10 @@
      - Se promovió `CurrentSchemaVersion` de 12 a 13 en `AppSettings.cs`.
      - Nuevas opciones persistidas: `EnableEnergySaverAlerts`, `DefaultEnergySaverPriority`, `EnergySaverTransientDurationSeconds`, `EnableEnergySaverEfficientMode`, `EnergySaverReduceAnimations`, `EnergySaverCapAudioVisualizer`, `EnergySaverThrottleHardwareSampling` y `EnergySaverHardwareSamplingIntervalSeconds`.
      - Migración automática v12 -> v13 en `SettingsService.cs` sin pérdida de configuraciones existentes.
-     - Tarjeta "🌱 Ahorro de Energía de Windows" en `SettingsWindow.xaml` con indicador de estado en tiempo real (`EnergySaverStateSummaryText`) y refresco al abrir (`RefreshEnergySaverStatus()`).
+     - Tarjeta "🌱 Ahorro de Energía de Windows" en `SettingsWindow.xaml` con indicador de estado en tiempo real (`EnergySaverStateSummaryText`) suscrito a `EnergySaverStatusChangedMessage`.
 
 - **Consecuencias y Verificación:**
-  - 506 pruebas unitarias automáticas en verde (100% de la suite; 53 nuevas pruebas incorporadas en la fase).
+  - 512 pruebas unitarias automáticas en verde (100% de la suite; 59 nuevas pruebas incorporadas en la fase).
   - Cero bucles de sondeo; consumo de CPU estrictamente del 0% en reposo.
   - Compilación Release limpia con 0 errores y 0 advertencias (`TreatWarningsAsErrors`).
 

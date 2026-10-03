@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Messaging;
 using OpenDynamic.App.Orchestration;
 using OpenDynamic.App.Services;
 using OpenDynamic.App.Widgets.Hardware;
@@ -458,6 +459,14 @@ public partial class SettingsViewModel : ObservableObject
             _energySaverService.StateChanged += (_, _) => OnPropertyChanged(nameof(EnergySaverStateSummaryText));
             _energySaverService.HandleStatusChanged();
         }
+
+        WeakReferenceMessenger.Default.Register<Widgets.Messages.EnergySaverStatusChangedMessage>(this, (_, msg) =>
+        {
+            System.Windows.Application.Current?.Dispatcher.InvokeAsync(() =>
+            {
+                OnPropertyChanged(nameof(EnergySaverStateSummaryText));
+            });
+        });
 
         _settings = _settingsService.CurrentSettings;
 

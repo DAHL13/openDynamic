@@ -36,6 +36,27 @@ public class EnergySaverStateMapperTests
         Assert.Equal(expected, result);
     }
 
+    [Theory]
+    // Laptop with physical battery present (hasBattery: true)
+    [InlineData((byte)0, true, EnergySaverState.Off)]
+    [InlineData((byte)1, true, EnergySaverState.On)]
+    [InlineData((byte)255, true, EnergySaverState.Unknown)]
+    // Desktop PC without physical battery (hasBattery: false)
+    [InlineData((byte)0, false, EnergySaverState.NotSupported)]
+    [InlineData((byte)1, false, EnergySaverState.NotSupported)]
+    public void FromSystemStatusFlag_MapsCorrectly(byte rawValue, bool hasBattery, EnergySaverState expected)
+    {
+        var result = EnergySaverStateMapper.FromSystemStatusFlag(rawValue, hasBattery);
+        Assert.Equal(expected, result);
+    }
+
+    [Fact]
+    public void FromSystemStatusFlag_DefaultHasBatteryTrue_MapsZeroToOffAndOneToOn()
+    {
+        Assert.Equal(EnergySaverState.Off, EnergySaverStateMapper.FromSystemStatusFlag(0));
+        Assert.Equal(EnergySaverState.On, EnergySaverStateMapper.FromSystemStatusFlag(1));
+    }
+
     [Fact]
     public void FromWinRt_DefaultHasBatteryTrue_MapsDisabledToOff()
     {

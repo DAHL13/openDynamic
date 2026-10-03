@@ -620,6 +620,16 @@ public partial class IslandWindow : Window
                 _energySaverService?.NotifyResumed();
                 break;
 
+            case NativeMethods.PBT_APMPOWERSTATUSCHANGE: // 0x000A
+            {
+                var newState = Services.EnergySaverService.QueryLiveEnergySaverState();
+                Log.Information("WM_POWERBROADCAST PBT_APMPOWERSTATUSCHANGE: Live State = {State}", newState);
+                _energySaverService?.HandleStatusChanged(newState);
+                WeakReferenceMessenger.Default.Send(new Widgets.Messages.EnergySaverStatusChangedMessage(newState));
+                _powerService?.HandlePowerBroadcast(wParam, lParam);
+                break;
+            }
+
             case NativeMethods.PBT_POWERSETTINGCHANGE:
                 HandlePowerSettingChange(lParam);
                 _powerService?.HandlePowerBroadcast(wParam, lParam);

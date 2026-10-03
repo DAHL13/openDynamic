@@ -51,4 +51,23 @@ public static class EnergySaverStateMapper
             _ => EnergySaverState.Unknown
         };
     }
+
+    /// <summary>
+    /// Translates Win32 SYSTEM_POWER_STATUS.SystemStatusFlag (0 = Battery Saver Off, 1 = Battery Saver On)
+    /// to <see cref="EnergySaverState"/>, taking into account whether physical battery hardware is present.
+    /// </summary>
+    public static EnergySaverState FromSystemStatusFlag(byte systemStatusFlag, bool hasBattery = true)
+    {
+        if (!hasBattery)
+        {
+            return EnergySaverState.NotSupported;
+        }
+
+        return systemStatusFlag switch
+        {
+            1 => EnergySaverState.On,
+            0 => EnergySaverState.Off,
+            _ => EnergySaverState.Unknown
+        };
+    }
 }
