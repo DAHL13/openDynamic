@@ -148,17 +148,18 @@ public sealed class FullscreenWatcher : IDisposable
         uint dwEventThread,
         uint dwmsEventTime)
     {
-        if (eventType == NativeMethods.EVENT_SYSTEM_FOREGROUND && hwnd != IntPtr.Zero)
+        if (eventType == NativeMethods.EVENT_SYSTEM_FOREGROUND)
         {
-            EvaluateFullscreenState(hwnd);
+            IntPtr targetHwnd = (hwnd != IntPtr.Zero && NativeMethods.IsWindow(hwnd)) ? hwnd : NativeMethods.GetForegroundWindow();
+            EvaluateFullscreenState(targetHwnd);
         }
-        else if (eventType == NativeMethods.EVENT_OBJECT_LOCATIONCHANGE && idObject == NativeMethods.OBJID_WINDOW && hwnd != IntPtr.Zero)
+        else if (eventType == NativeMethods.EVENT_OBJECT_LOCATIONCHANGE && idObject == NativeMethods.OBJID_WINDOW)
         {
             // Efficiency filter: only evaluate if the resizing/moving window is currently the foreground window
             IntPtr foregroundHwnd = NativeMethods.GetForegroundWindow();
-            if (hwnd == foregroundHwnd)
+            if (hwnd == foregroundHwnd || hwnd == IntPtr.Zero)
             {
-                EvaluateFullscreenState(hwnd);
+                EvaluateFullscreenState(foregroundHwnd);
             }
         }
     }
@@ -171,17 +172,38 @@ public sealed class FullscreenWatcher : IDisposable
     {
         try
         {
+            if (!_settings.HideOnFullscreen)
+            {
+                if (_isFullscreenActive)
+                {
+                    _isFullscreenActive = false;
+                    FullscreenChanged?.Invoke(this, false);
+                }
+                return;
+            }
+
             bool isFullscreen = false;
+
+            // Resolve foreground window if passed handle is null or invalid
+            if (foregroundHwnd == IntPtr.Zero || !NativeMethods.IsWindow(foregroundHwnd))
+            {
+                foregroundHwnd = NativeMethods.GetForegroundWindow();
+            }
 
             // 1. Check SHQueryUserNotificationState
             int hr = NativeMethods.SHQueryUserNotificationState(out var queryState);
-            if (hr == 0 && Core.Windowing.FullscreenDetector.IsNotificationStateFullscreen((int)queryState))
+            int qunsValue = (int)queryState;
+
+            // Direct3D exclusive fullscreen or presentation mode
+            if (hr == 0 && (qunsValue == Core.Windowing.FullscreenDetector.QUNS_RUNNING_D3D_FULL_SCREEN ||
+                            qunsValue == Core.Windowing.FullscreenDetector.QUNS_PRESENTATION_MODE))
             {
                 isFullscreen = true;
             }
-
-            // 2. Check window bounds vs monitor bounds (catches borderless video/games like YouTube, VLC)
-            if (!isFullscreen && foregroundHwnd != IntPtr.Zero)
+            // For QUNS_BUSY or normal window check:
+            // In Windows 10/11, Focus Assist / Do Not Disturb sets QUNS_BUSY (2) even when idling on the desktop.
+            // Therefore, verify whether a valid foreground window actually exists and its bounds cover the display monitor.
+            else if (foregroundHwnd != IntPtr.Zero && NativeMethods.IsWindow(foregroundHwnd))
             {
                 IntPtr shellHwnd = NativeMethods.GetShellWindow();
                 IntPtr desktopHwnd = NativeMethods.GetDesktopWindow();

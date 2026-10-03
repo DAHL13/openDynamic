@@ -36,6 +36,7 @@ public partial class IslandWindow : Window
 
     private readonly DispatcherTimer _hoverEnterTimer;
     private readonly DispatcherTimer _hoverLeaveTimer;
+    private readonly DispatcherTimer _restingHoverWatcherTimer;
 
     private IntPtr _hwnd = IntPtr.Zero;
     private HwndSource? _hwndSource;
@@ -82,6 +83,13 @@ public partial class IslandWindow : Window
         };
         _hoverLeaveTimer.Tick += OnHoverLeaveTimerTick;
 
+        _restingHoverWatcherTimer = new DispatcherTimer(DispatcherPriority.Background)
+        {
+            Interval = TimeSpan.FromMilliseconds(100)
+        };
+        _restingHoverWatcherTimer.Tick += OnRestingHoverWatcherTick;
+        _restingHoverWatcherTimer.Start();
+
         _animator.FrameUpdated += OnAnimatorFrameUpdated;
         _animator.Settled += OnAnimatorSettled;
         IslandHostView.SatelliteFadeOutCompleted += OnSatelliteFadeOutCompleted;
@@ -94,6 +102,8 @@ public partial class IslandWindow : Window
 
                 if (msg.NewState != IslandState.Hidden)
                 {
+                    _restingHoverWatcherTimer.Stop();
+
                     if (IslandHostView.Visibility != Visibility.Visible)
                     {
                         IslandHostView.Visibility = Visibility.Visible;
@@ -133,6 +143,11 @@ public partial class IslandWindow : Window
                             Log.Debug("[Hover] Enter Timer Started (Retained on State Change)");
                             _hoverEnterTimer.Start();
                         }
+                    }
+
+                    if (!_restingHoverWatcherTimer.IsEnabled && !_orchestrator.IsHovering)
+                    {
+                        _restingHoverWatcherTimer.Start();
                     }
 
                     CheckAndApplyHiddenVisibility();
@@ -341,6 +356,11 @@ public partial class IslandWindow : Window
         {
             RestingSensorNotch.Visibility = Visibility.Visible;
             RestingSensorNotch.IsHitTestVisible = true;
+        }
+
+        if (!_restingHoverWatcherTimer.IsEnabled && !_orchestrator.IsHovering)
+        {
+            _restingHoverWatcherTimer.Start();
         }
     }
 
@@ -802,7 +822,7 @@ public partial class IslandWindow : Window
 
     private void OnPhysicalCursorPresence()
     {
-        if (_orchestrator.IsFullscreenSuppressed || _orchestrator.IsPowerSuspended)
+        if (_orchestrator.IsPowerSuspended)
         {
             return;
         }
@@ -1000,7 +1020,7 @@ public partial class IslandWindow : Window
         _hoverEnterTimer.Stop();
         var state = _orchestrator.StateMachine.CurrentState;
 
-        if (IsPhysicalCursorOverInteractiveZone() && !_orchestrator.IsFullscreenSuppressed && !_orchestrator.IsPowerSuspended)
+        if (IsPhysicalCursorOverInteractiveZone() && !_orchestrator.IsPowerSuspended)
         {
             Log.Debug("[Hover] Enter Timer Fired -> Deploying");
 
@@ -1017,6 +1037,20 @@ public partial class IslandWindow : Window
                     _orchestrator.RequestExpand();
                 }
             }
+        }
+    }
+
+    private void OnRestingHoverWatcherTick(object? sender, EventArgs e)
+    {
+        if (_orchestrator.StateMachine.CurrentState != IslandState.Hidden || _orchestrator.IsHovering)
+        {
+            _restingHoverWatcherTimer.Stop();
+            return;
+        }
+
+        if (IsPhysicalCursorOverInteractiveZone())
+        {
+            OnPhysicalCursorPresence();
         }
     }
 
@@ -1083,6 +1117,10 @@ public partial class IslandWindow : Window
         _hoverEnterTimer.Tick -= OnHoverEnterTimerTick;
 
         _hoverLeaveTimer.Stop();
+        _hoverLeaveTimer.Tick -= OnHoverLeaveTimerTick;
+
+        _restingHoverWatcherTimer.Stop();
+        _restingHoverWatcherTimer.Tick -= OnRestingHoverWatcherTick;
         _animator.FrameUpdated -= OnAnimatorFrameUpdated;
         _animator.Settled -= OnAnimatorSettled;
         IslandHostView.SatelliteFadeOutCompleted -= OnSatelliteFadeOutCompleted;

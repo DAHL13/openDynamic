@@ -20,7 +20,7 @@
                 VerticalAlignment="Top"
                 Width="240"
                 Height="44"
-                Background="Transparent"
+                Background="#01000000"
                 Focusable="False"
                 IsHitTestVisible="True" />
 

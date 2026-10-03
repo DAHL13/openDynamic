@@ -452,7 +452,8 @@ public sealed class IslandOrchestrator : IDisposable
     /// </summary>
     public void UpdateOrchestration()
     {
-        if (_disposed || _isFullscreenSuppressed || _isPowerSuspended) return;
+        if (_disposed || _isPowerSuspended) return;
+        if (_isFullscreenSuppressed && !_isHovering) return;
 
         // Cancel previous expiration timer
         _transientTimer?.Stop();
@@ -723,8 +724,11 @@ public sealed class IslandOrchestrator : IDisposable
     {
         if ((_isFullscreenSuppressed || _isPowerSuspended) && targetState != IslandState.Hidden)
         {
-            Log.Debug("Transition to {TargetState} suppressed because fullscreen or power suspension is active.", targetState);
-            return false;
+            if (!_isHovering)
+            {
+                Log.Debug("Transition to {TargetState} suppressed because fullscreen or power suspension is active.", targetState);
+                return false;
+            }
         }
 
         if (_stateMachine.CurrentState == targetState)
