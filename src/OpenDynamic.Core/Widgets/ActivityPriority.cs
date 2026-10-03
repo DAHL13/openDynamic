@@ -19,6 +19,7 @@ public static class ActivityPriority
     public const int Network = 65;
     public const int Volume = 80;
     public const int Privacy = 85;
+    public const int EnergySaver = 88;
     public const int Battery = 90;
     public const int TimerAlert = 100;
     public const int High = 100;
