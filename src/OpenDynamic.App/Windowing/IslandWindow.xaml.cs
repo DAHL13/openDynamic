@@ -32,6 +32,7 @@ public partial class IslandWindow : Window
     private readonly Services.DeviceService? _deviceService;
     private readonly Services.ClipboardService? _clipboardService;
     private readonly Services.PrivacyAccessMonitor? _privacyMonitor;
+    private readonly Services.EnergySaverService? _energySaverService;
     private readonly Core.Settings.AppSettings _settings;
 
     private readonly DispatcherTimer _hoverEnterTimer;
@@ -55,7 +56,8 @@ public partial class IslandWindow : Window
         Services.NetworkService? networkService = null,
         Services.DeviceService? deviceService = null,
         Services.ClipboardService? clipboardService = null,
-        Services.PrivacyAccessMonitor? privacyMonitor = null)
+        Services.PrivacyAccessMonitor? privacyMonitor = null,
+        Services.EnergySaverService? energySaverService = null)
     {
         _windowPositioner = windowPositioner ?? throw new ArgumentNullException(nameof(windowPositioner));
         _foregroundWatcher = foregroundWatcher ?? throw new ArgumentNullException(nameof(foregroundWatcher));
@@ -67,7 +69,13 @@ public partial class IslandWindow : Window
         _deviceService = deviceService;
         _clipboardService = clipboardService;
         _privacyMonitor = privacyMonitor;
+        _energySaverService = energySaverService;
         _settings = settings ?? new Core.Settings.AppSettings();
+
+        if (_energySaverService != null)
+        {
+            _energySaverService.ResourceProfileChanged += OnResourceProfileChanged;
+        }
 
         InitializeComponent();
 
@@ -496,6 +504,21 @@ public partial class IslandWindow : Window
         });
     }
 
+    private void OnResourceProfileChanged(object? sender, Core.EnergySaver.ResourceProfile profile)
+    {
+        Dispatcher.InvokeAsync(() =>
+        {
+            _animator.ApplyProfile(profile.MotionProfile);
+            IslandHostView.UpdateMotionProfile(profile.MotionProfile);
+
+            CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger.Default.Send(
+                new Widgets.Messages.MotionProfileChangedMessage(profile.MotionProfile));
+
+            Log.Information("IslandWindow: Applied MotionProfile from ResourceProfile (IsEfficient={IsEfficient}, Stiffness={Stiffness}, AllowDecorative={AllowDecorative})",
+                profile.IsEfficientModeActive, profile.MotionProfile.Stiffness, profile.MotionProfile.AllowDecorative);
+        });
+    }
+
     /// <summary>
     /// Evaluates the system animation preference and resolves the active motion profile in real time.
     /// Preserves in-flight spring velocities (Task 3).
@@ -503,7 +526,10 @@ public partial class IslandWindow : Window
     public void UpdateMotionProfileLive()
     {
         bool systemAnimations = SystemParameters.ClientAreaAnimation;
-        var resolvedProfile = Core.Animation.MotionProfileResolver.Resolve(_settings.MotionMode, systemAnimations);
+        var resolvedProfile = _energySaverService != null
+            ? _energySaverService.CurrentProfile.MotionProfile
+            : Core.Animation.MotionProfileResolver.Resolve(_settings.MotionMode, systemAnimations);
+
         _animator.ApplyProfile(resolvedProfile);
         IslandHostView.UpdateMotionProfile(resolvedProfile);
 
@@ -553,6 +579,7 @@ public partial class IslandWindow : Window
                 _networkService?.NotifySuspended();
                 _deviceService?.NotifySuspended();
                 _clipboardService?.NotifySuspended();
+                _energySaverService?.NotifySuspended();
                 break;
 
             case NativeMethods.PBT_APMRESUMEAUTOMATIC:
@@ -568,6 +595,7 @@ public partial class IslandWindow : Window
                 _networkService?.NotifyResumed();
                 _deviceService?.NotifyResumed();
                 _clipboardService?.NotifyResumed();
+                _energySaverService?.NotifyResumed();
                 break;
 
             default:
@@ -587,6 +615,7 @@ public partial class IslandWindow : Window
                     _hoverEnterTimer.Stop();
                     _hoverLeaveTimer.Stop();
                     _orchestrator.SuspendForPower();
+                    _energySaverService?.NotifySuspended();
                 });
                 break;
 
@@ -600,6 +629,7 @@ public partial class IslandWindow : Window
                         _windowPositioner.ReassertTopmost(_hwnd);
                     }
                     _powerService?.RefreshPowerStatus(isInitial: false);
+                    _energySaverService?.NotifyResumed();
                 });
                 break;
         }
@@ -1144,6 +1174,11 @@ public partial class IslandWindow : Window
         if (_privacyMonitor != null)
         {
             _privacyMonitor.StateChanged -= OnPrivacyStateChanged;
+        }
+
+        if (_energySaverService != null)
+        {
+            _energySaverService.ResourceProfileChanged -= OnResourceProfileChanged;
         }
 
         if (_hwndSource != null)

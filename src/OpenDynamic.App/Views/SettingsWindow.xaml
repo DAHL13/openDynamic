@@ -653,6 +653,67 @@
                             </StackPanel>
                         </Border>
 
+                        <!-- Energy Saver Card (Phase 20) -->
+                        <Border Style="{StaticResource SettingCard}">
+                            <StackPanel>
+                                <Grid>
+                                    <StackPanel>
+                                        <TextBlock Text="🌱 Ahorro de Energía de Windows" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Detección reactiva de ahorro de batería y adaptación inteligente de recursos." Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <Border Background="#252834" CornerRadius="4" Padding="8,4" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding EnergySaverStateSummaryText}" FontSize="11" FontWeight="SemiBold" Foreground="#34D399"/>
+                                    </Border>
+                                </Grid>
+
+                                <!-- Alert Notification Toggle -->
+                                <Grid Margin="0,12,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="Notificación en la Isla" Style="{StaticResource SettingDesc}" Foreground="#F3F4F6"/>
+                                        <TextBlock Text="Muestra un aviso flotante cuando el sistema entra o sale de ahorro de energía." Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <CheckBox IsChecked="{Binding EnableEnergySaverAlerts}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                </Grid>
+
+                                <!-- Efficient Mode Toggle -->
+                                <Grid Margin="0,10,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="Perfil de Recursos Eficiente" Style="{StaticResource SettingDesc}" Foreground="#F3F4F6"/>
+                                        <TextBlock Text="Adapta dinámicamente los recursos internos de openDynamic al activarse el ahorro de energía." Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <CheckBox IsChecked="{Binding EnableEnergySaverEfficientMode}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                </Grid>
+
+                                <!-- Sub-optimizations (indented) -->
+                                <StackPanel Margin="16,8,0,0">
+                                    <Grid Margin="0,4,0,0">
+                                        <TextBlock Text="Reducir animaciones de resortes a perfil directo" Style="{StaticResource SettingDesc}"/>
+                                        <CheckBox IsChecked="{Binding EnergySaverReduceAnimations}" IsEnabled="{Binding EnableEnergySaverEfficientMode}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                    </Grid>
+
+                                    <Grid Margin="0,6,0,0">
+                                        <TextBlock Text="Suspender espectro de audio reactivo (limitar a simulado)" Style="{StaticResource SettingDesc}"/>
+                                        <CheckBox IsChecked="{Binding EnergySaverCapAudioVisualizer}" IsEnabled="{Binding EnableEnergySaverEfficientMode}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                    </Grid>
+
+                                    <Grid Margin="0,6,0,0">
+                                        <TextBlock Text="Espaciar telemetría de hardware (CPU/GPU/RAM)" Style="{StaticResource SettingDesc}"/>
+                                        <CheckBox IsChecked="{Binding EnergySaverThrottleHardwareSampling}" IsEnabled="{Binding EnableEnergySaverEfficientMode}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </StackPanel>
+
+                                <!-- Sampling Interval Slider -->
+                                <StackPanel Margin="16,8,0,0">
+                                    <Grid>
+                                        <TextBlock Text="Intervalo de telemetría en ahorro de energía" Style="{StaticResource SettingDesc}"/>
+                                        <TextBlock Text="{Binding EnergySaverHardwareSamplingIntervalSeconds, StringFormat='{}{0:0.#} s'}" Style="{StaticResource ValueBadge}"/>
+                                    </Grid>
+                                    <Slider Minimum="3.0" Maximum="10.0" Value="{Binding EnergySaverHardwareSamplingIntervalSeconds}" SmallChange="0.5" LargeChange="1.0"
+                                            IsEnabled="{Binding EnableEnergySaverEfficientMode}"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
                         <!-- Timer Widget Card -->
                         <Border Style="{StaticResource SettingCard}">
                             <StackPanel>

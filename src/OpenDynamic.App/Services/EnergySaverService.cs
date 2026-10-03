@@ -181,6 +181,14 @@ public sealed class EnergySaverService : IResourceProfileProvider, IDisposable
 
     private void OnSettingsChanged(object? sender, AppSettings newSettings)
     {
+        ReevaluateProfile();
+    }
+
+    /// <summary>
+    /// Explicitly recalculates the active resource profile based on current settings and system energy state.
+    /// </summary>
+    public void ReevaluateProfile()
+    {
         ResourceProfile newProfile;
         bool profileChanged = false;
 

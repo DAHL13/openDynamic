@@ -85,6 +85,10 @@ public partial class App : Application
         var batteryWidget = Services.GetRequiredService<Widgets.Battery.BatteryWidget>();
         orchestrator.RegisterWidget(batteryWidget);
 
+        // Register EnergySaverWidget (Priority 88, Transient)
+        var energySaverWidget = Services.GetRequiredService<Widgets.EnergySaver.EnergySaverWidget>();
+        orchestrator.RegisterWidget(energySaverWidget);
+
         // Register HardwareWidget (Priority 10)
         var hardwareWidget = Services.GetRequiredService<Widgets.Hardware.HardwareWidget>();
         orchestrator.RegisterWidget(hardwareWidget);

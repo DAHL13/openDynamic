@@ -67,6 +67,7 @@ public partial class SettingsViewModel : ObservableObject
     private readonly ITimerCollection? _timerCollection;
     private readonly ClipboardService? _clipboardService;
     private readonly Services.PrivacyAccessMonitor? _privacyMonitor;
+    private readonly Services.EnergySaverService? _energySaverService;
 
     private readonly AppSettings _settings;
 
@@ -173,6 +174,46 @@ public partial class SettingsViewModel : ObservableObject
 
     [ObservableProperty]
     private int _batteryCriticalThresholdPercent;
+
+    // Energy Saver
+    [ObservableProperty]
+    private bool _enableEnergySaverAlerts;
+
+    [ObservableProperty]
+    private int _defaultEnergySaverPriority;
+
+    [ObservableProperty]
+    private double _energySaverTransientDurationSeconds;
+
+    [ObservableProperty]
+    private bool _enableEnergySaverEfficientMode;
+
+    [ObservableProperty]
+    private bool _energySaverReduceAnimations;
+
+    [ObservableProperty]
+    private bool _energySaverCapAudioVisualizer;
+
+    [ObservableProperty]
+    private bool _energySaverThrottleHardwareSampling;
+
+    [ObservableProperty]
+    private double _energySaverHardwareSamplingIntervalSeconds;
+
+    public string EnergySaverStateSummaryText
+    {
+        get
+        {
+            if (_energySaverService == null) return "No disponible";
+            return _energySaverService.CurrentState switch
+            {
+                Core.EnergySaver.EnergySaverState.On => "Activado (Ahorro de energía en curso)",
+                Core.EnergySaver.EnergySaverState.Off => "Desactivado (Rendimiento estándar)",
+                Core.EnergySaver.EnergySaverState.NotSupported => "No compatible (Equipo sin batería)",
+                _ => "Desconocido"
+            };
+        }
+    }
 
     // Hardware
     [ObservableProperty]
@@ -390,7 +431,8 @@ public partial class SettingsViewModel : ObservableObject
         DeviceService? deviceService = null,
         ITimerCollection? timerCollection = null,
         ClipboardService? clipboardService = null,
-        Services.PrivacyAccessMonitor? privacyMonitor = null)
+        Services.PrivacyAccessMonitor? privacyMonitor = null,
+        Services.EnergySaverService? energySaverService = null)
     {
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _orchestrator = orchestrator ?? throw new ArgumentNullException(nameof(orchestrator));
@@ -403,6 +445,12 @@ public partial class SettingsViewModel : ObservableObject
         _timerCollection = timerCollection;
         _clipboardService = clipboardService;
         _privacyMonitor = privacyMonitor;
+        _energySaverService = energySaverService;
+
+        if (_energySaverService != null)
+        {
+            _energySaverService.StateChanged += (_, _) => OnPropertyChanged(nameof(EnergySaverStateSummaryText));
+        }
 
         _settings = _settingsService.CurrentSettings;
 
@@ -435,6 +483,15 @@ public partial class SettingsViewModel : ObservableObject
         _defaultBatteryPriority = _settings.DefaultBatteryPriority;
         _batteryLowThresholdPercent = _settings.BatteryLowThresholdPercent;
         _batteryCriticalThresholdPercent = _settings.BatteryCriticalThresholdPercent;
+
+        _enableEnergySaverAlerts = _settings.EnableEnergySaverAlerts;
+        _defaultEnergySaverPriority = _settings.DefaultEnergySaverPriority;
+        _energySaverTransientDurationSeconds = _settings.EnergySaverTransientDurationSeconds;
+        _enableEnergySaverEfficientMode = _settings.EnableEnergySaverEfficientMode;
+        _energySaverReduceAnimations = _settings.EnergySaverReduceAnimations;
+        _energySaverCapAudioVisualizer = _settings.EnergySaverCapAudioVisualizer;
+        _energySaverThrottleHardwareSampling = _settings.EnergySaverThrottleHardwareSampling;
+        _energySaverHardwareSamplingIntervalSeconds = _settings.EnergySaverHardwareSamplingIntervalSeconds;
 
         _enableHardwareMonitoring = _settings.EnableHardwareMonitoring;
         _defaultHardwarePriority = _settings.DefaultHardwarePriority;
@@ -639,6 +696,59 @@ public partial class SettingsViewModel : ObservableObject
     {
         _settings.BatteryCriticalThresholdPercent = value;
         _settingsService.SaveDebounced();
+    }
+
+    partial void OnEnableEnergySaverAlertsChanged(bool value)
+    {
+        _settings.EnableEnergySaverAlerts = value;
+        _settingsService.SaveDebounced();
+    }
+
+    partial void OnDefaultEnergySaverPriorityChanged(int value)
+    {
+        _settings.DefaultEnergySaverPriority = value;
+        _settingsService.SaveDebounced();
+    }
+
+    partial void OnEnergySaverTransientDurationSecondsChanged(double value)
+    {
+        _settings.EnergySaverTransientDurationSeconds = value;
+        _settingsService.SaveDebounced();
+    }
+
+    partial void OnEnableEnergySaverEfficientModeChanged(bool value)
+    {
+        _settings.EnableEnergySaverEfficientMode = value;
+        _settingsService.SaveDebounced();
+        _energySaverService?.ReevaluateProfile();
+    }
+
+    partial void OnEnergySaverReduceAnimationsChanged(bool value)
+    {
+        _settings.EnergySaverReduceAnimations = value;
+        _settingsService.SaveDebounced();
+        _energySaverService?.ReevaluateProfile();
+    }
+
+    partial void OnEnergySaverCapAudioVisualizerChanged(bool value)
+    {
+        _settings.EnergySaverCapAudioVisualizer = value;
+        _settingsService.SaveDebounced();
+        _energySaverService?.ReevaluateProfile();
+    }
+
+    partial void OnEnergySaverThrottleHardwareSamplingChanged(bool value)
+    {
+        _settings.EnergySaverThrottleHardwareSampling = value;
+        _settingsService.SaveDebounced();
+        _energySaverService?.ReevaluateProfile();
+    }
+
+    partial void OnEnergySaverHardwareSamplingIntervalSecondsChanged(double value)
+    {
+        _settings.EnergySaverHardwareSamplingIntervalSeconds = value;
+        _settingsService.SaveDebounced();
+        _energySaverService?.ReevaluateProfile();
     }
 
     partial void OnEnableHardwareMonitoringChanged(bool value)
@@ -1171,6 +1281,16 @@ public partial class SettingsViewModel : ObservableObject
         DefaultBatteryPriority = _settings.DefaultBatteryPriority;
         BatteryLowThresholdPercent = _settings.BatteryLowThresholdPercent;
         BatteryCriticalThresholdPercent = _settings.BatteryCriticalThresholdPercent;
+
+        EnableEnergySaverAlerts = _settings.EnableEnergySaverAlerts;
+        DefaultEnergySaverPriority = _settings.DefaultEnergySaverPriority;
+        EnergySaverTransientDurationSeconds = _settings.EnergySaverTransientDurationSeconds;
+        EnableEnergySaverEfficientMode = _settings.EnableEnergySaverEfficientMode;
+        EnergySaverReduceAnimations = _settings.EnergySaverReduceAnimations;
+        EnergySaverCapAudioVisualizer = _settings.EnergySaverCapAudioVisualizer;
+        EnergySaverThrottleHardwareSampling = _settings.EnergySaverThrottleHardwareSampling;
+        EnergySaverHardwareSamplingIntervalSeconds = _settings.EnergySaverHardwareSamplingIntervalSeconds;
+        OnPropertyChanged(nameof(EnergySaverStateSummaryText));
 
         EnableHardwareMonitoring = _settings.EnableHardwareMonitoring;
         DefaultHardwarePriority = _settings.DefaultHardwarePriority;

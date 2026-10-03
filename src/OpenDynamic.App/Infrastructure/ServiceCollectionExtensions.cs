@@ -46,7 +46,8 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<NetworkService>(),
             sp.GetRequiredService<DeviceService>(),
             sp.GetRequiredService<ClipboardService>(),
-            sp.GetRequiredService<PrivacyAccessMonitor>()));
+            sp.GetRequiredService<PrivacyAccessMonitor>(),
+            sp.GetService<EnergySaverService>()));
 
         // Settings Service & Persistence
         services.AddSingleton<ISettingsService>(sp =>
@@ -88,17 +89,26 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<AppSettings>(),
             System.Windows.Application.Current?.Dispatcher,
             sp.GetRequiredService<MediaColorService>(),
-            sp.GetRequiredService<Core.Audio.Spectrum.IAudioSpectrumService>()));
+            sp.GetRequiredService<Core.Audio.Spectrum.IAudioSpectrumService>(),
+            sp.GetService<Core.EnergySaver.IResourceProfileProvider>()));
 
         // Power & Battery Services
         services.AddSingleton<PowerService>();
         services.AddSingleton<Core.Power.IBatteryMonitor>(sp => sp.GetRequiredService<PowerService>());
         services.AddSingleton<Widgets.Battery.BatteryWidget>();
 
+        // Energy Saver Services & Widget (Priority 88, Transient)
+        services.AddSingleton<EnergySaverService>();
+        services.AddSingleton<Core.EnergySaver.IResourceProfileProvider>(sp => sp.GetRequiredService<EnergySaverService>());
+        services.AddSingleton<Widgets.EnergySaver.EnergySaverWidget>();
+
         // Hardware Monitoring Services
         services.AddSingleton<HardwareService>();
         services.AddSingleton<Core.Hardware.IHardwareMonitor>(sp => sp.GetRequiredService<HardwareService>());
-        services.AddSingleton<Widgets.Hardware.HardwareWidget>();
+        services.AddSingleton<Widgets.Hardware.HardwareWidget>(sp => new Widgets.Hardware.HardwareWidget(
+            sp.GetRequiredService<HardwareService>(),
+            sp.GetRequiredService<AppSettings>(),
+            sp.GetService<Core.EnergySaver.IResourceProfileProvider>()));
 
         // Timer & Pomodoro Services
         services.AddSingleton<Core.Timer.TimerController>();
@@ -158,7 +168,8 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<DeviceService>(),
             sp.GetRequiredService<Core.Timer.ITimerCollection>(),
             sp.GetRequiredService<ClipboardService>(),
-            sp.GetRequiredService<PrivacyAccessMonitor>()));
+            sp.GetRequiredService<PrivacyAccessMonitor>(),
+            sp.GetService<EnergySaverService>()));
         services.AddSingleton<SettingsWindow>();
 
         // System Tray Icon Manager

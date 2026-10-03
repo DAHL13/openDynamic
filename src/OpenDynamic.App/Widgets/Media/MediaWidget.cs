@@ -8,6 +8,7 @@ using OpenDynamic.App.Services;
 using OpenDynamic.App.Widgets.Media.Views;
 using OpenDynamic.App.Widgets.Messages;
 using OpenDynamic.Core.Audio.Spectrum;
+using OpenDynamic.Core.EnergySaver;
 using OpenDynamic.Core.Media;
 using OpenDynamic.Core.Media.Color;
 using OpenDynamic.Core.Media.Gestures;
@@ -31,6 +32,7 @@ public sealed class MediaWidget : IslandWidgetBase
     private readonly AppSettings _settings;
     private readonly Dispatcher _dispatcher;
     private readonly IAudioSpectrumService? _spectrumService;
+    private readonly IResourceProfileProvider? _resourceProfileProvider;
 
     private DispatcherTimer? _pauseGraceTimer;
     private DispatcherTimer? _progressExtrapolationTimer;
@@ -167,10 +169,19 @@ public sealed class MediaWidget : IslandWidgetBase
     /// <summary>
     /// Equalizer bars are visible ONLY if music is playing and visualizer is not disabled.
     /// </summary>
-    public System.Windows.Visibility EqualizerVisibility =>
-        (_isPlaying && _settings.VisualizerMode != AudioVisualizerMode.Disabled)
-            ? System.Windows.Visibility.Visible
-            : System.Windows.Visibility.Collapsed;
+    public System.Windows.Visibility EqualizerVisibility
+    {
+        get
+        {
+            var effectiveMode = _resourceProfileProvider != null
+                ? _resourceProfileProvider.CurrentProfile.VisualizerMode
+                : _settings.VisualizerMode;
+
+            return (_isPlaying && effectiveMode != AudioVisualizerMode.Disabled)
+                ? System.Windows.Visibility.Visible
+                : System.Windows.Visibility.Collapsed;
+        }
+    }
 
     public TimeSpan CurrentPosition
     {
@@ -249,7 +260,8 @@ public sealed class MediaWidget : IslandWidgetBase
         AppSettings? settings = null,
         Dispatcher? dispatcher = null,
         MediaColorService? colorService = null,
-        IAudioSpectrumService? spectrumService = null)
+        IAudioSpectrumService? spectrumService = null,
+        IResourceProfileProvider? resourceProfileProvider = null)
         : base(settings?.DefaultMediaPriority ?? ActivityPriority.Media)
     {
         _mediaService = mediaService ?? throw new ArgumentNullException(nameof(mediaService));
@@ -257,6 +269,7 @@ public sealed class MediaWidget : IslandWidgetBase
         _dispatcher = dispatcher ?? (System.Windows.Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher);
         _colorService = colorService ?? new MediaColorService();
         _spectrumService = spectrumService;
+        _resourceProfileProvider = resourceProfileProvider;
 
         _wheelGestureDetector = new SwipeGestureDetector(threshold: _settings.MediaGestureSensitivity > 0 ? _settings.MediaGestureSensitivity : SwipeGestureDetector.DefaultWheelThreshold);
         _dragGestureDetector = new SwipeGestureDetector(threshold: SwipeGestureDetector.DefaultDragThreshold);
@@ -278,6 +291,11 @@ public sealed class MediaWidget : IslandWidgetBase
     public override void Initialize()
     {
         base.Initialize();
+
+        if (_resourceProfileProvider != null)
+        {
+            _resourceProfileProvider.ResourceProfileChanged += OnResourceProfileChanged;
+        }
 
         _mediaService.CurrentSessionChanged += OnMediaServiceCurrentSessionChanged;
         HookCurrentSession(_mediaService.CurrentSession);
@@ -725,6 +743,14 @@ public sealed class MediaWidget : IslandWidgetBase
         UpdateVisualizerState();
     }
 
+    private void OnResourceProfileChanged(object? sender, ResourceProfile profile)
+    {
+        _dispatcher.InvokeAsync(() =>
+        {
+            UpdateVisualizerState();
+        });
+    }
+
     public void UpdateVisualizerState()
     {
         if (_spectrumService == null) return;
@@ -735,8 +761,12 @@ public sealed class MediaWidget : IslandWidgetBase
                 ? IslandState.Expanded
                 : (DisplayMode == WidgetDisplayMode.Split ? IslandState.Split : IslandState.Compact));
 
+        var effectiveMode = _resourceProfileProvider != null
+            ? _resourceProfileProvider.CurrentProfile.VisualizerMode
+            : _settings.VisualizerMode;
+
         var context = new VisualizerActivationContext(
-            Mode: _settings.VisualizerMode,
+            Mode: effectiveMode,
             IsMediaPlaying: _isPlaying,
             IsMediaWidgetVisible: IsVisibleOnIsland,
             IslandState: state,
@@ -829,6 +859,11 @@ public sealed class MediaWidget : IslandWidgetBase
     {
         if (disposing)
         {
+            if (_resourceProfileProvider != null)
+            {
+                _resourceProfileProvider.ResourceProfileChanged -= OnResourceProfileChanged;
+            }
+
             CancelPauseGraceTimer();
             StopProgressTimer();
 

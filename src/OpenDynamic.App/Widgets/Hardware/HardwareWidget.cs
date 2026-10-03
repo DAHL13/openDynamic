@@ -2,6 +2,7 @@ using System.Windows.Controls;
 using System.Windows.Threading;
 using OpenDynamic.App.Services;
 using OpenDynamic.App.Widgets.Hardware.Views;
+using OpenDynamic.Core.EnergySaver;
 using OpenDynamic.Core.Hardware;
 using OpenDynamic.Core.Settings;
 using OpenDynamic.Core.Widgets;
@@ -19,6 +20,7 @@ public sealed class HardwareWidget : IslandWidgetBase
 {
     private readonly HardwareService _hardwareService;
     private readonly AppSettings _settings;
+    private readonly IResourceProfileProvider? _resourceProfileProvider;
     private DispatcherTimer? _sampleTimer;
 
     private double _cpuUsagePercent;
@@ -120,16 +122,25 @@ public sealed class HardwareWidget : IslandWidgetBase
     public string RamDetailText => MemoryUsageText;
     public string GpuSummaryText => GpuUsagePercent.HasValue ? $"{GpuUsagePercent.Value:0}%" : "N/A";
 
-    public HardwareWidget(HardwareService hardwareService, AppSettings settings)
+    public HardwareWidget(
+        HardwareService hardwareService,
+        AppSettings settings,
+        IResourceProfileProvider? resourceProfileProvider = null)
         : base(settings?.DefaultHardwarePriority ?? ActivityPriority.Hardware)
     {
         _hardwareService = hardwareService ?? throw new ArgumentNullException(nameof(hardwareService));
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+        _resourceProfileProvider = resourceProfileProvider;
     }
 
     public override void Initialize()
     {
         base.Initialize();
+
+        if (_resourceProfileProvider != null)
+        {
+            _resourceProfileProvider.ResourceProfileChanged += OnResourceProfileChanged;
+        }
 
         if (_settings.EnableHardwareMonitoring)
         {
@@ -214,17 +225,21 @@ public sealed class HardwareWidget : IslandWidgetBase
 
         if (shouldSample)
         {
+            TimeSpan currentInterval = _resourceProfileProvider != null
+                ? _resourceProfileProvider.CurrentProfile.HardwareSamplingInterval
+                : TimeSpan.FromSeconds(_settings.HardwareSamplingIntervalSeconds > 0 ? _settings.HardwareSamplingIntervalSeconds : 2.0);
+
             if (_sampleTimer == null)
             {
-                double intervalSecs = _settings.HardwareSamplingIntervalSeconds > 0
-                    ? _settings.HardwareSamplingIntervalSeconds
-                    : 2.0;
-
                 _sampleTimer = new DispatcherTimer
                 {
-                    Interval = TimeSpan.FromSeconds(intervalSecs)
+                    Interval = currentInterval
                 };
                 _sampleTimer.Tick += OnSampleTimerTick;
+            }
+            else if (_sampleTimer.Interval != currentInterval)
+            {
+                _sampleTimer.Interval = currentInterval;
             }
 
             if (!_sampleTimer.IsEnabled)
@@ -242,6 +257,16 @@ public sealed class HardwareWidget : IslandWidgetBase
                 _sampleTimer.Stop();
                 Log.Debug("HardwareWidget: Sampling timer halted for zero CPU consumption.");
             }
+        }
+    }
+
+    private void OnResourceProfileChanged(object? sender, ResourceProfile profile)
+    {
+        if (_sampleTimer != null && profile.HardwareSamplingInterval > TimeSpan.Zero)
+        {
+            _sampleTimer.Interval = profile.HardwareSamplingInterval;
+            Log.Information("HardwareWidget: Telemetry sampling interval dynamically updated to {Interval}s (ResourceProfile IsEfficient={IsEfficient}).",
+                profile.HardwareSamplingInterval.TotalSeconds, profile.IsEfficientModeActive);
         }
     }
 
@@ -287,6 +312,11 @@ public sealed class HardwareWidget : IslandWidgetBase
     {
         if (disposing)
         {
+            if (_resourceProfileProvider != null)
+            {
+                _resourceProfileProvider.ResourceProfileChanged -= OnResourceProfileChanged;
+            }
+
             if (_sampleTimer != null)
             {
                 _sampleTimer.Stop();
