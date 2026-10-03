@@ -70,6 +70,23 @@ openDynamic adopta una estética de **muesca rectangular superior (Notch)** pega
 | **Fase 15** | **Indicador de micrófono y cámara en uso (ConsentStore pasivo, cero polling, notch UI) (v1.1)** | **Completada** |
 | **Fase 16** | **Visualizador de audio real (espectro FFT propia, WASAPI loopback, 0 heap alloc, <2% CPU) (v1.1)** | **Completada** |
 | **Fase 19** | **Reloj ambiental en reposo (OnHover, 0% CPU idle, WM_TIMECHANGE, alineación al minuto) (v1.4)** | **Completada** |
+| **Fase 20** | **Ahorro de energía reactivo (WinRT PowerManager, ResourceProfile en Core, 0% polling) (v1.5)** | **Completada** |
+
+---
+
+## Ahorro de Energía y Perfil de Recursos Inteligente
+
+openDynamic monitorea el estado de **Ahorro de Batería de Windows** de forma estrictamente reactiva mediante la API nativa de WinRT (`Windows.System.Power.PowerManager.EnergySaverStatusChanged`), con cero bucles de sondeo (0% CPU adicional en reposo):
+
+- **Aviso Discreto en la Muesca (`EnergySaverWidget`):**
+  - Notificación transitoria de 3 segundos en modo compacto con acentos color esmeralda cuando Windows activa o desactiva el ahorro de energía.
+  - Supresión automática en el arranque del sistema y ventana de gracia de 10 segundos tras reanudar de suspensión o hibernación, evitando falsos avisos por lecturas transitorias de ACPI.
+  - Cooldown de 5 segundos para prevenir saturación de avisos ante cambios rápidos.
+- **Perfil de Recursos Adaptativo (`ResourceProfile`):**
+  - **Física de Resortes:** Conmuta automáticamente los resortes elásticos a amortiguamiento directo (`Reduced`) si el modo de movimiento está en `Auto`, reduciendo cuadros innecesarios. Respeta de forma prioritaria la configuración explícita del usuario (`Full`).
+  - **Espectro de Audio:** Suspende la captura de audio en bucle loopback y el procesamiento FFT pesado conmutando el visualizador a modo `Simulated`, liberando ciclos de CPU.
+  - **Telemetría de Hardware:** Espacia automáticamente el intervalo de muestreo de CPU, GPU y RAM de 2.0 s a 5.0 s (o el valor personalizado por el usuario).
+- **Compatibilidad Total:** Detecta entornos de escritorio sin batería (`NotSupported`) de forma silenciosa sin arrojar excepciones ni degradar el funcionamiento de la aplicación.
 
 ---
 

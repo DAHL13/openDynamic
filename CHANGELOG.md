@@ -3,6 +3,32 @@
 Todas las modificaciones notables en este proyecto serán documentadas en este archivo.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y cumple con [SemVer](https://semver.org/).
 
+## [1.5.0-dev] - 2026-10-02 (Fase 20: Ahorro de Energía)
+
+### Añadido
+- **Monitoreo Reactivo de Energía de Windows (`EnergySaverService`):**
+  - Suscripción reactiva nativa al evento WinRT `Windows.System.Power.PowerManager.EnergySaverStatusChanged` con cero bucles de polling (0% CPU en reposo).
+  - Manejo transparente y sin excepciones de PCs de escritorio y entornos sin batería (`EnergySaverState.NotSupported`).
+  - Mapeo desacoplado de estados WinRT a Core mediante `EnergySaverStateMapper`.
+- **Política Pura de Alertas (`EnergySaverAlertPolicy`):**
+  - Supresión automática de alertas visuales espurias durante el arranque de la aplicación.
+  - Supresión de 10 segundos tras reanudación de suspensión/hibernación (`NotifySuspended`, `NotifyResumedFromSuspend`) para amortiguar transiciones ACPI.
+  - Enfriamiento (*cooldown*) de 5 segundos entre transiciones consecutivas.
+  - Abstracción completa de tiempo con `TimeProvider`.
+- **Política Pura de Perfiles de Recursos (`ResourceProfilePolicy`):**
+  - Cálculo determinista del perfil de recursos (`ResourceProfile`: Standard vs Efficient) en `OpenDynamic.Core` sin dependencias de UI.
+  - Adaptación de resortes elásticos (`MotionProfile.Reduced` cuando `MotionMode == Auto`), reducción del espectro de audio a `Simulated` y espaciado de telemetría de hardware (de 2.0s a 5.0s).
+  - Respeto estricto de la precedencia de configuraciones explícitas del usuario (ej. `MotionMode.Full` se preserva intacto).
+- **Widget de Muesca y Adaptaciones Dinámicas (`EnergySaverWidget`):**
+  - Widget transitorio de 3 segundos con prioridad 88 (`ActivityPriority.EnergySaver`).
+  - Vistas XAML `EnergySaverCompactView`, `EnergySaverExpandedView` y `EnergySaverSplitView` adaptadas a Upper Notch con acentos esmeralda.
+  - Adaptación en tiempo real de `IslandWindow`, `HardwareWidget` y `MediaWidget` mediante `IResourceProfileProvider`.
+- **Ajustes y Migración de Esquema v13:**
+  - `AppSettings.cs` promovido a `CurrentSchemaVersion = 13` con migración automática y limpia en `SettingsService.cs`.
+  - Nueva tarjeta "🌱 Ahorro de Energía de Windows" en `SettingsWindow.xaml` con estado del sistema en vivo e interruptores para alertas, modo eficiente y sub-optimizaciones.
+- **Pruebas Automatizadas:**
+  - 43 nuevas pruebas unitarias en `OpenDynamic.Tests` (totalizando 496 pruebas en verde al 100%), cubriendo políticas puras, mapeador WinRT, resolución de prioridades y migración v13.
+
 ## [1.4.0-dev] - 2026-10-02 (Fase 19: Reloj Ambiental en Reposo)
 
 ### Añadido

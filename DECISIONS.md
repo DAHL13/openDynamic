@@ -899,3 +899,52 @@
   - 426 pruebas unitarias automáticas en verde (100% de la suite).
   - Pruebas existentes de `PriorityResolver` intactas y superadas al 100%.
   - Compilación Release limpia con 0 advertencias (`TreatWarningsAsErrors`).
+
+---
+
+## ADR-029: Monitorización Reactiva del Ahorro de Energía de Windows y Perfil Puro de Recursos en Core (Fase 20)
+
+- **Estado:** Aceptado
+- **Fecha:** 2026-10-02
+- **Contexto:**
+  El sistema operativo Windows incorpora el modo de Ahorro de Energía (*Energy Saver / Battery Saver*), activado por umbral de batería baja o por decisión del usuario en el Centro de Control. openDynamic requería:
+  1. Detectar transiciones de estado de forma 100% reactiva sin bucles de sondeo (*zero polling*, 0% de CPU en reposo).
+  2. Implementar una política pura de recursos en `OpenDynamic.Core` sin dependencias de Windows ni WPF que determine el perfil de recursos (`ResourceProfile`: Standard vs Efficient), adaptando la tasa de cuadros/física de resortes, el modo del visualizador de espectro y la cadencia de telemetría de hardware, respetando de forma prioritaria las configuraciones explícitas del usuario.
+  3. Manejo resiliente de PCs de escritorio y hardware sin batería (`EnergySaverState.NotSupported`), sin lanzar excepciones ni degradar el servicio.
+  4. Supresión estricta de alertas espurias durante el arranque de la aplicación y en una ventana de gracia de 10 segundos tras reanudar el sistema desde suspensión/hibernación, con enfriamiento (*cooldown*) de 5 segundos entre alertas consecutivas.
+  5. Interfaz de usuario integrada con widget transitorio en la muesca (`EnergySaverWidget`, prioridad 88, 3 segundos) y controles completos en Ajustes con migración limpia a esquema v13 en `AppSettings`.
+
+- **Decisiones Técnicas:**
+  1. **Monitoreo Reactivo de Energía vía WinRT (Reglas de Oro 1 y 11):**
+     - Se utiliza el evento nativo `Windows.System.Power.PowerManager.EnergySaverStatusChanged` para escuchar transiciones del sistema de manera reactiva, eliminando cualquier temporizador de sondeo periódico.
+     - En equipos de escritorio o entornos virtuales sin batería, la API reporta `Disabled`, el cual es mapeado cleanly a `EnergySaverState.NotSupported` mediante `EnergySaverStateMapper`. Si la suscripción falla por restricciones de plataforma, se degrada a `NotSupported` de forma segura.
+  2. **Política Pura de Alertas (`EnergySaverAlertPolicy`) con `TimeProvider` (Regla de Oro 5):**
+     - Ubicada en `OpenDynamic.Core.EnergySaver`, sin referencias a UI.
+     - Implementa supresión en el arranque (`Initialize`), impidiendo notificaciones flotantes al iniciar openDynamic.
+     - Implementa ventana de supresión de 10 segundos tras reanudación de suspensión/hibernación (`NotifySuspended()`, `NotifyResumedFromSuspend()`), amortiguando lecturas inestables transitorias del subsistema ACPI de Windows.
+     - Implementa un periodo de enfriamiento (*cooldown*) de 5 segundos entre transiciones válidas para evitar saturación de la isla ante conmutaciones rápidas.
+  3. **Política Determinista de Recursos (`ResourceProfilePolicy`):**
+     - Resuelve el `ResourceProfile` activo combinando el estado de energía, las opciones globales de modo eficiente y las preferencias explícitas del usuario.
+     - Reglas de precedencia estrictas:
+       - Si el usuario configuró explícitamente `MotionMode.Full`, el modo de energía no reduce las animaciones (solo lo hace si `MotionMode == Auto` y `EnergySaverReduceAnimations == true`).
+       - Si el visualizador de audio está en `Reactive` y `EnergySaverCapAudioVisualizer == true`, se reduce a `Simulated` para liberar la captura de bucle loopback y el procesamiento FFT. Si el usuario configuró `Off`, se mantiene en `Off`.
+       - Si `EnergySaverThrottleHardwareSampling == true`, el intervalo de muestreo de hardware se espacia al valor configurado (por defecto 5.0 s en lugar de 2.0 s).
+  4. **Adaptación en Caliente en App y Widgets:**
+     - `IslandWindow.xaml.cs`: Escucha `ResourceProfileChanged` del `EnergySaverService` y reconfigura los resortes elásticos en vivo; intercepta `WM_POWERBROADCAST` (`PBT_APMSUSPEND`, `PBT_APMRESUMEAUTOMATIC`, `PBT_APMRESUMESUSPEND`) para notificar suspensión y reanudación a la política de alertas.
+     - `HardwareWidget`: Recibe `IResourceProfileProvider` e intercambia su cadencia de muestreo en tiempo real ante cambios de perfil.
+     - `MediaWidget`: Recibe `IResourceProfileProvider` y conmuta el modo visualizador dinámicamente entre reactivo y simulado según el perfil activo.
+  5. **Widget de Muesca Transitorio (`EnergySaverWidget`):**
+     - Prioridad 88 (`ActivityPriority.EnergySaver`), con duración transitoria de 3 segundos.
+     - Vistas XAML `EnergySaverCompactView`, `EnergySaverExpandedView` y `EnergySaverSplitView` adaptadas al Upper Notch UI con esquinas asimétricas, icono de batería/hoja y acentos verdes (#34D399).
+     - En `PriorityResolver`, la alerta transitoria asume foco exclusivo en modo compacto durante su ciclo de vida y restaura la actividad persistente subyacente (ej. reproducción multimedia) al expirar.
+  6. **Ajustes y Migración de Esquema v13 (Regla de Oro 9):**
+     - Se promovió `CurrentSchemaVersion` de 12 a 13 en `AppSettings.cs`.
+     - Nuevas opciones persistidas: `EnableEnergySaverAlerts`, `DefaultEnergySaverPriority`, `EnergySaverTransientDurationSeconds`, `EnableEnergySaverEfficientMode`, `EnergySaverReduceAnimations`, `EnergySaverCapAudioVisualizer`, `EnergySaverThrottleHardwareSampling` y `EnergySaverHardwareSamplingIntervalSeconds`.
+     - Migración automática v12 -> v13 en `SettingsService.cs` sin pérdida de configuraciones existentes.
+     - Tarjeta "🌱 Ahorro de Energía de Windows" en `SettingsWindow.xaml` con indicador de estado en tiempo real (`EnergySaverStateSummaryText`).
+
+- **Consecuencias y Verificación:**
+  - 496 pruebas unitarias automáticas en verde (100% de la suite; 43 nuevas pruebas incorporadas en la fase).
+  - Cero bucles de sondeo; consumo de CPU estrictamente del 0% en reposo.
+  - Compilación Release limpia con 0 errores y 0 advertencias (`TreatWarningsAsErrors`).
+
