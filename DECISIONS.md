@@ -915,10 +915,11 @@
   5. Interfaz de usuario integrada con widget transitorio en la muesca (`EnergySaverWidget`, prioridad 88, 3 segundos) y controles completos en Ajustes con migración limpia a esquema v13 en `AppSettings`.
 
 - **Decisiones Técnicas:**
-  1. **Monitoreo Reactivo de Energía vía Win32 `PBT_APMPOWERSTATUSCHANGE` + `GetSystemPowerStatus` (`SystemStatusFlag`) (Reglas de Oro 1 y 11):**
-     - En aplicaciones de escritorio Win32 desempaquetadas, el evento WinRT `PowerManager.EnergySaverStatusChanged` no se despacha al carecer de infraestructura `CoreWindow`.
-     - La detección estándar y universal en Win32 se realiza interceptando `WM_POWERBROADCAST` con `wParam == PBT_APMPOWERSTATUSCHANGE` (0x000A) en el procedimiento de ventana de `IslandWindow`.
-     - Al recibir el evento, se consulta `GetSystemPowerStatus(out SYSTEM_POWER_STATUS status)` y se evalúa el byte oficial `status.SystemStatusFlag` (`1` = Battery Saver activado / `On`, `0` = Battery Saver desactivado / `Off`) mediante `EnergySaverService.QueryLiveEnergySaverState()` y `EnergySaverStateMapper.FromSystemStatusFlag()`, despachando el cambio de forma 100% reactiva sin sondeo (*zero polling*).
+  1. **Monitoreo Reactivo Multicapa de Energía (WNF `ntdll.dll` + Win32 `WM_POWERBROADCAST` + `GetSystemPowerStatus`) (Reglas de Oro 1 y 11):**
+     - En Windows 11 (24H2), el mosaico de Configuración Rápida "Ahorro de energía" (`SettingsHandlers_OneCore_BatterySaver.dll`) publica las conmutaciones manuales del usuario a través de **Windows Notification Facility (WNF)** en `ntdll.dll` sobre el estado `WNF_PO_ENERGY_SAVER_OVERRIDE` (`0x41C6013DA3BC3075`: `2` = Forzado Activo, `1` = Forzado Inactivo, `0` = Automático por política) y el estado automático en `WNF_PO_ENERGY_SAVER_STATE` (`0x41C6013DA3BC2075`: `2` = Activo, `1` = Inactivo), sin modificar `SYSTEM_POWER_STATUS.SystemStatusFlag` ni `PowerManager.EnergySaverStatus` cuando el nivel de batería supera el umbral automático.
+     - `EnergySaverService` se suscribe de forma 100% reactiva (cero polling) mediante `RtlSubscribeWnfStateChangeNotification` a `WNF_PO_ENERGY_SAVER_OVERRIDE` y `WNF_PO_ENERGY_SAVER_STATE`, manteniendo el delegado fijado en memoria y liberando las suscripciones con `RtlUnsubscribeWnfStateChangeNotification` en `Dispose()`.
+     - Adicionalmente, `IslandWindow` registra `GUID_POWER_SAVING_STATUS` oficial de `winnt.h` (`E00958C0-C213-4ACE-AC77-FECCED2EEEA5`) y `GUID_ENERGY_SAVER_POLICY` (`5C5BB349-AD29-4EE2-9D0B-2B25270F7A81`), e intercepta `WM_POWERBROADCAST` (`PBT_APMPOWERSTATUSCHANGE` y `PBT_POWERSETTINGCHANGE`).
+     - `EnergySaverService.QueryLiveEnergySaverState()` consulta en vivo `NtQueryWnfStateData` y `GetSystemPowerStatus`, resolviendo el estado mediante el mapeador puro `EnergySaverStateMapper.FromWnf(wnfOverride, wnfState, systemStatusFlag, hasBattery)`.
      - **Detección Fidedigna de Hardware con Batería:** Para evitar falsos positivos en laptops conectadas a la corriente, se comprueba la presencia física de batería con `GetSystemPowerStatus`. `EnergySaverState.NotSupported` solo se emite si el hardware carece de batería (`BatteryFlag == 128` o `BatteryLifePercent == 255`).
   2. **Política Pura de Alertas (`EnergySaverAlertPolicy`) con `TimeProvider` (Regla de Oro 5):**
      - Ubicada en `OpenDynamic.Core.EnergySaver`, sin referencias a UI.
@@ -946,7 +947,7 @@
      - Tarjeta "🌱 Ahorro de Energía de Windows" en `SettingsWindow.xaml` con indicador de estado en tiempo real (`EnergySaverStateSummaryText`) suscrito a `EnergySaverStatusChangedMessage`.
 
 - **Consecuencias y Verificación:**
-  - 512 pruebas unitarias automáticas en verde (100% de la suite; 59 nuevas pruebas incorporadas en la fase).
+  - 524 pruebas unitarias automáticas en verde (100% de la suite; 71 nuevas pruebas incorporadas en la fase).
   - Cero bucles de sondeo; consumo de CPU estrictamente del 0% en reposo.
   - Compilación Release limpia con 0 errores y 0 advertencias (`TreatWarningsAsErrors`).
 

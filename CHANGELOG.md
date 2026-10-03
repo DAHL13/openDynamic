@@ -7,7 +7,7 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ### Añadido
 - **Monitoreo Reactivo de Energía de Windows (`EnergySaverService` / `IslandWindow`):**
-  - Registro infalible Win32 en `IslandWindow` mediante `RegisterPowerSettingNotification` con `GUID_POWER_SAVING_STATUS` (`E00958C0-C213-4ACE-AC77-B78D78560846`).
+  - Registro Win32 en `IslandWindow` mediante `RegisterPowerSettingNotification` con `GUID_POWER_SAVING_STATUS` (`E00958C0-C213-4ACE-AC77-FECCED2EEEA5`) y `GUID_ENERGY_SAVER_POLICY` (`5C5BB349-AD29-4EE2-9D0B-2B25270F7A81`).
   - Intercepción en tiempo real de `WM_POWERBROADCAST` con `PBT_POWERSETTINGCHANGE` (0x8013) y `POWERBROADCAST_SETTING` con cero bucles de sondeo (0% CPU en reposo).
   - Suscripción y fallback complementario WinRT (`Windows.System.Power.PowerManager.EnergySaverStatusChanged`).
   - Manejo transparente y sin excepciones de PCs de escritorio y entornos sin batería (`EnergySaverState.NotSupported`).
@@ -29,17 +29,20 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
   - `AppSettings.cs` promovido a `CurrentSchemaVersion = 13` con migración automática y limpia en `SettingsService.cs`.
   - Nueva tarjeta "🌱 Ahorro de Energía de Windows" en `SettingsWindow.xaml` con estado del sistema en vivo e interruptores para alertas, modo eficiente y sub-optimizaciones.
 - **Pruebas Automatizadas:**
-  - 49 nuevas pruebas unitarias en `OpenDynamic.Tests` (totalizando 512 pruebas en verde al 100%), cubriendo políticas puras, mapeador WinRT/Win32/SystemStatusFlag, presencia de batería, resolución de prioridades y migración v13.
+  - 61 nuevas pruebas unitarias en `OpenDynamic.Tests` (totalizando 524 pruebas en verde al 100%), cubriendo políticas puras, mapeador WNF (`FromWnf`), mapeadores WinRT/Win32/SystemStatusFlag, presencia de batería, resolución de prioridades y migración v13.
 
 ### Corregido
+- **Detección Dinámica de Ahorro de Energía en Windows 11 (24H2) vía WNF (`ntdll.dll`):**
+  - **Diagnóstico y causa raíz:** En Windows 11 24H2, el mosaico de configuración rápida "Ahorro de energía" (`SettingsHandlers_OneCore_BatterySaver.dll`) no modifica `SYSTEM_POWER_STATUS.SystemStatusFlag` ni emite `WM_POWERBROADCAST` si el nivel de batería supera el umbral de disparo automático. Windows gestiona las conmutaciones manuales a través de Windows Notification Facility (WNF).
+  - **Suscripción Reactiva WNF:** Suscripción 100% reactiva en `EnergySaverService` con `RtlSubscribeWnfStateChangeNotification` para `WNF_PO_ENERGY_SAVER_OVERRIDE` (`0x41C6013DA3BC3075`: 2 = manual On, 1 = manual Off) y `WNF_PO_ENERGY_SAVER_STATE` (`0x41C6013DA3BC2075`: 2 = auto On, 1 = auto Off).
+  - **Corrección de GUID Win32:** Corrección del GUID de registro en `NativeMethods.cs` a `E00958C0-C213-4ACE-AC77-FECCED2EEEA5` (oficial de `winnt.h`) y añadido `GUID_ENERGY_SAVER_POLICY` (`5C5BB349-AD29-4EE2-9D0B-2B25270F7A81`).
+  - **Mapeador Puro Multicapa (`EnergySaverStateMapper.FromWnf`):** Fusión determinista de WNF Override, WNF State y fallback a `SystemStatusFlag` manteniendo `OpenDynamic.Core` completamente puro.
 - **Detección Fidedigna de Batería Física vs Estado Desactivado en AC (`GetSystemPowerStatus`):**
   - Corrección del falso positivo donde una laptop conectada a corriente alterna (ACLineStatus == 1, WinRT `Disabled` / Win32 `0`) reportaba erróneamente "No compatible (Equipo sin batería)".
   - Verificación física mediante `GetSystemPowerStatus`: sólo se clasifica como `NotSupported` si el hardware carece de batería (`BatteryFlag == 128` o `BatteryLifePercent == 255`).
   - Mapeo fidedigno en `EnergySaverStateMapper.FromWinRt` y `FromWin32`: con batería presente, `Disabled` (0) se resuelve como `EnergySaverState.Off` ("Desactivado (Rendimiento estándar)").
-- **Detección Dinámica de Activación/Desactivación de Ahorro de Energía con `PBT_APMPOWERSTATUSCHANGE`:**
-  - Intercepción en `IslandWindow.xaml.cs` del mensaje Win32 universal `PBT_APMPOWERSTATUSCHANGE` (0x000A) emitido por Windows al pulsar el mosaico de ahorro de batería.
-  - Consulta en vivo mediante `SystemStatusFlag` de `SYSTEM_POWER_STATUS` (`SystemStatusFlag == 1` -> `On`, `0` -> `Off`) vía `EnergySaverService.QueryLiveEnergySaverState()` y `EnergySaverStateMapper.FromSystemStatusFlag()`.
-  - Suscripción reactiva de `SettingsViewModel` a `EnergySaverStatusChangedMessage` para refresco instantáneo del indicador de estado en la ventana de Ajustes en tiempo real.
+- **Actualización Reactiva en Ajustes:**
+  - Suscripción de `SettingsViewModel` a `EnergySaverStatusChangedMessage` para refresco instantáneo del indicador de estado en la ventana de Ajustes en tiempo real.
 
 ## [1.4.0-dev] - 2026-10-02 (Fase 19: Reloj Ambiental en Reposo)
 

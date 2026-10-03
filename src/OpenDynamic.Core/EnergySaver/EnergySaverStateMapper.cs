@@ -70,4 +70,48 @@ public static class EnergySaverStateMapper
             _ => EnergySaverState.Unknown
         };
     }
+
+    /// <summary>
+    /// Translates Windows Notification Facility (WNF) and system power states into domain <see cref="EnergySaverState"/>.
+    /// Handles Windows 11 Energy Saver (where user manual override is tracked via WNF_PO_ENERGY_SAVER_OVERRIDE = 2),
+    /// automatic engagement via WNF_PO_ENERGY_SAVER_STATE = 2, and legacy Windows 10 Battery Saver (SystemStatusFlag = 1).
+    /// </summary>
+    public static EnergySaverState FromWnf(int? wnfOverride, int? wnfState, byte systemStatusFlag = 0, bool hasBattery = true)
+    {
+        if (!hasBattery)
+        {
+            return EnergySaverState.NotSupported;
+        }
+
+        // 1. Explicit user override takes highest precedence in Windows 11
+        // 2 = User forced Energy Saver ON via Quick Settings / Settings
+        // 1 = User forced Energy Saver OFF
+        // 0 = Auto / No override (follow threshold policy)
+        if (wnfOverride.HasValue)
+        {
+            if (wnfOverride.Value == 2)
+            {
+                return EnergySaverState.On;
+            }
+            if (wnfOverride.Value == 1)
+            {
+                return EnergySaverState.Off;
+            }
+        }
+
+        // 2. Automatic engagement via threshold or policy
+        // In WNF_PO_ENERGY_SAVER_STATE: 2 = On, 1 = Off
+        if (wnfState.HasValue && wnfState.Value == 2)
+        {
+            return EnergySaverState.On;
+        }
+
+        // 3. Legacy Windows 10 SYSTEM_POWER_STATUS
+        if (systemStatusFlag == 1)
+        {
+            return EnergySaverState.On;
+        }
+
+        return EnergySaverState.Off;
+    }
 }

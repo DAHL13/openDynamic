@@ -221,7 +221,45 @@ public static class NativeMethods
 
     public static readonly Guid GUID_ACDC_POWER_SOURCE = new("5d3e4eb2-ee30-4726-ac55-d0f930e41497");
     public static readonly Guid GUID_BATTERY_PERCENTAGE_REMAINING = new("a7ad8041-b45a-4cae-87a3-eecbb468a9e1");
-    public static readonly Guid GUID_POWER_SAVING_STATUS = new("E00958C0-C213-4ACE-AC77-B78D78560846");
+    public static readonly Guid GUID_POWER_SAVING_STATUS = new("E00958C0-C213-4ACE-AC77-FECCED2EEEA5");
+    public static readonly Guid GUID_ENERGY_SAVER_POLICY = new("5C5BB349-AD29-4EE2-9D0B-2B25270F7A81");
+
+    // Windows Notification Facility (WNF) Power State Names (Windows 10/11 Energy Saver)
+    public const ulong WNF_PO_ENERGY_SAVER_STATE = 0x41C6013DA3BC2075;
+    public const ulong WNF_PO_ENERGY_SAVER_SETTING = 0x41C6013DA3BC2875;
+    public const ulong WNF_PO_ENERGY_SAVER_OVERRIDE = 0x41C6013DA3BC3075;
+
+    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+    public delegate uint WnfCallback(
+        ulong stateName,
+        uint changeStamp,
+        IntPtr typeId,
+        IntPtr callbackContext,
+        IntPtr buffer,
+        uint bufferSize);
+
+    [DllImport("ntdll.dll")]
+    public static extern int RtlSubscribeWnfStateChangeNotification(
+        out IntPtr subscriptionPointer,
+        ulong stateName,
+        uint changeStamp,
+        WnfCallback callback,
+        IntPtr callbackContext,
+        IntPtr typeId,
+        uint serializationGroup,
+        uint unknown);
+
+    [DllImport("ntdll.dll")]
+    public static extern int RtlUnsubscribeWnfStateChangeNotification(IntPtr subscriptionPointer);
+
+    [DllImport("ntdll.dll")]
+    public static extern int NtQueryWnfStateData(
+        ref ulong stateName,
+        IntPtr typeId,
+        IntPtr explicitScope,
+        out uint changeStamp,
+        byte[] buffer,
+        ref uint bufferSize);
 
     [StructLayout(LayoutKind.Sequential, Pack = 4)]
     public struct POWERBROADCAST_SETTING

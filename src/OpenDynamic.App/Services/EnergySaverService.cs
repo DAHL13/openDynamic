@@ -25,6 +25,9 @@ public sealed class EnergySaverService : IResourceProfileProvider, IDisposable
 
     private EnergySaverState _currentState = EnergySaverState.Unknown;
     private ResourceProfile _currentProfile = ResourceProfile.Standard;
+    private IntPtr _wnfOverrideSubscription = IntPtr.Zero;
+    private IntPtr _wnfStateSubscription = IntPtr.Zero;
+    private NativeMethods.WnfCallback? _wnfCallback;
     private bool _isWinRtSubscribed;
     private bool _isDisposed;
 
@@ -79,18 +82,6 @@ public sealed class EnergySaverService : IResourceProfileProvider, IDisposable
             _settingsService.SettingsChanged += OnSettingsChanged;
         }
 
-        WeakReferenceMessenger.Default.Register<Widgets.Messages.EnergySaverStatusChangedMessage>(this, (_, msg) =>
-        {
-            if (_dispatcher.CheckAccess())
-            {
-                HandleStatusChanged(msg.State);
-            }
-            else
-            {
-                _dispatcher.InvokeAsync(() => HandleStatusChanged(msg.State));
-            }
-        });
-
         Initialize();
     }
 
@@ -108,6 +99,64 @@ public sealed class EnergySaverService : IResourceProfileProvider, IDisposable
 
             SubscribeWinRtEvents();
         }
+
+        SubscribeWnfEvents();
+    }
+
+    private void SubscribeWnfEvents()
+    {
+        try
+        {
+            _wnfCallback = OnWnfStateChanged;
+
+            int r1 = NativeMethods.RtlSubscribeWnfStateChangeNotification(
+                out _wnfOverrideSubscription,
+                NativeMethods.WNF_PO_ENERGY_SAVER_OVERRIDE,
+                0,
+                _wnfCallback,
+                IntPtr.Zero,
+                IntPtr.Zero,
+                0,
+                0);
+
+            int r2 = NativeMethods.RtlSubscribeWnfStateChangeNotification(
+                out _wnfStateSubscription,
+                NativeMethods.WNF_PO_ENERGY_SAVER_STATE,
+                0,
+                _wnfCallback,
+                IntPtr.Zero,
+                IntPtr.Zero,
+                0,
+                0);
+
+            Log.Information("EnergySaverService: Subscribed to Windows Notification Facility (WNF Override: 0x{R1:X8}, WNF State: 0x{R2:X8}).", r1, r2);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to subscribe to WNF energy saver notifications.");
+        }
+    }
+
+    private uint OnWnfStateChanged(
+        ulong stateName,
+        uint changeStamp,
+        IntPtr typeId,
+        IntPtr callbackContext,
+        IntPtr buffer,
+        uint bufferSize)
+    {
+        Log.Debug("EnergySaverService: WNF state change received (StateName: 0x{StateName:X16}, Stamp: {Stamp})", stateName, changeStamp);
+
+        if (_dispatcher.CheckAccess())
+        {
+            HandleStatusChanged();
+        }
+        else
+        {
+            _dispatcher.InvokeAsync(() => HandleStatusChanged());
+        }
+
+        return 0;
     }
 
     private void SubscribeWinRtEvents()
@@ -182,6 +231,7 @@ public sealed class EnergySaverService : IResourceProfileProvider, IDisposable
         {
             Log.Information("EnergySaverService: Operating system energy saver state changed to {NewState}", newState);
             StateChanged?.Invoke(this, newState);
+            WeakReferenceMessenger.Default.Send(new Widgets.Messages.EnergySaverStatusChangedMessage(newState));
         }
 
         if (profileChanged)
@@ -287,18 +337,66 @@ public sealed class EnergySaverService : IResourceProfileProvider, IDisposable
     }
 
     /// <summary>
-    /// Live query of Windows energy saver (battery saver) status via Win32 GetSystemPowerStatus.
-    /// SystemStatusFlag == 1 indicates Battery Saver is active.
-    /// SystemStatusFlag == 0 indicates Battery Saver is inactive.
+    /// Live query of Windows energy saver (battery saver) status via WNF (Windows 11) and Win32 GetSystemPowerStatus (Windows 10/11).
+    /// WNF_PO_ENERGY_SAVER_OVERRIDE == 2 indicates user explicitly activated Energy Saver via Quick Settings / Settings.
+    /// WNF_PO_ENERGY_SAVER_OVERRIDE == 1 indicates user explicitly turned Energy Saver off.
+    /// WNF_PO_ENERGY_SAVER_STATE == 2 or SystemStatusFlag == 1 indicates automatic Battery Saver engagement.
     /// </summary>
     public static EnergySaverState QueryLiveEnergySaverState()
     {
         if (!CheckHasSystemBattery()) return EnergySaverState.NotSupported;
-        if (NativeMethods.GetSystemPowerStatus(out var status))
+
+        int? wnfOverride = null;
+        int? wnfState = null;
+        byte systemStatusFlag = 0;
+
+        try
         {
-            return EnergySaverStateMapper.FromSystemStatusFlag(status.SystemStatusFlag, hasBattery: true);
+            ulong overrideName = NativeMethods.WNF_PO_ENERGY_SAVER_OVERRIDE;
+            byte[] buf = new byte[8];
+            uint size = (uint)buf.Length;
+            if (NativeMethods.NtQueryWnfStateData(ref overrideName, IntPtr.Zero, IntPtr.Zero, out _, buf, ref size) == 0 && size >= 4)
+            {
+                wnfOverride = BitConverter.ToInt32(buf, 0);
+            }
         }
-        return EnergySaverState.Off;
+        catch (Exception ex)
+        {
+            Log.Debug(ex, "Could not query WNF_PO_ENERGY_SAVER_OVERRIDE");
+        }
+
+        try
+        {
+            ulong stateName = NativeMethods.WNF_PO_ENERGY_SAVER_STATE;
+            byte[] buf = new byte[8];
+            uint size = (uint)buf.Length;
+            if (NativeMethods.NtQueryWnfStateData(ref stateName, IntPtr.Zero, IntPtr.Zero, out _, buf, ref size) == 0 && size >= 4)
+            {
+                wnfState = BitConverter.ToInt32(buf, 0);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Debug(ex, "Could not query WNF_PO_ENERGY_SAVER_STATE");
+        }
+
+        try
+        {
+            if (NativeMethods.GetSystemPowerStatus(out var status))
+            {
+                systemStatusFlag = status.SystemStatusFlag;
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Debug(ex, "Could not query GetSystemPowerStatus");
+        }
+
+        var resolved = EnergySaverStateMapper.FromWnf(wnfOverride, wnfState, systemStatusFlag, hasBattery: true);
+        Log.Debug("QueryLiveEnergySaverState: WNF_Override={Override}, WNF_State={State}, SystemStatusFlag={Flag} => {Resolved}",
+            wnfOverride, wnfState, systemStatusFlag, resolved);
+
+        return resolved;
     }
 
     /// <summary>
@@ -342,6 +440,32 @@ public sealed class EnergySaverService : IResourceProfileProvider, IDisposable
             if (_isDisposed) return;
             _isDisposed = true;
 
+            if (_wnfOverrideSubscription != IntPtr.Zero)
+            {
+                try
+                {
+                    NativeMethods.RtlUnsubscribeWnfStateChangeNotification(_wnfOverrideSubscription);
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(ex, "Error unsubscribing WNF_PO_ENERGY_SAVER_OVERRIDE.");
+                }
+                _wnfOverrideSubscription = IntPtr.Zero;
+            }
+
+            if (_wnfStateSubscription != IntPtr.Zero)
+            {
+                try
+                {
+                    NativeMethods.RtlUnsubscribeWnfStateChangeNotification(_wnfStateSubscription);
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(ex, "Error unsubscribing WNF_PO_ENERGY_SAVER_STATE.");
+                }
+                _wnfStateSubscription = IntPtr.Zero;
+            }
+
             if (_isWinRtSubscribed)
             {
                 try
@@ -356,8 +480,6 @@ public sealed class EnergySaverService : IResourceProfileProvider, IDisposable
             }
 
             _alertPolicy.AlertTriggered -= OnAlertPolicyTriggered;
-
-            WeakReferenceMessenger.Default.Unregister<Widgets.Messages.EnergySaverStatusChangedMessage>(this);
 
             if (_settingsService != null)
             {

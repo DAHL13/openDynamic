@@ -44,6 +44,7 @@ public partial class IslandWindow : Window
     private IntPtr _hwnd = IntPtr.Zero;
     private HwndSource? _hwndSource;
     private IntPtr _energySaverNotificationHandle = IntPtr.Zero;
+    private IntPtr _energySaverPolicyNotificationHandle = IntPtr.Zero;
 
 #if DEBUG
     private IslandDebugWindow? _debugWindow;
@@ -216,10 +217,18 @@ public partial class IslandWindow : Window
                     (int)NativeMethods.DEVICE_NOTIFY_WINDOW_HANDLE);
                 Log.Information("IslandWindow registered power setting notification for GUID_POWER_SAVING_STATUS (Handle: {Handle}).",
                     _energySaverNotificationHandle);
+
+                Guid policyGuid = NativeMethods.GUID_ENERGY_SAVER_POLICY;
+                _energySaverPolicyNotificationHandle = NativeMethods.RegisterPowerSettingNotification(
+                    _hwnd,
+                    ref policyGuid,
+                    (int)NativeMethods.DEVICE_NOTIFY_WINDOW_HANDLE);
+                Log.Information("IslandWindow registered power setting notification for GUID_ENERGY_SAVER_POLICY (Handle: {Handle}).",
+                    _energySaverPolicyNotificationHandle);
             }
             catch (Exception ex)
             {
-                Log.Warning(ex, "Failed to register power setting notification for GUID_POWER_SAVING_STATUS.");
+                Log.Warning(ex, "Failed to register power setting notification for energy saver.");
             }
         }
 
@@ -648,14 +657,12 @@ public partial class IslandWindow : Window
         try
         {
             var setting = Marshal.PtrToStructure<NativeMethods.POWERBROADCAST_SETTING>(lParam);
-            if (setting.PowerSetting == NativeMethods.GUID_POWER_SAVING_STATUS)
+            if (setting.PowerSetting == NativeMethods.GUID_POWER_SAVING_STATUS ||
+                setting.PowerSetting == NativeMethods.GUID_ENERGY_SAVER_POLICY)
             {
-                // In Windows 10/11, Data is a DWORD: 0 = Off / Disabled, 1 = On.
-                int stateInt = setting.DataLength >= 4 ? Marshal.ReadInt32(lParam, 20) : setting.Data;
-                bool hasBattery = Services.EnergySaverService.CheckHasSystemBattery();
-                var state = EnergySaverStateMapper.FromWin32(stateInt, hasBattery);
-                Log.Information("IslandWindow WndProc WM_POWERBROADCAST PBT_POWERSETTINGCHANGE: GUID_POWER_SAVING_STATUS={State} (raw={Raw}, hasBattery={HasBattery})",
-                    state, stateInt, hasBattery);
+                var state = Services.EnergySaverService.QueryLiveEnergySaverState();
+                Log.Information("IslandWindow WndProc WM_POWERBROADCAST PBT_POWERSETTINGCHANGE: Setting={Guid}, State={State}",
+                    setting.PowerSetting, state);
 
                 _energySaverService?.HandleStatusChanged(state);
                 WeakReferenceMessenger.Default.Send(new Widgets.Messages.EnergySaverStatusChangedMessage(state));
@@ -1248,6 +1255,12 @@ public partial class IslandWindow : Window
         {
             NativeMethods.UnregisterPowerSettingNotification(_energySaverNotificationHandle);
             _energySaverNotificationHandle = IntPtr.Zero;
+        }
+
+        if (_energySaverPolicyNotificationHandle != IntPtr.Zero)
+        {
+            NativeMethods.UnregisterPowerSettingNotification(_energySaverPolicyNotificationHandle);
+            _energySaverPolicyNotificationHandle = IntPtr.Zero;
         }
 
         if (_hwndSource != null)

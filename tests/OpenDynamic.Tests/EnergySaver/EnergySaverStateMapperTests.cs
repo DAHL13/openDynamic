@@ -57,6 +57,31 @@ public class EnergySaverStateMapperTests
         Assert.Equal(EnergySaverState.On, EnergySaverStateMapper.FromSystemStatusFlag(1));
     }
 
+    [Theory]
+    // Desktop PC without physical battery -> always NotSupported
+    [InlineData(2, 2, (byte)1, false, EnergySaverState.NotSupported)]
+    [InlineData(0, 1, (byte)0, false, EnergySaverState.NotSupported)]
+    // Windows 11 Quick Settings manual override ON (wnfOverride = 2), even when wnfState = 1 and systemStatusFlag = 0
+    [InlineData(2, 1, (byte)0, true, EnergySaverState.On)]
+    [InlineData(2, 0, (byte)0, true, EnergySaverState.On)]
+    // Windows 11 Quick Settings manual override OFF (wnfOverride = 1), even when wnfState = 2
+    [InlineData(1, 2, (byte)1, true, EnergySaverState.Off)]
+    [InlineData(1, 1, (byte)0, true, EnergySaverState.Off)]
+    // Auto mode (wnfOverride = 0 or null): engaged via WNF_PO_ENERGY_SAVER_STATE = 2
+    [InlineData(0, 2, (byte)0, true, EnergySaverState.On)]
+    [InlineData(null, 2, (byte)0, true, EnergySaverState.On)]
+    // Auto mode (wnfOverride = 0 or null): engaged via legacy SystemStatusFlag = 1
+    [InlineData(0, 1, (byte)1, true, EnergySaverState.On)]
+    [InlineData(null, null, (byte)1, true, EnergySaverState.On)]
+    // Auto mode: all indicators Off -> Off
+    [InlineData(0, 1, (byte)0, true, EnergySaverState.Off)]
+    [InlineData(null, null, (byte)0, true, EnergySaverState.Off)]
+    public void FromWnf_MapsCorrectly(int? wnfOverride, int? wnfState, byte systemStatusFlag, bool hasBattery, EnergySaverState expected)
+    {
+        var result = EnergySaverStateMapper.FromWnf(wnfOverride, wnfState, systemStatusFlag, hasBattery);
+        Assert.Equal(expected, result);
+    }
+
     [Fact]
     public void FromWinRt_DefaultHasBatteryTrue_MapsDisabledToOff()
     {
