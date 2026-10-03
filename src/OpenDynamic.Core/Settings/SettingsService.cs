@@ -209,6 +209,19 @@ public sealed class SettingsService : ISettingsService
                         loaded.DefaultAmbientClockPriority = 5;
                     }
 
+                    if (loaded.SchemaVersion < 13)
+                    {
+                        // Migration v12 -> v13: Introduce Energy Saver & Resource Profile settings.
+                        loaded.EnableEnergySaverAlerts = true;
+                        loaded.DefaultEnergySaverPriority = 88;
+                        loaded.EnergySaverTransientDurationSeconds = 3.0;
+                        loaded.EnableEnergySaverEfficientMode = true;
+                        loaded.EnergySaverReduceAnimations = true;
+                        loaded.EnergySaverCapAudioVisualizer = true;
+                        loaded.EnergySaverThrottleHardwareSampling = true;
+                        loaded.EnergySaverHardwareSamplingIntervalSeconds = 5.0;
+                    }
+
                     loaded.IgnoredPrivacyApps ??= new List<string>();
                     loaded.IgnoredDeviceNames ??= new List<string>();
                     loaded.SchemaVersion = AppSettings.CurrentSchemaVersion;

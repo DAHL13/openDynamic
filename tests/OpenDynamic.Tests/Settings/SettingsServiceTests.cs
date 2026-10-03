@@ -637,6 +637,14 @@ public sealed class SettingsServiceTests : IDisposable
         Assert.Equal(original.ClockShowDate, cloned.ClockShowDate);
         Assert.Equal(original.ClockShowWeekNumber, cloned.ClockShowWeekNumber);
         Assert.Equal(original.DefaultAmbientClockPriority, cloned.DefaultAmbientClockPriority);
+        Assert.Equal(original.EnableEnergySaverAlerts, cloned.EnableEnergySaverAlerts);
+        Assert.Equal(original.DefaultEnergySaverPriority, cloned.DefaultEnergySaverPriority);
+        Assert.Equal(original.EnergySaverTransientDurationSeconds, cloned.EnergySaverTransientDurationSeconds);
+        Assert.Equal(original.EnableEnergySaverEfficientMode, cloned.EnableEnergySaverEfficientMode);
+        Assert.Equal(original.EnergySaverReduceAnimations, cloned.EnergySaverReduceAnimations);
+        Assert.Equal(original.EnergySaverCapAudioVisualizer, cloned.EnergySaverCapAudioVisualizer);
+        Assert.Equal(original.EnergySaverThrottleHardwareSampling, cloned.EnergySaverThrottleHardwareSampling);
+        Assert.Equal(original.EnergySaverHardwareSamplingIntervalSeconds, cloned.EnergySaverHardwareSamplingIntervalSeconds);
 
         var destination = new AppSettings();
         destination.CopyFrom(original);
@@ -660,6 +668,14 @@ public sealed class SettingsServiceTests : IDisposable
         Assert.Equal(original.ClockShowDate, destination.ClockShowDate);
         Assert.Equal(original.ClockShowWeekNumber, destination.ClockShowWeekNumber);
         Assert.Equal(original.DefaultAmbientClockPriority, destination.DefaultAmbientClockPriority);
+        Assert.Equal(original.EnableEnergySaverAlerts, destination.EnableEnergySaverAlerts);
+        Assert.Equal(original.DefaultEnergySaverPriority, destination.DefaultEnergySaverPriority);
+        Assert.Equal(original.EnergySaverTransientDurationSeconds, destination.EnergySaverTransientDurationSeconds);
+        Assert.Equal(original.EnableEnergySaverEfficientMode, destination.EnableEnergySaverEfficientMode);
+        Assert.Equal(original.EnergySaverReduceAnimations, destination.EnergySaverReduceAnimations);
+        Assert.Equal(original.EnergySaverCapAudioVisualizer, destination.EnergySaverCapAudioVisualizer);
+        Assert.Equal(original.EnergySaverThrottleHardwareSampling, destination.EnergySaverThrottleHardwareSampling);
+        Assert.Equal(original.EnergySaverHardwareSamplingIntervalSeconds, destination.EnergySaverHardwareSamplingIntervalSeconds);
     }
 
     [Fact]
@@ -752,7 +768,7 @@ public sealed class SettingsServiceTests : IDisposable
         service.Load();
 
         Assert.NotNull(service.CurrentSettings);
-        Assert.Equal(12, service.CurrentSettings.SchemaVersion);
+        Assert.Equal(AppSettings.CurrentSchemaVersion, service.CurrentSettings.SchemaVersion);
         Assert.Equal(210.0, service.CurrentSettings.CapsuleWidth);
         Assert.Equal(40.0, service.CurrentSettings.CapsuleHeight);
         Assert.True(service.CurrentSettings.EnableMicrophoneIndicator);
@@ -766,7 +782,61 @@ public sealed class SettingsServiceTests : IDisposable
         Assert.False(service.CurrentSettings.ClockShowWeekNumber);
         Assert.Equal(5, service.CurrentSettings.DefaultAmbientClockPriority);
 
+        // Energy saver defaults for schema v13
+        Assert.True(service.CurrentSettings.EnableEnergySaverAlerts);
+        Assert.Equal(88, service.CurrentSettings.DefaultEnergySaverPriority);
+        Assert.True(service.CurrentSettings.EnableEnergySaverEfficientMode);
+        Assert.True(service.CurrentSettings.EnergySaverReduceAnimations);
+        Assert.True(service.CurrentSettings.EnergySaverCapAudioVisualizer);
+        Assert.True(service.CurrentSettings.EnergySaverThrottleHardwareSampling);
+        Assert.Equal(5.0, service.CurrentSettings.EnergySaverHardwareSamplingIntervalSeconds);
+
         Assert.NotNull(loggedNotice);
-        Assert.Contains("v11 to v12", loggedNotice);
+        Assert.Contains($"v11 to v{AppSettings.CurrentSchemaVersion}", loggedNotice);
+    }
+
+    [Fact]
+    public void Load_WhenSchemaVersionIs12_MigratesToSchemaVersion13WithEnergySaverDefaults()
+    {
+        string filePath = Path.Combine(_testDirectory, "settings.json");
+        const string v12Json = """
+        {
+          "SchemaVersion": 12,
+          "CapsuleWidth": 215.0,
+          "CapsuleHeight": 38.0,
+          "EnableAmbientClock": true,
+          "ClockShowSeconds": true
+        }
+        """;
+
+        File.WriteAllText(filePath, v12Json);
+
+        string? loggedNotice = null;
+        using var service = new SettingsService(
+            filePath,
+            warningLogger: (msg, _) => loggedNotice = msg,
+            debounceMilliseconds: 100);
+
+        service.Load();
+
+        Assert.NotNull(service.CurrentSettings);
+        Assert.Equal(13, service.CurrentSettings.SchemaVersion);
+        Assert.Equal(215.0, service.CurrentSettings.CapsuleWidth);
+        Assert.Equal(38.0, service.CurrentSettings.CapsuleHeight);
+        Assert.True(service.CurrentSettings.EnableAmbientClock);
+        Assert.True(service.CurrentSettings.ClockShowSeconds);
+
+        // Energy saver defaults
+        Assert.True(service.CurrentSettings.EnableEnergySaverAlerts);
+        Assert.Equal(88, service.CurrentSettings.DefaultEnergySaverPriority);
+        Assert.Equal(3.0, service.CurrentSettings.EnergySaverTransientDurationSeconds);
+        Assert.True(service.CurrentSettings.EnableEnergySaverEfficientMode);
+        Assert.True(service.CurrentSettings.EnergySaverReduceAnimations);
+        Assert.True(service.CurrentSettings.EnergySaverCapAudioVisualizer);
+        Assert.True(service.CurrentSettings.EnergySaverThrottleHardwareSampling);
+        Assert.Equal(5.0, service.CurrentSettings.EnergySaverHardwareSamplingIntervalSeconds);
+
+        Assert.NotNull(loggedNotice);
+        Assert.Contains("v12 to v13", loggedNotice);
     }
 }

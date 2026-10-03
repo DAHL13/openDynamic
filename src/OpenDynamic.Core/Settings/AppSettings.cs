@@ -22,8 +22,9 @@ public sealed class AppSettings
     /// Version 9 introduces Audio Spectrum Visualizer mode (Disabled, Simulated, Real).
     /// Version 10/11 maintained schema stability across integration retirements (Task R1).
     /// Version 12 introduces Ambient Clock settings (enabled by default, Auto format, priority 5).
+    /// Version 13 introduces Energy Saver reactive alerts, priority (88), and efficient resource profile settings.
     /// </summary>
-    public const int CurrentSchemaVersion = 12;
+    public const int CurrentSchemaVersion = 13;
 
     /// <summary>
     /// Configuration schema version. Defaults to <see cref="CurrentSchemaVersion"/>.
@@ -203,6 +204,59 @@ public sealed class AppSettings
     /// Default is 10%.
     /// </summary>
     public int BatteryCriticalThresholdPercent { get; set; } = 10;
+
+    #endregion
+
+    #region Energy Saver Settings
+
+    /// <summary>
+    /// Flag to enable transient alerts when Windows Energy Saver state transitions.
+    /// Default is true.
+    /// </summary>
+    public bool EnableEnergySaverAlerts { get; set; } = true;
+
+    /// <summary>
+    /// Default priority value for energy saver transient alerts.
+    /// Default is 88.
+    /// </summary>
+    public int DefaultEnergySaverPriority { get; set; } = 88;
+
+    /// <summary>
+    /// Lifespan in seconds for energy saver transient notices.
+    /// Default is 3.0 seconds.
+    /// </summary>
+    public double EnergySaverTransientDurationSeconds { get; set; } = 3.0;
+
+    /// <summary>
+    /// Flag to automatically activate openDynamic's efficient resource profile when Windows Energy Saver is active.
+    /// Default is true.
+    /// </summary>
+    public bool EnableEnergySaverEfficientMode { get; set; } = true;
+
+    /// <summary>
+    /// Flag to reduce island spring animations (MotionProfile.Reduced) in efficient mode when MotionMode is Auto.
+    /// Explicit user choices (Full or Reduced) are strictly preserved.
+    /// Default is true.
+    /// </summary>
+    public bool EnergySaverReduceAnimations { get; set; } = true;
+
+    /// <summary>
+    /// Flag to cap audio spectrum visualizer to simulated procedural mode in efficient mode.
+    /// Default is true.
+    /// </summary>
+    public bool EnergySaverCapAudioVisualizer { get; set; } = true;
+
+    /// <summary>
+    /// Flag to throttle hardware sampling interval from 2s to 5s in efficient mode.
+    /// Default is true.
+    /// </summary>
+    public bool EnergySaverThrottleHardwareSampling { get; set; } = true;
+
+    /// <summary>
+    /// Sampling interval in seconds for hardware monitoring during energy saver mode.
+    /// Default is 5.0 seconds.
+    /// </summary>
+    public double EnergySaverHardwareSamplingIntervalSeconds { get; set; } = 5.0;
 
     #endregion
 
@@ -571,7 +625,15 @@ public sealed class AppSettings
             ClockShowSeconds = this.ClockShowSeconds,
             ClockShowDate = this.ClockShowDate,
             ClockShowWeekNumber = this.ClockShowWeekNumber,
-            DefaultAmbientClockPriority = this.DefaultAmbientClockPriority
+            DefaultAmbientClockPriority = this.DefaultAmbientClockPriority,
+            EnableEnergySaverAlerts = this.EnableEnergySaverAlerts,
+            DefaultEnergySaverPriority = this.DefaultEnergySaverPriority,
+            EnergySaverTransientDurationSeconds = this.EnergySaverTransientDurationSeconds,
+            EnableEnergySaverEfficientMode = this.EnableEnergySaverEfficientMode,
+            EnergySaverReduceAnimations = this.EnergySaverReduceAnimations,
+            EnergySaverCapAudioVisualizer = this.EnergySaverCapAudioVisualizer,
+            EnergySaverThrottleHardwareSampling = this.EnergySaverThrottleHardwareSampling,
+            EnergySaverHardwareSamplingIntervalSeconds = this.EnergySaverHardwareSamplingIntervalSeconds
         };
     }
 
@@ -649,5 +711,13 @@ public sealed class AppSettings
         ClockShowDate = other.ClockShowDate;
         ClockShowWeekNumber = other.ClockShowWeekNumber;
         DefaultAmbientClockPriority = other.DefaultAmbientClockPriority;
+        EnableEnergySaverAlerts = other.EnableEnergySaverAlerts;
+        DefaultEnergySaverPriority = other.DefaultEnergySaverPriority;
+        EnergySaverTransientDurationSeconds = other.EnergySaverTransientDurationSeconds;
+        EnableEnergySaverEfficientMode = other.EnableEnergySaverEfficientMode;
+        EnergySaverReduceAnimations = other.EnergySaverReduceAnimations;
+        EnergySaverCapAudioVisualizer = other.EnergySaverCapAudioVisualizer;
+        EnergySaverThrottleHardwareSampling = other.EnergySaverThrottleHardwareSampling;
+        EnergySaverHardwareSamplingIntervalSeconds = other.EnergySaverHardwareSamplingIntervalSeconds;
     }
 }
