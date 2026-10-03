@@ -642,9 +642,10 @@ public partial class IslandWindow : Window
             {
                 // In Windows 10/11, Data is a DWORD: 0 = Off / Disabled, 1 = On.
                 int stateInt = setting.DataLength >= 4 ? Marshal.ReadInt32(lParam, 20) : setting.Data;
-                var state = stateInt == 1 ? EnergySaverState.On : EnergySaverState.Off;
-                Log.Information("IslandWindow WndProc WM_POWERBROADCAST PBT_POWERSETTINGCHANGE: GUID_POWER_SAVING_STATUS={State} (raw={Raw})",
-                    state, stateInt);
+                bool hasBattery = Services.EnergySaverService.CheckHasSystemBattery();
+                var state = EnergySaverStateMapper.FromWin32(stateInt, hasBattery);
+                Log.Information("IslandWindow WndProc WM_POWERBROADCAST PBT_POWERSETTINGCHANGE: GUID_POWER_SAVING_STATUS={State} (raw={Raw}, hasBattery={HasBattery})",
+                    state, stateInt, hasBattery);
 
                 _energySaverService?.HandleStatusChanged(state);
                 WeakReferenceMessenger.Default.Send(new Widgets.Messages.EnergySaverStatusChangedMessage(state));

@@ -61,6 +61,27 @@ public class ResourceProfilePolicyTests
     }
 
     [Fact]
+    public void LaptopConnectedToAc_WhenEnergySaverDisabledInWinRt_ResolvesToStandardProfile()
+    {
+        // On a laptop plugged into AC, Windows reports WinRtDisabled (0) with physical battery present
+        var state = EnergySaverStateMapper.FromWinRt(EnergySaverStateMapper.WinRtDisabled, hasBattery: true);
+        Assert.Equal(EnergySaverState.Off, state);
+
+        var profile = ResourceProfilePolicy.Resolve(
+            energySaverState: state,
+            enableEfficientMode: true,
+            configuredMotionMode: MotionMode.Auto,
+            systemAnimationsEnabled: true,
+            configuredVisualizerMode: AudioVisualizerMode.Real,
+            configuredHardwareInterval: TimeSpan.FromSeconds(2.0));
+
+        Assert.False(profile.IsEfficientModeActive);
+        Assert.Equal(MotionProfile.Full, profile.MotionProfile);
+        Assert.Equal(AudioVisualizerMode.Real, profile.VisualizerMode);
+        Assert.Equal(TimeSpan.FromSeconds(2.0), profile.HardwareSamplingInterval);
+    }
+
+    [Fact]
     public void EfficientMode_ForcesReducedMotion_WhenMotionModeIsAuto()
     {
         var profile = ResourceProfilePolicy.Resolve(

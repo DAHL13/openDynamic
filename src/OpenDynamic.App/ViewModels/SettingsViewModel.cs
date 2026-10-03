@@ -204,15 +204,21 @@ public partial class SettingsViewModel : ObservableObject
     {
         get
         {
-            if (_energySaverService == null) return "No disponible";
-            return _energySaverService.CurrentState switch
+            var state = _energySaverService?.CurrentState ?? Services.EnergySaverService.QueryPlatformEnergySaverState();
+            return state switch
             {
-                Core.EnergySaver.EnergySaverState.On => "Activado (Ahorro de energía en curso)",
+                Core.EnergySaver.EnergySaverState.On => "Activado (Modo eficiente activo)",
                 Core.EnergySaver.EnergySaverState.Off => "Desactivado (Rendimiento estándar)",
                 Core.EnergySaver.EnergySaverState.NotSupported => "No compatible (Equipo sin batería)",
                 _ => "Desconocido"
             };
         }
+    }
+
+    public void RefreshEnergySaverStatus()
+    {
+        _energySaverService?.HandleStatusChanged();
+        OnPropertyChanged(nameof(EnergySaverStateSummaryText));
     }
 
     // Hardware
@@ -450,6 +456,7 @@ public partial class SettingsViewModel : ObservableObject
         if (_energySaverService != null)
         {
             _energySaverService.StateChanged += (_, _) => OnPropertyChanged(nameof(EnergySaverStateSummaryText));
+            _energySaverService.HandleStatusChanged();
         }
 
         _settings = _settingsService.CurrentSettings;

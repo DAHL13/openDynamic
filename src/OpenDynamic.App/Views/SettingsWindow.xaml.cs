@@ -40,6 +40,7 @@ public partial class SettingsWindow : Window
         try
         {
             ViewModel.RefreshMonitors();
+            ViewModel.RefreshEnergySaverStatus();
 
             if (WindowState == WindowState.Minimized)
             {
