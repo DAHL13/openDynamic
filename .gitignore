@@ -482,3 +482,5 @@ $RECYCLE.BIN/
 *.swp
 
 installer/Output/
+
+scripts/resultados-rendimiento-v2-*.json
