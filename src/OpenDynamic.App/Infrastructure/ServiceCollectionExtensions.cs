@@ -47,7 +47,8 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<DeviceService>(),
             sp.GetRequiredService<ClipboardService>(),
             sp.GetRequiredService<PrivacyAccessMonitor>(),
-            sp.GetService<EnergySaverService>()));
+            sp.GetService<EnergySaverService>(),
+            sp.GetService<ScreenshotWatcherService>()));
 
         // Settings Service & Persistence
         services.AddSingleton<ISettingsService>(sp =>
@@ -143,6 +144,17 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ClipboardService>();
         services.AddSingleton<Widgets.Clipboard.ClipboardWidget>();
 
+        // Screenshot Preview Services (Priority 75, Reactive FileSystemWatcher, Strict RAM)
+        services.AddSingleton<Core.Screenshots.ScreenshotHistory>(sp =>
+        {
+            var settings = sp.GetRequiredService<AppSettings>();
+            return new Core.Screenshots.ScreenshotHistory(
+                capacity: settings.ScreenshotHistoryCapacity,
+                retentionDuration: TimeSpan.FromMinutes(Math.Max(1, settings.ScreenshotHistoryRetentionMinutes)));
+        });
+        services.AddSingleton<ScreenshotWatcherService>();
+        services.AddSingleton<Widgets.Screenshot.ScreenshotWidget>();
+
         // Privacy Sensor Services (Priority 85, Passive ConsentStore Monitor, Zero Polling)
         services.AddSingleton<Core.Privacy.IPrivacyAccessAggregator>(sp =>
         {
@@ -169,7 +181,8 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<Core.Timer.ITimerCollection>(),
             sp.GetRequiredService<ClipboardService>(),
             sp.GetRequiredService<PrivacyAccessMonitor>(),
-            sp.GetService<EnergySaverService>()));
+            sp.GetService<EnergySaverService>(),
+            sp.GetService<ScreenshotWatcherService>()));
         services.AddSingleton<SettingsWindow>();
 
         // System Tray Icon Manager

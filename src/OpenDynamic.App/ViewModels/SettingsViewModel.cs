@@ -69,6 +69,7 @@ public partial class SettingsViewModel : ObservableObject
     private readonly ClipboardService? _clipboardService;
     private readonly Services.PrivacyAccessMonitor? _privacyMonitor;
     private readonly Services.EnergySaverService? _energySaverService;
+    private readonly Services.ScreenshotWatcherService? _screenshotWatcherService;
 
     private readonly AppSettings _settings;
 
@@ -332,6 +333,86 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private int _clipboardExpirationMinutes;
 
+    // Screenshot Preview (Phase 21 - Reactive FileSystemWatcher, Strict RAM)
+    [ObservableProperty]
+    private bool _enableScreenshotWidget;
+
+    [ObservableProperty]
+    private bool _showScreenshotThumbnail;
+
+    [ObservableProperty]
+    private int _defaultScreenshotPriority;
+
+    [ObservableProperty]
+    private double _screenshotTransientDurationSeconds;
+
+    [ObservableProperty]
+    private int _screenshotHistoryCapacity;
+
+    [ObservableProperty]
+    private int _screenshotHistoryRetentionMinutes;
+
+    [ObservableProperty]
+    private bool _enableScreenshotTrashAction;
+
+    [ObservableProperty]
+    private string _additionalScreenshotFolder = string.Empty;
+
+    public string DefaultScreenshotsFolderPath => Services.ScreenshotWatcherService.ResolveDefaultScreenshotsFolder();
+
+    public bool IsDefaultScreenshotsFolderMissing
+    {
+        get
+        {
+            string path = DefaultScreenshotsFolderPath;
+            return string.IsNullOrWhiteSpace(path) || !System.IO.Directory.Exists(path);
+        }
+    }
+
+    public string DefaultScreenshotsFolderStatusText
+    {
+        get
+        {
+            string path = DefaultScreenshotsFolderPath;
+            if (string.IsNullOrWhiteSpace(path) || !System.IO.Directory.Exists(path))
+            {
+                return "Carpeta no encontrada — puedes elegir una carpeta adicional abajo";
+            }
+
+            return EnableScreenshotWidget
+                ? $"Activa ({path})"
+                : $"Encontrada, vigilancia desactivada ({path})";
+        }
+    }
+
+    public bool IsAdditionalScreenshotFolderMissing
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(AdditionalScreenshotFolder))
+            {
+                return false;
+            }
+
+            return !System.IO.Directory.Exists(AdditionalScreenshotFolder);
+        }
+    }
+
+    public string AdditionalScreenshotFolderStatusText
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(AdditionalScreenshotFolder))
+            {
+                return "Opcional: ej. carpeta personalizada de Recortes o ShareX";
+            }
+
+            return System.IO.Directory.Exists(AdditionalScreenshotFolder)
+                ? "Carpeta adicional encontrada y vigilada"
+                : "Carpeta no encontrada (elige otra carpeta existente)";
+        }
+    }
+
     // Privacy Sensor Indicators (Phase 15 - Microphone and Camera)
     [ObservableProperty]
     private bool _enableMicrophoneIndicator;
@@ -439,7 +520,8 @@ public partial class SettingsViewModel : ObservableObject
         ITimerCollection? timerCollection = null,
         ClipboardService? clipboardService = null,
         Services.PrivacyAccessMonitor? privacyMonitor = null,
-        Services.EnergySaverService? energySaverService = null)
+        Services.EnergySaverService? energySaverService = null,
+        Services.ScreenshotWatcherService? screenshotWatcherService = null)
     {
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _orchestrator = orchestrator ?? throw new ArgumentNullException(nameof(orchestrator));
@@ -453,6 +535,7 @@ public partial class SettingsViewModel : ObservableObject
         _clipboardService = clipboardService;
         _privacyMonitor = privacyMonitor;
         _energySaverService = energySaverService;
+        _screenshotWatcherService = screenshotWatcherService;
 
         if (_energySaverService != null)
         {
@@ -544,6 +627,15 @@ public partial class SettingsViewModel : ObservableObject
         _showClipboardPreview = _settings.ShowClipboardPreview;
         _clipboardHistoryCapacity = _settings.ClipboardHistoryCapacity;
         _clipboardExpirationMinutes = _settings.ClipboardExpirationMinutes;
+
+        _enableScreenshotWidget = _settings.EnableScreenshotWidget;
+        _showScreenshotThumbnail = _settings.ShowScreenshotThumbnail;
+        _defaultScreenshotPriority = _settings.DefaultScreenshotPriority;
+        _screenshotTransientDurationSeconds = _settings.ScreenshotTransientDurationSeconds;
+        _screenshotHistoryCapacity = _settings.ScreenshotHistoryCapacity;
+        _screenshotHistoryRetentionMinutes = _settings.ScreenshotHistoryRetentionMinutes;
+        _enableScreenshotTrashAction = _settings.EnableScreenshotTrashAction;
+        _additionalScreenshotFolder = _settings.AdditionalScreenshotFolder ?? string.Empty;
 
         _enableMicrophoneIndicator = _settings.EnableMicrophoneIndicator;
         _enableCameraIndicator = _settings.EnableCameraIndicator;
@@ -1032,6 +1124,105 @@ public partial class SettingsViewModel : ObservableObject
         _clipboardService?.ClearHistory();
     }
 
+    partial void OnEnableScreenshotWidgetChanged(bool value)
+    {
+        _settings.EnableScreenshotWidget = value;
+        _settingsService.SaveDebounced();
+        _screenshotWatcherService?.ApplySettings();
+        OnPropertyChanged(nameof(DefaultScreenshotsFolderStatusText));
+        OnPropertyChanged(nameof(IsDefaultScreenshotsFolderMissing));
+
+        if (!value)
+        {
+            var sw = _orchestrator.RegisteredWidgets.OfType<Widgets.Screenshot.ScreenshotWidget>().FirstOrDefault();
+            if (sw != null && sw.IsActive)
+            {
+                sw.OnCollapse();
+            }
+        }
+    }
+
+    partial void OnShowScreenshotThumbnailChanged(bool value)
+    {
+        _settings.ShowScreenshotThumbnail = value;
+        _settingsService.SaveDebounced();
+    }
+
+    partial void OnDefaultScreenshotPriorityChanged(int value)
+    {
+        _settings.DefaultScreenshotPriority = value;
+        _settingsService.SaveDebounced();
+    }
+
+    partial void OnScreenshotTransientDurationSecondsChanged(double value)
+    {
+        _settings.ScreenshotTransientDurationSeconds = value;
+        _settingsService.SaveDebounced();
+    }
+
+    partial void OnScreenshotHistoryCapacityChanged(int value)
+    {
+        _settings.ScreenshotHistoryCapacity = Math.Clamp(value, 1, 10);
+        _screenshotWatcherService?.ApplySettings();
+        _settingsService.SaveDebounced();
+    }
+
+    partial void OnScreenshotHistoryRetentionMinutesChanged(int value)
+    {
+        _settings.ScreenshotHistoryRetentionMinutes = Math.Clamp(value, 1, 120);
+        _screenshotWatcherService?.ApplySettings();
+        _settingsService.SaveDebounced();
+    }
+
+    partial void OnEnableScreenshotTrashActionChanged(bool value)
+    {
+        _settings.EnableScreenshotTrashAction = value;
+        _settingsService.SaveDebounced();
+    }
+
+    partial void OnAdditionalScreenshotFolderChanged(string value)
+    {
+        _settings.AdditionalScreenshotFolder = value?.Trim() ?? string.Empty;
+        _settingsService.SaveDebounced();
+        _screenshotWatcherService?.ApplySettings();
+        OnPropertyChanged(nameof(IsAdditionalScreenshotFolderMissing));
+        OnPropertyChanged(nameof(AdditionalScreenshotFolderStatusText));
+    }
+
+    [RelayCommand]
+    public void BrowseAdditionalScreenshotFolder()
+    {
+        try
+        {
+            var dialog = new Microsoft.Win32.OpenFolderDialog
+            {
+                Title = "Seleccionar carpeta adicional de capturas de pantalla",
+                Multiselect = false
+            };
+
+            if (dialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(dialog.FolderName))
+            {
+                AdditionalScreenshotFolder = dialog.FolderName;
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to open folder selection dialog for AdditionalScreenshotFolder.");
+        }
+    }
+
+    [RelayCommand]
+    public void ClearAdditionalScreenshotFolder()
+    {
+        AdditionalScreenshotFolder = string.Empty;
+    }
+
+    [RelayCommand]
+    public void ClearScreenshotHistory()
+    {
+        _screenshotWatcherService?.ClearHistory();
+    }
+
     partial void OnEnableMicrophoneIndicatorChanged(bool value)
     {
         _settings.EnableMicrophoneIndicator = value;
@@ -1342,6 +1533,20 @@ public partial class SettingsViewModel : ObservableObject
         ShowClipboardPreview = _settings.ShowClipboardPreview;
         ClipboardHistoryCapacity = _settings.ClipboardHistoryCapacity;
         ClipboardExpirationMinutes = _settings.ClipboardExpirationMinutes;
+
+        EnableScreenshotWidget = _settings.EnableScreenshotWidget;
+        ShowScreenshotThumbnail = _settings.ShowScreenshotThumbnail;
+        DefaultScreenshotPriority = _settings.DefaultScreenshotPriority;
+        ScreenshotTransientDurationSeconds = _settings.ScreenshotTransientDurationSeconds;
+        ScreenshotHistoryCapacity = _settings.ScreenshotHistoryCapacity;
+        ScreenshotHistoryRetentionMinutes = _settings.ScreenshotHistoryRetentionMinutes;
+        EnableScreenshotTrashAction = _settings.EnableScreenshotTrashAction;
+        AdditionalScreenshotFolder = _settings.AdditionalScreenshotFolder ?? string.Empty;
+        _screenshotWatcherService?.ApplySettings();
+        OnPropertyChanged(nameof(DefaultScreenshotsFolderStatusText));
+        OnPropertyChanged(nameof(IsDefaultScreenshotsFolderMissing));
+        OnPropertyChanged(nameof(AdditionalScreenshotFolderStatusText));
+        OnPropertyChanged(nameof(IsAdditionalScreenshotFolderMissing));
 
         EnableMicrophoneIndicator = _settings.EnableMicrophoneIndicator;
         EnableCameraIndicator = _settings.EnableCameraIndicator;

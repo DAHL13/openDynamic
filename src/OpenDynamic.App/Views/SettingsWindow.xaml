@@ -1026,6 +1026,180 @@
                             </StackPanel>
                         </Border>
 
+                        <!-- CARD: Vista Previa de Capturas de Pantalla (Fase 21) -->
+                        <Border Style="{StaticResource SettingCard}">
+                            <StackPanel>
+                                <TextBlock Text="📸 Vista Previa de Capturas de Pantalla" Style="{StaticResource SectionHeader}"/>
+
+                                <!-- Nota de limitación técnica (Win+Shift+S vs archivo en disco) -->
+                                <Border Background="#1A06B6D4" BorderBrush="#3306B6D4" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,0,0,12">
+                                    <TextBlock Text="ℹ️ Nota sobre atajos: Win+Shift+S por sí solo copia al portapapeles y no guarda archivo en disco (eso lo gestiona el Portapapeles de la Fase 14). Esta vista previa se activa automáticamente cuando se guarda un archivo de imagen nuevo en disco (por ejemplo con Win+Impr Pant o al guardar desde la herramienta Recortes)."
+                                               Foreground="#67E8F9" FontSize="11" TextWrapping="Wrap"/>
+                                </Border>
+
+                                <!-- Interruptor principal: Vista previa de capturas -->
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Vista Previa de Capturas" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Vigila reactivamente la carpeta de capturas con FileSystemWatcher (sin sondeo; 0% CPU al desactivar)" Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <CheckBox Grid.Column="1" IsChecked="{Binding EnableScreenshotWidget}"
+                                              VerticalAlignment="Center" AutomationProperties.Name="Activar vista previa de capturas"/>
+                                </Grid>
+
+                                <!-- Mostrar miniatura -->
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Mostrar Miniatura" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Muestra la miniatura decodificada en memoria (si se desactiva, muestra solo el aviso sin imagen)" Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <CheckBox Grid.Column="1" IsChecked="{Binding ShowScreenshotThumbnail}"
+                                              IsEnabled="{Binding EnableScreenshotWidget}"
+                                              VerticalAlignment="Center" AutomationProperties.Name="Mostrar miniatura de captura"/>
+                                </Grid>
+
+                                <!-- Activar acción Papelera -->
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Permitir Acción de Enviar a la Papelera" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Habilita el botón Papelera en la vista expandida con doble confirmación y reciclaje seguro (recuperable)" Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <CheckBox Grid.Column="1" IsChecked="{Binding EnableScreenshotTrashAction}"
+                                              IsEnabled="{Binding EnableScreenshotWidget}"
+                                              VerticalAlignment="Center" AutomationProperties.Name="Permitir acción de enviar a la papelera"/>
+                                </Grid>
+
+                                <!-- Estado de carpeta del sistema (KnownFolder) -->
+                                <Border Background="#14FFFFFF" CornerRadius="6" Padding="10,8" Margin="0,0,0,12">
+                                    <StackPanel>
+                                        <TextBlock Text="Carpeta de Capturas de Windows (FOLDERID_Screenshots)" FontSize="11.5" FontWeight="SemiBold" Foreground="#E2E8F0"/>
+                                        <TextBlock Text="{Binding DefaultScreenshotsFolderStatusText}" FontSize="11" Foreground="#94A3B8" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Carpeta adicional opcional -->
+                                <TextBlock Text="Carpeta Vigilada Adicional (Opcional)" Style="{StaticResource SettingTitle}" Margin="0,0,0,2"/>
+                                <TextBlock Text="{Binding AdditionalScreenshotFolderStatusText}" Style="{StaticResource SettingDesc}" Margin="0,0,0,6"/>
+
+                                <Grid Margin="0,0,0,14">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="8"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="6"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox Grid.Column="0"
+                                             Text="{Binding AdditionalScreenshotFolder, UpdateSourceTrigger=LostFocus}"
+                                             IsEnabled="{Binding EnableScreenshotWidget}"
+                                             Height="32" Padding="8,6" Background="#111827" Foreground="White" BorderBrush="#374151" BorderThickness="1"
+                                             VerticalContentAlignment="Center" AutomationProperties.Name="Ruta de carpeta adicional de capturas"/>
+                                    <Button Grid.Column="2" Content="Elegir..."
+                                            Command="{Binding BrowseAdditionalScreenshotFolderCommand}"
+                                            IsEnabled="{Binding EnableScreenshotWidget}"
+                                            Height="32" Padding="12,0" Background="#252A36" Foreground="#60A5FA" BorderBrush="#374151" BorderThickness="1"
+                                            AutomationProperties.Name="Elegir carpeta adicional de capturas"/>
+                                    <Button Grid.Column="4" Content="Limpiar"
+                                            Command="{Binding ClearAdditionalScreenshotFolderCommand}"
+                                            IsEnabled="{Binding EnableScreenshotWidget}"
+                                            Height="32" Padding="10,0" Background="#252A36" Foreground="#9CA3AF" BorderBrush="#374151" BorderThickness="1"
+                                            AutomationProperties.Name="Limpiar carpeta adicional"/>
+                                </Grid>
+
+                                <!-- Prioridad del Widget de Capturas -->
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Prioridad de Captura de Pantalla" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Prioridad en el orquestador (por defecto 75, entre Volumen 80 y Red 65)" Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="1" Text="{Binding DefaultScreenshotPriority}" Style="{StaticResource ValueBadge}"/>
+                                </Grid>
+                                <Slider Minimum="40" Maximum="85" SmallChange="1" LargeChange="5"
+                                        IsSnapToTickEnabled="True" TickFrequency="1"
+                                        Value="{Binding DefaultScreenshotPriority}"
+                                        IsEnabled="{Binding EnableScreenshotWidget}"
+                                        Margin="0,0,0,14" AutomationProperties.Name="Prioridad de captura de pantalla"/>
+
+                                <!-- Duración del Aviso Transitorio -->
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Duración del Aviso Transitorio" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Segundos antes de ocultarse automáticamente (se pausa al pasar el cursor; por defecto 6.0 s)" Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="1" Text="{Binding ScreenshotTransientDurationSeconds, StringFormat='{}{0:F1} s'}" Style="{StaticResource ValueBadge}"/>
+                                </Grid>
+                                <Slider Minimum="2.0" Maximum="15.0" SmallChange="0.5" LargeChange="1.0"
+                                        IsSnapToTickEnabled="True" TickFrequency="0.5"
+                                        Value="{Binding ScreenshotTransientDurationSeconds}"
+                                        IsEnabled="{Binding EnableScreenshotWidget}"
+                                        Margin="0,0,0,14" AutomationProperties.Name="Duración del aviso de captura"/>
+
+                                <!-- Capacidad del historial reciente en RAM -->
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Capturas Recientes en Memoria" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Cantidad máxima de rutas recientes conservadas solo en RAM (1 a 10, por defecto 5)" Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="1" Text="{Binding ScreenshotHistoryCapacity}" Style="{StaticResource ValueBadge}"/>
+                                </Grid>
+                                <Slider Minimum="1" Maximum="10" SmallChange="1" LargeChange="2"
+                                        IsSnapToTickEnabled="True" TickFrequency="1"
+                                        Value="{Binding ScreenshotHistoryCapacity}"
+                                        IsEnabled="{Binding EnableScreenshotWidget}"
+                                        Margin="0,0,0,14" AutomationProperties.Name="Capacidad del historial de capturas"/>
+
+                                <!-- Retención temporal en memoria -->
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Retención Temporal en Memoria" Style="{StaticResource SettingTitle}"/>
+                                        <TextBlock Text="Minutos que las rutas recientes permanecen en la lista en memoria (1 a 120 min, por defecto 30 min)" Style="{StaticResource SettingDesc}"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="1" Text="{Binding ScreenshotHistoryRetentionMinutes, StringFormat='{}{0} min'}" Style="{StaticResource ValueBadge}"/>
+                                </Grid>
+                                <Slider Minimum="1" Maximum="120" SmallChange="5" LargeChange="15"
+                                        IsSnapToTickEnabled="True" TickFrequency="1"
+                                        Value="{Binding ScreenshotHistoryRetentionMinutes}"
+                                        IsEnabled="{Binding EnableScreenshotWidget}"
+                                        Margin="0,0,0,14" AutomationProperties.Name="Retención temporal de capturas en memoria"/>
+
+                                <!-- Botón Limpiar Historial -->
+                                <Button Content="🗑 Limpiar Historial de Capturas"
+                                        Command="{Binding ClearScreenshotHistoryCommand}"
+                                        Height="32" Padding="14,0"
+                                        Background="#252A36" Foreground="#F87171" BorderBrush="#374151" BorderThickness="1"
+                                        HorizontalAlignment="Left"
+                                        AutomationProperties.Name="Limpiar historial de capturas en memoria"/>
+                            </StackPanel>
+                        </Border>
+
                         <!-- CARD: Indicadores de Privacidad (Micrófono y Cámara) -->
                         <Border Style="{StaticResource SettingCard}">
                             <StackPanel>
