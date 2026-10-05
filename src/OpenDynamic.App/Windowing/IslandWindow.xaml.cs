@@ -13,6 +13,7 @@ using OpenDynamic.App.Orchestration;
 using OpenDynamic.App.Widgets.Hardware;
 using OpenDynamic.Core.EnergySaver;
 using OpenDynamic.Core.State;
+using OpenDynamic.Core.Windowing;
 using Serilog;
 
 namespace OpenDynamic.App.Windowing;
@@ -40,7 +41,6 @@ public partial class IslandWindow : Window
 
     private readonly DispatcherTimer _hoverEnterTimer;
     private readonly DispatcherTimer _hoverLeaveTimer;
-    private readonly DispatcherTimer _restingHoverWatcherTimer;
 
     private IntPtr _hwnd = IntPtr.Zero;
     private HwndSource? _hwndSource;
@@ -98,13 +98,6 @@ public partial class IslandWindow : Window
         };
         _hoverLeaveTimer.Tick += OnHoverLeaveTimerTick;
 
-        _restingHoverWatcherTimer = new DispatcherTimer(DispatcherPriority.Background)
-        {
-            Interval = TimeSpan.FromMilliseconds(100)
-        };
-        _restingHoverWatcherTimer.Tick += OnRestingHoverWatcherTick;
-        _restingHoverWatcherTimer.Start();
-
         _animator.FrameUpdated += OnAnimatorFrameUpdated;
         _animator.Settled += OnAnimatorSettled;
         IslandHostView.SatelliteFadeOutCompleted += OnSatelliteFadeOutCompleted;
@@ -113,12 +106,19 @@ public partial class IslandWindow : Window
         {
             Dispatcher.InvokeAsync(() =>
             {
+                // AUD-021: the handler runs asynchronously, so by the time it executes the orchestrator may already
+                // be in a different state. Acting on a stale notification (e.g. "-> Hidden" while a reveal is live)
+                // would cancel hover/reveal prematurely, so only the current state is authoritative.
+                var currentState = _orchestrator.StateMachine.CurrentState;
+                if (msg.NewState != currentState)
+                {
+                    return;
+                }
+
                 Log.Debug("IslandWindow: StateChanged: {OldState} -> {NewState}", msg.PreviousState, msg.NewState);
 
-                if (msg.NewState != IslandState.Hidden)
+                if (currentState != IslandState.Hidden)
                 {
-                    _restingHoverWatcherTimer.Stop();
-
                     if (IslandHostView.Visibility != Visibility.Visible)
                     {
                         IslandHostView.Visibility = Visibility.Visible;
@@ -158,11 +158,6 @@ public partial class IslandWindow : Window
                             Log.Debug("[Hover] Enter Timer Started (Retained on State Change)");
                             _hoverEnterTimer.Start();
                         }
-                    }
-
-                    if (!_restingHoverWatcherTimer.IsEnabled && !_orchestrator.IsHovering)
-                    {
-                        _restingHoverWatcherTimer.Start();
                     }
 
                     CheckAndApplyHiddenVisibility();
@@ -274,8 +269,8 @@ public partial class IslandWindow : Window
 
         if (RestingSensorNotch != null)
         {
-            RestingSensorNotch.Width = Math.Max(_settings.CapsuleWidth > 0 ? _settings.CapsuleWidth : 200.0, 240.0);
-            RestingSensorNotch.Height = Math.Max(_settings.CapsuleHeight > 0 ? _settings.CapsuleHeight : 28.0, 44.0);
+            RestingSensorNotch.Width = RestingSensorPolicy.WidthDip;
+            RestingSensorNotch.Height = RestingSensorPolicy.HeightDip;
         }
 
         if (_hwnd != IntPtr.Zero)
@@ -398,11 +393,6 @@ public partial class IslandWindow : Window
         {
             RestingSensorNotch.Visibility = Visibility.Visible;
             RestingSensorNotch.IsHitTestVisible = true;
-        }
-
-        if (!_restingHoverWatcherTimer.IsEnabled && !_orchestrator.IsHovering)
-        {
-            _restingHoverWatcherTimer.Start();
         }
     }
 
@@ -826,51 +816,6 @@ public partial class IslandWindow : Window
     }
 
     /// <summary>
-    /// Evaluates if a physical screen coordinate falls within the resting notch sensor strip
-    /// at the top edge of the screen when the island is in Hidden state.
-    /// Converts physical screen coordinates to WPF device-independent pixels (DIPs)
-    /// using <see cref="Visual.PointFromScreen"/> taking display DPI scaling into account.
-    /// </summary>
-    public bool IsScreenPointInHiddenSensorZone(int screenX, int screenY)
-    {
-        if (!this.IsLoaded || PresentationSource.FromVisual(this) == null)
-        {
-            return false;
-        }
-
-        try
-        {
-            Point screenPoint = new Point(screenX, screenY);
-            Point clientPoint = this.PointFromScreen(screenPoint);
-
-            double windowWidthDip = this.ActualWidth > 0 ? this.ActualWidth : this.Width;
-            if (windowWidthDip <= 0) windowWidthDip = 640.0;
-
-            double notchWidthDip = Math.Max(_settings.CapsuleWidth > 0 ? _settings.CapsuleWidth : 200.0, 240.0);
-            double sensorHeightDip = Math.Max(_settings.CapsuleHeight > 0 ? _settings.CapsuleHeight : 28.0, 44.0);
-
-            bool hit = (clientPoint.X >= ((windowWidthDip / 2.0) - (notchWidthDip / 2.0) - 2.0) &&
-                        clientPoint.X <= ((windowWidthDip / 2.0) + (notchWidthDip / 2.0) + 2.0) &&
-                        clientPoint.Y >= -5.0 && clientPoint.Y <= (sensorHeightDip + 2.0));
-
-            if (clientPoint.Y < sensorHeightDip + 10.0)
-            {
-                double centerDip = windowWidthDip / 2.0;
-                double minX = centerDip - (notchWidthDip / 2.0);
-                double maxX = centerDip + (notchWidthDip / 2.0);
-                Log.Debug("IsScreenPointInHiddenSensorZone: Screen=({ScreenX},{ScreenY}) -> Client=({ClientX:F1},{ClientY:F1}), Bounds=[{MinX:F1}..{MaxX:F1}, -5.0..{SensorHeight:F1}], Hit={Hit}",
-                    screenX, screenY, clientPoint.X, clientPoint.Y, minX, maxX, sensorHeightDip, hit);
-            }
-
-            return hit;
-        }
-        catch (InvalidOperationException)
-        {
-            return false;
-        }
-    }
-
-    /// <summary>
     /// Evaluates whether the physical mouse cursor (queried directly via Win32 GetCursorPos)
     /// falls within the interactive zone of the island, without relying on WPF IsMouseOver.
     /// </summary>
@@ -887,16 +832,19 @@ public partial class IslandWindow : Window
             double windowWidth = this.ActualWidth > 0 ? this.ActualWidth : 640.0;
             double center = windowWidth / 2.0;
 
-            // When Island is Hidden: the interactive zone is the resting sensor notch at top edge
+            // When Island is Hidden: the interactive zone is the minimal resting sensor strip at the top edge,
+            // and only while it has a purpose (ambient clock enabled, no fullscreen/power suppression).
+            // Otherwise the whole window stays click-through (HTTRANSPARENT).
             if (_orchestrator.StateMachine.CurrentState == IslandState.Hidden)
             {
-                double notchWidth = Math.Max(_settings.CapsuleWidth > 0 ? _settings.CapsuleWidth : 200.0, 240.0);
-                double sensorHeight = Math.Max(_settings.CapsuleHeight > 0 ? _settings.CapsuleHeight : 28.0, 44.0);
-                return (clientPoint.X >= (center - notchWidth / 2.0) &&
-                        clientPoint.X <= (center + notchWidth / 2.0) &&
-                        clientPoint.Y >= -5.0 && clientPoint.Y <= sensorHeight);
+                return RestingSensorPolicy.ShouldCapture(
+                    _settings.EnableAmbientClock,
+                    _orchestrator.IsFullscreenSuppressed,
+                    _orchestrator.IsPowerSuspended,
+                    clientPoint.X,
+                    clientPoint.Y,
+                    windowWidth);
             }
-            // When Island is active (Compact, Expanded, Split): the interactive zone is the physical capsule
             else
             {
                 double capsuleWidth = IslandHostView.CapsuleBorder.ActualWidth > 0 ? IslandHostView.CapsuleBorder.ActualWidth : 200.0;
@@ -1163,20 +1111,6 @@ public partial class IslandWindow : Window
         }
     }
 
-    private void OnRestingHoverWatcherTick(object? sender, EventArgs e)
-    {
-        if (_orchestrator.StateMachine.CurrentState != IslandState.Hidden || _orchestrator.IsHovering)
-        {
-            _restingHoverWatcherTimer.Stop();
-            return;
-        }
-
-        if (IsPhysicalCursorOverInteractiveZone())
-        {
-            OnPhysicalCursorPresence();
-        }
-    }
-
     private void OnHoverLeaveTimerTick(object? sender, EventArgs e)
     {
         _hoverLeaveTimer.Stop();
@@ -1242,8 +1176,6 @@ public partial class IslandWindow : Window
         _hoverLeaveTimer.Stop();
         _hoverLeaveTimer.Tick -= OnHoverLeaveTimerTick;
 
-        _restingHoverWatcherTimer.Stop();
-        _restingHoverWatcherTimer.Tick -= OnRestingHoverWatcherTick;
         _animator.FrameUpdated -= OnAnimatorFrameUpdated;
         _animator.Settled -= OnAnimatorSettled;
         IslandHostView.SatelliteFadeOutCompleted -= OnSatelliteFadeOutCompleted;

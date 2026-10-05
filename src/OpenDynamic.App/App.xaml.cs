@@ -13,6 +13,8 @@ public partial class App : Application
     private SingleInstanceManager? _singleInstance;
     private TrayIconManager? _trayIconManager;
     private Services.IHotkeyService? _hotkeyService;
+    private System.Windows.Interop.HwndSource? _hwndSource;
+    private System.Windows.Interop.HwndSourceHook? _taskbarCreatedHook;
 
     public static new App Current => (App)Application.Current;
 
@@ -137,11 +139,11 @@ public partial class App : Application
 
         // Initialize Global Hotkey Service using native Win32 RegisterHotKey
         _hotkeyService = Services.GetRequiredService<Services.IHotkeyService>();
-        var hwndSource = System.Windows.Interop.HwndSource.FromHwnd(islandWindow.Hwnd);
-        if (hwndSource != null)
+        _hwndSource = System.Windows.Interop.HwndSource.FromHwnd(islandWindow.Hwnd);
+        if (_hwndSource != null)
         {
             uint taskbarCreatedMsg = Native.NativeMethods.RegisterWindowMessage("TaskbarCreated");
-            hwndSource.AddHook((IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled) =>
+            _taskbarCreatedHook = (IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled) =>
             {
                 if (msg != 0 && (uint)msg == taskbarCreatedMsg)
                 {
@@ -149,9 +151,10 @@ public partial class App : Application
                     _trayIconManager?.Recreate();
                 }
                 return IntPtr.Zero;
-            });
+            };
+            _hwndSource.AddHook(_taskbarCreatedHook);
 
-            _hotkeyService.Initialize(islandWindow.Hwnd, hwndSource);
+            _hotkeyService.Initialize(islandWindow.Hwnd, _hwndSource);
             var settings = Services.GetRequiredService<Core.Settings.AppSettings>();
             if (settings.EnableGlobalHotkeys && !string.IsNullOrWhiteSpace(settings.ToggleIslandHotkey))
             {
@@ -274,6 +277,13 @@ public partial class App : Application
     {
         try
         {
+            if (_hwndSource != null && _taskbarCreatedHook != null)
+            {
+                _hwndSource.RemoveHook(_taskbarCreatedHook);
+                _taskbarCreatedHook = null;
+            }
+            _hwndSource = null;
+
             _trayIconManager?.Dispose();
             _trayIconManager = null;
 
@@ -286,6 +296,9 @@ public partial class App : Application
 
             var settingsWindow = Services?.GetService<Views.SettingsWindow>();
             settingsWindow?.ForceClose();
+
+            var islandWindow = Services?.GetService<Windowing.IslandWindow>();
+            islandWindow?.Close();
 
             if (Services is IDisposable disposableServices)
             {
