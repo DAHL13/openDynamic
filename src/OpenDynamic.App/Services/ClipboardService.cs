@@ -28,6 +28,7 @@ public sealed class ClipboardService : IDisposable
     private bool _isDisposed;
     private uint _internalCopySequenceNumber;
     private string? _lastInternalCopyText;
+    private long _lastInternalImageCopyTicks;
 
     // Password manager exclusion formats
     private static readonly uint FormatExclude = NativeMethods.RegisterClipboardFormat("ExcludeClipboardContentFromMonitorProcessing");
@@ -232,6 +233,13 @@ public sealed class ClipboardService : IDisposable
                         }
                         else if (System.Windows.Clipboard.ContainsImage())
                         {
+                            if (_lastInternalImageCopyTicks != 0 && (Environment.TickCount64 - _lastInternalImageCopyTicks) < 500)
+                            {
+                                _lastInternalImageCopyTicks = 0;
+                                Log.Debug("WM_CLIPBOARDUPDATE matched recent internal image copy. Suppressing notice.");
+                                return true;
+                            }
+
                             if (_historyManager.TryAddImage(out var item) && item != null)
                             {
                                 Log.Information("Clipboard item added: Kind=Image");
@@ -296,6 +304,59 @@ public sealed class ClipboardService : IDisposable
                 Log.Warning(ex, "Failed to copy item to Windows Clipboard.");
             }
         });
+    }
+
+    /// <summary>
+    /// Writes a bitmap image to the Windows Clipboard with short retries on COMException
+    /// and tracks sequence number / timestamp to prevent Phase 14 from firing a duplicate alert.
+    /// </summary>
+    public async Task<bool> CopyImageToClipboardAsync(System.Windows.Media.Imaging.BitmapSource image)
+    {
+        if (image == null || _isDisposed)
+        {
+            return false;
+        }
+
+        for (int attempt = 1; attempt <= 3; attempt++)
+        {
+            try
+            {
+                bool copied = await _dispatcher.InvokeAsync(() =>
+                {
+                    if (_isDisposed) return false;
+
+                    _lastInternalImageCopyTicks = Environment.TickCount64;
+                    System.Windows.Clipboard.SetImage(image);
+                    _internalCopySequenceNumber = NativeMethods.GetClipboardSequenceNumber();
+                    Log.Information("Copied screenshot image to clipboard internally (Width={Width}, Height={Height}, Seq={Seq}).",
+                        image.PixelWidth, image.PixelHeight, _internalCopySequenceNumber);
+                    return true;
+                });
+
+                if (copied)
+                {
+                    return true;
+                }
+            }
+            catch (COMException ex) when ((uint)ex.ErrorCode == 0x800401D0 || ex.ErrorCode == NativeMethods.CLIPBRD_E_CANT_OPEN)
+            {
+                if (attempt < 3)
+                {
+                    await Task.Delay(50);
+                }
+                else
+                {
+                    Log.Warning("Clipboard busy (CLIPBRD_E_CANT_OPEN) after 3 attempts when copying screenshot image.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Failed to copy screenshot image to Windows Clipboard.");
+                return false;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>
