@@ -113,6 +113,13 @@ public partial class App : Application
         var clipboardWidget = Services.GetRequiredService<Widgets.Clipboard.ClipboardWidget>();
         orchestrator.RegisterWidget(clipboardWidget);
 
+        // Register ScreenshotWidget (Priority 75, Transient) & Start ScreenshotWatcherService
+        var screenshotWatcher = Services.GetRequiredService<Services.ScreenshotWatcherService>();
+        screenshotWatcher.Start();
+
+        var screenshotWidget = Services.GetRequiredService<Widgets.Screenshot.ScreenshotWidget>();
+        orchestrator.RegisterWidget(screenshotWidget);
+
         // Register PrivacyWidget (Priority 85, Transient) & Start PrivacyAccessMonitor
         var privacyMonitor = Services.GetRequiredService<Services.PrivacyAccessMonitor>();
         privacyMonitor.Start();

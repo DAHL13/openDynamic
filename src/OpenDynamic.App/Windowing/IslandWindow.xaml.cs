@@ -35,6 +35,7 @@ public partial class IslandWindow : Window
     private readonly Services.ClipboardService? _clipboardService;
     private readonly Services.PrivacyAccessMonitor? _privacyMonitor;
     private readonly Services.EnergySaverService? _energySaverService;
+    private readonly Services.ScreenshotWatcherService? _screenshotWatcherService;
     private readonly Core.Settings.AppSettings _settings;
 
     private readonly DispatcherTimer _hoverEnterTimer;
@@ -61,7 +62,8 @@ public partial class IslandWindow : Window
         Services.DeviceService? deviceService = null,
         Services.ClipboardService? clipboardService = null,
         Services.PrivacyAccessMonitor? privacyMonitor = null,
-        Services.EnergySaverService? energySaverService = null)
+        Services.EnergySaverService? energySaverService = null,
+        Services.ScreenshotWatcherService? screenshotWatcherService = null)
     {
         _windowPositioner = windowPositioner ?? throw new ArgumentNullException(nameof(windowPositioner));
         _foregroundWatcher = foregroundWatcher ?? throw new ArgumentNullException(nameof(foregroundWatcher));
@@ -74,6 +76,7 @@ public partial class IslandWindow : Window
         _clipboardService = clipboardService;
         _privacyMonitor = privacyMonitor;
         _energySaverService = energySaverService;
+        _screenshotWatcherService = screenshotWatcherService;
         _settings = settings ?? new Core.Settings.AppSettings();
 
         if (_energySaverService != null)
@@ -610,6 +613,7 @@ public partial class IslandWindow : Window
                 _networkService?.NotifySuspended();
                 _deviceService?.NotifySuspended();
                 _clipboardService?.NotifySuspended();
+                _screenshotWatcherService?.NotifySuspended();
                 _energySaverService?.NotifySuspended();
                 break;
 
@@ -626,6 +630,7 @@ public partial class IslandWindow : Window
                 _networkService?.NotifyResumed();
                 _deviceService?.NotifyResumed();
                 _clipboardService?.NotifyResumed();
+                _screenshotWatcherService?.NotifyResumed();
                 _energySaverService?.NotifyResumed();
                 break;
 

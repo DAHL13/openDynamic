@@ -71,6 +71,25 @@ openDynamic adopta una estética de **muesca rectangular superior (Notch)** pega
 | **Fase 16** | **Visualizador de audio real (espectro FFT propia, WASAPI loopback, 0 heap alloc, <2% CPU) (v1.1)** | **Completada** |
 | **Fase 19** | **Reloj ambiental en reposo (OnHover, 0% CPU idle, WM_TIMECHANGE, alineación al minuto) (v1.4)** | **Completada** |
 | **Fase 20** | **Ahorro de energía reactivo (WinRT PowerManager, ResourceProfile en Core, 0% polling) (v1.5)** | **Completada** |
+| **Fase 21** | **Vista previa de capturas de pantalla (FileSystemWatcher reactivo, Drag & Drop Copy, 0% bloqueo) (v1.6)** | **Completada** |
+
+---
+
+## Vista Previa de Capturas de Pantalla
+
+openDynamic detecta de forma instantánea las nuevas capturas de pantalla guardadas en el sistema mediante vigilancia reactiva por eventos de sistema de archivos (`FileSystemWatcher`), con cero sondeo periódico (0% CPU en reposo):
+
+- **Vigilancia Reactiva de Carpeta KnownFolder (`ScreenshotWatcherService`):**
+  - Resuelve dinámicamente la carpeta oficial del sistema (`FOLDERID_Screenshots` vía `SHGetKnownFolderPath`) y admite una carpeta adicional opcional configurada por el usuario.
+  - Cuando el widget se desactiva en Ajustes o el directorio no existe, el `FileSystemWatcher` se detiene y destruye (`Dispose()`) por completo.
+  - Nota sobre atajos de Windows: `Win + PrtScn` guarda directamente en disco y dispara la vista previa al instante; `Win + Shift + S` copia por defecto al portapapeles (cubierto por la Fase 14) y solo genera archivo si la Herramienta Recortes está configurada para guardar capturas automáticamente.
+- **Cero Bloqueo de Archivo y Estabilidad de Escritura (`FileStabilityPolicy`):**
+  - Espera de forma asíncrona a que el archivo termine de escribirse en disco (tamaño estable durante 300 ms y apertura compartida disponible) sin bloquear el hilo de interfaz.
+  - Decodifica la miniatura (`DecodePixelWidth = 320`, `BitmapCacheOption.OnLoad`, `Freeze()`) desde un flujo en memoria y cierra el archivo inmediatamente para que el usuario pueda moverlo, renombrarlo o borrarlo desde el Explorador en cualquier momento. Al cerrarse el aviso, la referencia a la miniatura se libera de RAM.
+- **Acciones Rápidas, Drag & Drop Seguro y Papelera:**
+  - **Arrastrar y Soltar (`DataFormats.FileDrop`):** Permite arrastrar la miniatura hacia cualquier aplicación (navegador, correo, chat, editor) utilizando estrictamente `DragDropEffects.Copy` (nunca `Move`) para evitar pérdida accidental del archivo original.
+  - **Acciones en Modo Expandido:** Copiar imagen al portapapeles (con supresión de eco hacia el historial de portapapeles de la Fase 14), copiar ruta, abrir archivo, mostrar en carpeta (`explorer.exe /select`) y enviar a la Papelera de reciclaje mediante `SHFileOperationW` (`FOF_ALLOWUNDO`) con **doble confirmación** visual.
+  - **Privacidad (Regla de Oro 10):** El historial reciente (máximo 5 elementos) vive únicamente en RAM y los registros de diagnóstico (`Serilog`) jamás incluyen rutas, nombres de archivo, nombres de usuario ni contenido de imagen.
 
 ---
 
@@ -206,8 +225,8 @@ openDynamic incorpora un widget de reloj ambiental diseñado para consultar la h
 ## Documentación Técnica
 
 - **[Arquitectura y Guía para Desarrolladores (`docs/arquitectura.md`)](./docs/arquitectura.md):** Diagramas conceptuales de capas (Core vs. App), flujo del `IslandOrchestrator`, ciclo de vida de la FSM y la **Guía de 10 pasos** para crear e integrar nuevos widgets desde cero.
-- **[Registro de Decisiones de Arquitectura (`DECISIONS.md`)](./DECISIONS.md):** Registro histórico y justificación de las 28 decisiones técnicas (ADR-001 a ADR-028).
-- **[Matriz de Validación y Pruebas (`docs/pruebas.md`)](./docs/pruebas.md):** 440 pruebas unitarias automatizadas y casos de prueba manual de sistema (DPI, multimonitor, suspensión, pantalla completa, accesibilidad, portapapeles, privacidad de cámara/micrófono, espectro de audio, reloj ambiental).
+- **[Registro de Decisiones de Arquitectura (`DECISIONS.md`)](./DECISIONS.md):** Registro histórico y justificación de las 30 decisiones técnicas (ADR-001 a ADR-030).
+- **[Matriz de Validación y Pruebas (`docs/pruebas.md`)](./docs/pruebas.md):** 586 pruebas unitarias automatizadas y casos de prueba manual de sistema (DPI, multimonitor, suspensión, pantalla completa, accesibilidad, portapapeles, privacidad de cámara/micrófono, espectro de audio, reloj ambiental, ahorro de energía, capturas de pantalla).
 
 ---
 
@@ -221,7 +240,7 @@ openDynamic incorpora un widget de reloj ambiental diseñado para consultar la h
 - **Multimedia:** WinRT `Windows.Media.Control` (GSMTC) con extrapolación continua y miniaturas congeladas
 - **Bandeja del Sistema (Tray):** `H.NotifyIcon.Wpf` (cero WinForms)
 - **Atajos Globales:** Win32 `RegisterHotKey` / `UnregisterHotKey` mediante WndProc
-- **Configuración y Persistencia:** `System.Text.Json` en `%AppData%\openDynamic\settings.json` (esquema v9 con migración automática y debounce de 500ms)
+- **Configuración y Persistencia:** `System.Text.Json` en `%AppData%\openDynamic\settings.json` (esquema v14 con migración automática y debounce de 500ms)
 - **Registro de Eventos (Logging):** `Serilog` y `Serilog.Sinks.File` en `%LocalAppData%\openDynamic\logs`
 - **Pruebas Unitarias:** `xUnit`
 - **Instalador:** Inno Setup 6 (distribución ReadyToRun)

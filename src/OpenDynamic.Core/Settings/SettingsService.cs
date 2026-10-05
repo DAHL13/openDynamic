@@ -222,8 +222,22 @@ public sealed class SettingsService : ISettingsService
                         loaded.EnergySaverHardwareSamplingIntervalSeconds = 5.0;
                     }
 
+                    if (loaded.SchemaVersion < 14)
+                    {
+                        // Migration v13 -> v14: Introduce Screenshot Preview widget settings.
+                        loaded.EnableScreenshotWidget = true;
+                        loaded.ShowScreenshotThumbnail = true;
+                        loaded.DefaultScreenshotPriority = 75;
+                        loaded.ScreenshotTransientDurationSeconds = 6.0;
+                        loaded.ScreenshotHistoryCapacity = 5;
+                        loaded.ScreenshotHistoryRetentionMinutes = 30;
+                        loaded.EnableScreenshotTrashAction = true;
+                        loaded.AdditionalScreenshotFolder ??= string.Empty;
+                    }
+
                     loaded.IgnoredPrivacyApps ??= new List<string>();
                     loaded.IgnoredDeviceNames ??= new List<string>();
+                    loaded.AdditionalScreenshotFolder ??= string.Empty;
                     loaded.SchemaVersion = AppSettings.CurrentSchemaVersion;
                     CurrentSettings = loaded;
                     WriteSettingsToDisk(CurrentSettings);
@@ -232,6 +246,7 @@ public sealed class SettingsService : ISettingsService
                 {
                     loaded.IgnoredPrivacyApps ??= new List<string>();
                     loaded.IgnoredDeviceNames ??= new List<string>();
+                    loaded.AdditionalScreenshotFolder ??= string.Empty;
                     CurrentSettings = loaded;
                 }
 

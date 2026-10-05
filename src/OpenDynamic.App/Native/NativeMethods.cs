@@ -486,5 +486,110 @@ public static class NativeMethods
         RegNotifyFilter dwNotifyFilter,
         Microsoft.Win32.SafeHandles.SafeWaitHandle hEvent,
         bool fAsynchronous);
+
+    // KnownFolder & Shell File Operations (Phase 21: Screenshots & Recycle Bin)
+    public static readonly Guid FOLDERID_Screenshots = new("B7BEDE81-DF94-4682-A7D8-57A52620B86F");
+
+    [DllImport("shell32.dll", ExactSpelling = true)]
+    public static extern int SHGetKnownFolderPath(
+        [MarshalAs(UnmanagedType.LPStruct)] Guid rfid,
+        uint dwFlags,
+        IntPtr hToken,
+        out IntPtr ppszPath);
+
+    public static bool TryGetScreenshotsKnownFolderPath(out string? folderPath)
+    {
+        folderPath = null;
+        IntPtr ppszPath = IntPtr.Zero;
+        try
+        {
+            int hr = SHGetKnownFolderPath(FOLDERID_Screenshots, 0, IntPtr.Zero, out ppszPath);
+            if (hr == 0 && ppszPath != IntPtr.Zero)
+            {
+                folderPath = Marshal.PtrToStringUni(ppszPath);
+                return !string.IsNullOrWhiteSpace(folderPath);
+            }
+
+            return false;
+        }
+        catch
+        {
+            return false;
+        }
+        finally
+        {
+            if (ppszPath != IntPtr.Zero)
+            {
+                Marshal.FreeCoTaskMem(ppszPath);
+            }
+        }
+    }
+
+    public const uint FO_DELETE = 0x0003;
+    public const ushort FOF_SILENT = 0x0004;
+    public const ushort FOF_NOCONFIRMATION = 0x0010;
+    public const ushort FOF_ALLOWUNDO = 0x0040;
+    public const ushort FOF_NOERRORUI = 0x0400;
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    public struct SHFILEOPSTRUCTW
+    {
+        public IntPtr hwnd;
+        public uint wFunc;
+        [MarshalAs(UnmanagedType.LPWStr)]
+        public string pFrom;
+        [MarshalAs(UnmanagedType.LPWStr)]
+        public string? pTo;
+        public ushort fFlags;
+        [MarshalAs(UnmanagedType.Bool)]
+        public bool fAnyOperationsAborted;
+        public IntPtr hNameMappings;
+        [MarshalAs(UnmanagedType.LPWStr)]
+        public string? lpszProgressTitle;
+    }
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
+    public static extern int SHFileOperationW(ref SHFILEOPSTRUCTW lpFileOp);
+
+    /// <summary>
+    /// Moves the specified file to the Windows Recycle Bin using SHFileOperationW with FOF_ALLOWUNDO.
+    /// Never performs a permanent deletion; requires a fully-qualified path.
+    /// </summary>
+    public static bool SendFileToRecycleBin(string fullPath)
+    {
+        if (string.IsNullOrWhiteSpace(fullPath))
+        {
+            return false;
+        }
+
+        try
+        {
+            string normalizedPath = System.IO.Path.GetFullPath(fullPath);
+            if (!System.IO.Path.IsPathFullyQualified(normalizedPath) || !System.IO.File.Exists(normalizedPath))
+            {
+                return false;
+            }
+
+            var fileOp = new SHFILEOPSTRUCTW
+            {
+                hwnd = IntPtr.Zero,
+                wFunc = FO_DELETE,
+                pFrom = normalizedPath + "\0\0",
+                pTo = null,
+                fFlags = (ushort)(FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_SILENT | FOF_NOERRORUI),
+                fAnyOperationsAborted = false,
+                hNameMappings = IntPtr.Zero,
+                lpszProgressTitle = null
+            };
+
+            int result = SHFileOperationW(ref fileOp);
+            return result == 0 && !fileOp.fAnyOperationsAborted;
+        }
+        catch
+        {
+            return false;
+        }
+    }
 }
+
 
