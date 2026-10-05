@@ -40,7 +40,6 @@ public sealed class ScreenshotWatcherService : IDisposable
     private readonly List<string> _watchedFolders = new();
     private readonly ConcurrentDictionary<string, byte> _inFlightPaths = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, DateTimeOffset> _recentlyProcessedUtc = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string, BitmapSource> _thumbnailsByPath = new(StringComparer.OrdinalIgnoreCase);
 
     private CancellationTokenSource? _cts;
     private DateTimeOffset _watchStartedUtc;
@@ -199,31 +198,15 @@ public sealed class ScreenshotWatcherService : IDisposable
     }
 
     /// <summary>
-    /// Retrieves the cached frozen thumbnail for a screenshot path if available in memory.
-    /// </summary>
-    public BitmapSource? GetCachedThumbnail(string filePath)
-    {
-        if (string.IsNullOrWhiteSpace(filePath))
-        {
-            return null;
-        }
-
-        return _thumbnailsByPath.TryGetValue(filePath, out var thumbnail) ? thumbnail : null;
-    }
-
-    /// <summary>
-    /// Refreshes the availability status of recent history entries against the filesystem
-    /// and prunes expired or evicted thumbnails.
+    /// Refreshes the availability status of recent history entries against the filesystem.
     /// </summary>
     public IReadOnlyList<ScreenshotEntry> GetRefreshedHistory()
     {
-        var items = _history.GetRecentEntries();
-        PruneOrphanedThumbnails(items);
-        return items;
+        return _history.GetRecentEntries();
     }
 
     /// <summary>
-    /// Removes a specific screenshot path from the in-memory history and thumbnail cache.
+    /// Removes a specific screenshot path from the in-memory history.
     /// </summary>
     public bool RemoveFromHistory(string filePath)
     {
@@ -232,7 +215,6 @@ public sealed class ScreenshotWatcherService : IDisposable
             return false;
         }
 
-        _thumbnailsByPath.TryRemove(filePath, out _);
         bool removed = _history.Remove(filePath);
         if (removed)
         {
@@ -243,12 +225,11 @@ public sealed class ScreenshotWatcherService : IDisposable
     }
 
     /// <summary>
-    /// Clears all in-memory screenshot history entries and cached thumbnails.
+    /// Clears all in-memory screenshot history entries.
     /// </summary>
     public void ClearHistory()
     {
         _history.Clear();
-        _thumbnailsByPath.Clear();
         _recentlyProcessedUtc.Clear();
         HistoryChanged?.Invoke(this, EventArgs.Empty);
         Log.Information("In-memory screenshot history cleared.");
@@ -567,13 +548,6 @@ public sealed class ScreenshotWatcherService : IDisposable
                 pixelHeight: pixelHeight);
 
             BitmapSource? thumbnailForDisplay = _settings.ShowScreenshotThumbnail ? frozenThumbnail : null;
-            if (frozenThumbnail != null)
-            {
-                _thumbnailsByPath[normalizedPath] = frozenThumbnail;
-            }
-
-            var currentHistory = _history.GetRecentEntries();
-            PruneOrphanedThumbnails(currentHistory);
 
             // Privacy: Log strictly non-PII metadata (extension, size, dimensions)
             Log.Information(
@@ -606,21 +580,6 @@ public sealed class ScreenshotWatcherService : IDisposable
         finally
         {
             _inFlightPaths.TryRemove(normalizedPath, out _);
-        }
-    }
-
-    private void PruneOrphanedThumbnails(IReadOnlyList<ScreenshotEntry> activeEntries)
-    {
-        var activePaths = new HashSet<string>(
-            activeEntries.Select(e => e.FilePath),
-            StringComparer.OrdinalIgnoreCase);
-
-        foreach (string cachedPath in _thumbnailsByPath.Keys)
-        {
-            if (!activePaths.Contains(cachedPath))
-            {
-                _thumbnailsByPath.TryRemove(cachedPath, out _);
-            }
         }
     }
 
@@ -667,6 +626,5 @@ public sealed class ScreenshotWatcherService : IDisposable
 
         SystemEvents.SessionSwitch -= OnSessionSwitch;
         Stop();
-        _thumbnailsByPath.Clear();
     }
 }
