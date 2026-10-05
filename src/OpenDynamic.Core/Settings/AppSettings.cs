@@ -23,8 +23,9 @@ public sealed class AppSettings
     /// Version 10/11 maintained schema stability across integration retirements (Task R1).
     /// Version 12 introduces Ambient Clock settings (enabled by default, Auto format, priority 5).
     /// Version 13 introduces Energy Saver reactive alerts, priority (88), and efficient resource profile settings.
+    /// Version 14 introduces Screenshot Preview widget settings, priority (75), thumbnail toggle, watched folder, temporal retention, and Recycle Bin toggle.
     /// </summary>
-    public const int CurrentSchemaVersion = 13;
+    public const int CurrentSchemaVersion = 14;
 
     /// <summary>
     /// Configuration schema version. Defaults to <see cref="CurrentSchemaVersion"/>.
@@ -552,6 +553,59 @@ public sealed class AppSettings
 
     #endregion
 
+    #region Screenshot Preview Settings
+
+    /// <summary>
+    /// Flag to enable or disable the reactive screenshot preview widget and FileSystemWatcher.
+    /// Default is true.
+    /// </summary>
+    public bool EnableScreenshotWidget { get; set; } = true;
+
+    /// <summary>
+    /// Flag to show the decoded screenshot thumbnail image in the compact and expanded notch views.
+    /// If false, displays only the notification notice without rendering the image.
+    /// Default is true.
+    /// </summary>
+    public bool ShowScreenshotThumbnail { get; set; } = true;
+
+    /// <summary>
+    /// Default priority value for screenshot transient notices.
+    /// Default is 75 (ActivityPriority.Screenshot).
+    /// </summary>
+    public int DefaultScreenshotPriority { get; set; } = 75;
+
+    /// <summary>
+    /// Lifespan in seconds for screenshot transient notices in compact mode (paused while cursor hovers).
+    /// Default is 6.0 seconds.
+    /// </summary>
+    public double ScreenshotTransientDurationSeconds { get; set; } = 6.0;
+
+    /// <summary>
+    /// Maximum number of recent screenshot paths kept in volatile RAM history.
+    /// Default is 5.
+    /// </summary>
+    public int ScreenshotHistoryCapacity { get; set; } = 5;
+
+    /// <summary>
+    /// Temporal retention in minutes before an in-memory screenshot history entry expires.
+    /// Default is 30 minutes.
+    /// </summary>
+    public int ScreenshotHistoryRetentionMinutes { get; set; } = 30;
+
+    /// <summary>
+    /// Flag to enable or disable the Recycle Bin action (with double confirmation) in the expanded screenshot view.
+    /// Default is true.
+    /// </summary>
+    public bool EnableScreenshotTrashAction { get; set; } = true;
+
+    /// <summary>
+    /// Optional additional folder path watched for screenshots (e.g., custom Snipping Tool folder).
+    /// Default is empty string.
+    /// </summary>
+    public string AdditionalScreenshotFolder { get; set; } = string.Empty;
+
+    #endregion
+
     /// <summary>
     /// Creates a deep copy of the current settings instance.
     /// </summary>
@@ -633,7 +687,15 @@ public sealed class AppSettings
             EnergySaverReduceAnimations = this.EnergySaverReduceAnimations,
             EnergySaverCapAudioVisualizer = this.EnergySaverCapAudioVisualizer,
             EnergySaverThrottleHardwareSampling = this.EnergySaverThrottleHardwareSampling,
-            EnergySaverHardwareSamplingIntervalSeconds = this.EnergySaverHardwareSamplingIntervalSeconds
+            EnergySaverHardwareSamplingIntervalSeconds = this.EnergySaverHardwareSamplingIntervalSeconds,
+            EnableScreenshotWidget = this.EnableScreenshotWidget,
+            ShowScreenshotThumbnail = this.ShowScreenshotThumbnail,
+            DefaultScreenshotPriority = this.DefaultScreenshotPriority,
+            ScreenshotTransientDurationSeconds = this.ScreenshotTransientDurationSeconds,
+            ScreenshotHistoryCapacity = this.ScreenshotHistoryCapacity,
+            ScreenshotHistoryRetentionMinutes = this.ScreenshotHistoryRetentionMinutes,
+            EnableScreenshotTrashAction = this.EnableScreenshotTrashAction,
+            AdditionalScreenshotFolder = this.AdditionalScreenshotFolder ?? string.Empty
         };
     }
 
@@ -719,5 +781,13 @@ public sealed class AppSettings
         EnergySaverCapAudioVisualizer = other.EnergySaverCapAudioVisualizer;
         EnergySaverThrottleHardwareSampling = other.EnergySaverThrottleHardwareSampling;
         EnergySaverHardwareSamplingIntervalSeconds = other.EnergySaverHardwareSamplingIntervalSeconds;
+        EnableScreenshotWidget = other.EnableScreenshotWidget;
+        ShowScreenshotThumbnail = other.ShowScreenshotThumbnail;
+        DefaultScreenshotPriority = other.DefaultScreenshotPriority;
+        ScreenshotTransientDurationSeconds = other.ScreenshotTransientDurationSeconds;
+        ScreenshotHistoryCapacity = other.ScreenshotHistoryCapacity;
+        ScreenshotHistoryRetentionMinutes = other.ScreenshotHistoryRetentionMinutes;
+        EnableScreenshotTrashAction = other.EnableScreenshotTrashAction;
+        AdditionalScreenshotFolder = other.AdditionalScreenshotFolder ?? string.Empty;
     }
 }

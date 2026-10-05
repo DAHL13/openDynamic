@@ -587,7 +587,15 @@ public sealed class SettingsServiceTests : IDisposable
             ClockShowSeconds = true,
             ClockShowDate = false,
             ClockShowWeekNumber = true,
-            DefaultAmbientClockPriority = 8
+            DefaultAmbientClockPriority = 8,
+            EnableScreenshotWidget = false,
+            ShowScreenshotThumbnail = false,
+            DefaultScreenshotPriority = 78,
+            ScreenshotTransientDurationSeconds = 8.0,
+            ScreenshotHistoryCapacity = 4,
+            ScreenshotHistoryRetentionMinutes = 45,
+            EnableScreenshotTrashAction = false,
+            AdditionalScreenshotFolder = @"C:\CustomScreenshots"
         };
 
         var cloned = original.Clone();
@@ -645,6 +653,14 @@ public sealed class SettingsServiceTests : IDisposable
         Assert.Equal(original.EnergySaverCapAudioVisualizer, cloned.EnergySaverCapAudioVisualizer);
         Assert.Equal(original.EnergySaverThrottleHardwareSampling, cloned.EnergySaverThrottleHardwareSampling);
         Assert.Equal(original.EnergySaverHardwareSamplingIntervalSeconds, cloned.EnergySaverHardwareSamplingIntervalSeconds);
+        Assert.Equal(original.EnableScreenshotWidget, cloned.EnableScreenshotWidget);
+        Assert.Equal(original.ShowScreenshotThumbnail, cloned.ShowScreenshotThumbnail);
+        Assert.Equal(original.DefaultScreenshotPriority, cloned.DefaultScreenshotPriority);
+        Assert.Equal(original.ScreenshotTransientDurationSeconds, cloned.ScreenshotTransientDurationSeconds);
+        Assert.Equal(original.ScreenshotHistoryCapacity, cloned.ScreenshotHistoryCapacity);
+        Assert.Equal(original.ScreenshotHistoryRetentionMinutes, cloned.ScreenshotHistoryRetentionMinutes);
+        Assert.Equal(original.EnableScreenshotTrashAction, cloned.EnableScreenshotTrashAction);
+        Assert.Equal(original.AdditionalScreenshotFolder, cloned.AdditionalScreenshotFolder);
 
         var destination = new AppSettings();
         destination.CopyFrom(original);
@@ -676,6 +692,14 @@ public sealed class SettingsServiceTests : IDisposable
         Assert.Equal(original.EnergySaverCapAudioVisualizer, destination.EnergySaverCapAudioVisualizer);
         Assert.Equal(original.EnergySaverThrottleHardwareSampling, destination.EnergySaverThrottleHardwareSampling);
         Assert.Equal(original.EnergySaverHardwareSamplingIntervalSeconds, destination.EnergySaverHardwareSamplingIntervalSeconds);
+        Assert.Equal(original.EnableScreenshotWidget, destination.EnableScreenshotWidget);
+        Assert.Equal(original.ShowScreenshotThumbnail, destination.ShowScreenshotThumbnail);
+        Assert.Equal(original.DefaultScreenshotPriority, destination.DefaultScreenshotPriority);
+        Assert.Equal(original.ScreenshotTransientDurationSeconds, destination.ScreenshotTransientDurationSeconds);
+        Assert.Equal(original.ScreenshotHistoryCapacity, destination.ScreenshotHistoryCapacity);
+        Assert.Equal(original.ScreenshotHistoryRetentionMinutes, destination.ScreenshotHistoryRetentionMinutes);
+        Assert.Equal(original.EnableScreenshotTrashAction, destination.EnableScreenshotTrashAction);
+        Assert.Equal(original.AdditionalScreenshotFolder, destination.AdditionalScreenshotFolder);
     }
 
     [Fact]
@@ -820,7 +844,7 @@ public sealed class SettingsServiceTests : IDisposable
         service.Load();
 
         Assert.NotNull(service.CurrentSettings);
-        Assert.Equal(13, service.CurrentSettings.SchemaVersion);
+        Assert.Equal(AppSettings.CurrentSchemaVersion, service.CurrentSettings.SchemaVersion);
         Assert.Equal(215.0, service.CurrentSettings.CapsuleWidth);
         Assert.Equal(38.0, service.CurrentSettings.CapsuleHeight);
         Assert.True(service.CurrentSettings.EnableAmbientClock);
@@ -837,6 +861,50 @@ public sealed class SettingsServiceTests : IDisposable
         Assert.Equal(5.0, service.CurrentSettings.EnergySaverHardwareSamplingIntervalSeconds);
 
         Assert.NotNull(loggedNotice);
-        Assert.Contains("v12 to v13", loggedNotice);
+        Assert.Contains($"v12 to v{AppSettings.CurrentSchemaVersion}", loggedNotice);
+    }
+
+    [Fact]
+    public void Load_WhenSchemaVersionIs13_MigratesToSchemaVersion14WithScreenshotDefaults()
+    {
+        string filePath = Path.Combine(_testDirectory, "settings.json");
+        const string v13Json = """
+        {
+          "SchemaVersion": 13,
+          "CapsuleWidth": 205.0,
+          "CapsuleHeight": 36.0,
+          "EnableEnergySaverAlerts": false,
+          "EnergySaverHardwareSamplingIntervalSeconds": 6.0
+        }
+        """;
+
+        File.WriteAllText(filePath, v13Json);
+
+        string? loggedNotice = null;
+        using var service = new SettingsService(
+            filePath,
+            warningLogger: (msg, _) => loggedNotice = msg,
+            debounceMilliseconds: 100);
+
+        service.Load();
+
+        Assert.NotNull(service.CurrentSettings);
+        Assert.Equal(14, service.CurrentSettings.SchemaVersion);
+        Assert.Equal(205.0, service.CurrentSettings.CapsuleWidth);
+        Assert.False(service.CurrentSettings.EnableEnergySaverAlerts);
+        Assert.Equal(6.0, service.CurrentSettings.EnergySaverHardwareSamplingIntervalSeconds);
+
+        // Screenshot defaults for schema v14
+        Assert.True(service.CurrentSettings.EnableScreenshotWidget);
+        Assert.True(service.CurrentSettings.ShowScreenshotThumbnail);
+        Assert.Equal(75, service.CurrentSettings.DefaultScreenshotPriority);
+        Assert.Equal(6.0, service.CurrentSettings.ScreenshotTransientDurationSeconds);
+        Assert.Equal(5, service.CurrentSettings.ScreenshotHistoryCapacity);
+        Assert.Equal(30, service.CurrentSettings.ScreenshotHistoryRetentionMinutes);
+        Assert.True(service.CurrentSettings.EnableScreenshotTrashAction);
+        Assert.Equal(string.Empty, service.CurrentSettings.AdditionalScreenshotFolder);
+
+        Assert.NotNull(loggedNotice);
+        Assert.Contains("v13 to v14", loggedNotice);
     }
 }
