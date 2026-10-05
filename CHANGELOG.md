@@ -3,6 +3,30 @@
 Todas las modificaciones notables en este proyecto serán documentadas en este archivo.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y cumple con [SemVer](https://semver.org/).
 
+## [1.6.0-dev] - 2026-10-05 (Fase 21: Vista Previa de Capturas de Pantalla)
+
+### Añadido
+- **Dominio Puro de Capturas en Core (`OpenDynamic.Core.Screenshots`):**
+  - `ScreenshotFileFilter`: Filtro puro de extensiones permitidas (`.png`, `.jpg`, `.jpeg`, `.bmp`, `.gif`, `.webp`), descarte de archivos temporales/parciales (`.tmp`, `.partial`, `.crdownload`, `.part`, `~`, `.`), validación de marcas de tiempo posteriores al inicio de vigilancia y validación canónica de rutas y enlaces simbólicos (`IsPathWithinWatchedFolders`, `ValidateSafeImageFileOnDisk`).
+  - `FileStabilityPolicy` y `FileStabilityTracker` con `TimeProvider`: Espera asíncrona no bloqueante que verifica que el archivo tenga tamaño $> 0$ inalterado durante `300 ms` y lectura compartida disponible (`FileShare.Read`), con timeout máximo de `3 s`.
+  - `ScreenshotHistory` y `ScreenshotEntry`: Historial volátil en memoria RAM de las últimas 5 capturas con retención temporal configurable (por defecto 30 min) y comprobación dinámica de existencia (`"No disponible"` si el archivo fue borrado externamente).
+  - Prioridad `ActivityPriority.Screenshot = 75` integrada en `PriorityResolver`.
+- **Servicio Reactivo de Vigilancia (`ScreenshotWatcherService`):**
+  - Resolución nativa de `FOLDERID_Screenshots` mediante `SHGetKnownFolderPath` (`shell32.dll`) con respaldo a `%UserProfile%\Pictures\Screenshots` y soporte para una carpeta adicional opcional.
+  - Ciclo de vida estricto de `FileSystemWatcher` (`Created` y `Renamed` con antirrebote): solo existe mientras la función esté activa en Ajustes y la carpeta exista; al desactivarse se detiene y destruye (`Dispose`) de inmediato (cero polling, 0% CPU en reposo).
+  - Decodificación de miniaturas en segundo plano desde un `MemoryStream` cerrando el `FileStream` al instante (`BitmapCacheOption.OnLoad`, `DecodePixelWidth = 320`, `Freeze()`), garantizando cero bloqueo del archivo en disco.
+  - Privacidad estricta en logs (Serilog): registro exclusivo de extensión, tamaño en bytes y dimensiones; cero nombres de usuario, rutas completas o nombres de archivo.
+- **Widget de Muesca y Acciones Rápidas (`ScreenshotWidget`, Prioridad 75):**
+  - Vistas `ScreenshotCompactView`, `ScreenshotExpandedView` y `ScreenshotSplitView` adaptadas a la geometría del Upper Notch UI.
+  - Aviso transitorio de 6 segundos por defecto (se pausa automáticamente al pasar el cursor encima o al expandir la vista) y liberación inmediata de la miniatura en memoria (`CurrentThumbnail = null`) al cerrarse.
+  - Acciones rápidas en modo expandido: **Copiar imagen** (`ClipboardService.CopyImageToClipboardAsync` con 3 reintentos de 50 ms y supresión por número de secuencia para no disparar la Fase 14), **Abrir** (visor predeterminado), **En carpeta** (`explorer.exe /select,"<ruta>"`), **Arrastrar** (`DragDrop.DoDragDrop` estrictamente con `DragDropEffects.Copy`, jamás `Move`) y **Papelera** con **doble confirmación** visible en 2 pasos usando `SHFileOperationW` (`FO_DELETE | FOF_ALLOWUNDO`).
+  - Pestaña de historial reciente en memoria (hasta 5 capturas) con insignia `"No disponible"` y botón `"Quitar"` para archivos eliminados externamente.
+- **Ajustes y Migración de Esquema v14:**
+  - `AppSettings.cs` promovido a `CurrentSchemaVersion = 14` con migración automática v13 $\rightarrow$ v14 en `SettingsService.cs`.
+  - Nueva tarjeta **"📸 Vista Previa de Capturas de Pantalla"** en `SettingsWindow.xaml` con interruptores, selector de carpeta adicional, sliders de prioridad/duración/retención y nota técnica sobre `Win + Shift + S` vs `Win + Impr Pant`.
+- **Pruebas Automatizadas:**
+  - 61 nuevas pruebas unitarias y de seguridad/privacidad en `OpenDynamic.Tests` (totalizando 586 pruebas en verde al 100%).
+
 ## [1.5.0-dev] - 2026-10-02 (Fase 20: Ahorro de Energía)
 
 ### Añadido

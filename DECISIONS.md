@@ -951,3 +951,44 @@
   - Cero bucles de sondeo; consumo de CPU estrictamente del 0% en reposo.
   - Compilación Release limpia con 0 errores y 0 advertencias (`TreatWarningsAsErrors`).
 
+---
+
+## ADR-030: Vista Previa Reactiva de Capturas de Pantalla, Estabilidad de Archivo No Bloqueante y Acciones Seguras (Fase 21)
+
+- **Estado:** Aceptado
+- **Fecha:** 2026-10-05
+- **Contexto:**
+  Cuando el usuario realiza una captura de pantalla guardada en disco (mediante `Win + Impr Pant` o al guardar desde la herramienta Recortes / Snipping Tool), openDynamic debe presentar una miniatura instantánea en la muesca superior con acciones rápidas (copiar imagen al portapapeles, abrir en el visor predeterminado, mostrar en el Explorador de archivos, arrastrar hacia otra aplicación y enviar a la Papelera de reciclaje), además de un historial reciente en memoria de las últimas 5 capturas.
+  Esta funcionalidad está sujeta a restricciones técnicas y de privacidad estrictas:
+  1. **Monitoreo 100% reactivo (Reglas de Oro 1 y 11):** Vigilancia exclusiva mediante `FileSystemWatcher` sobre la carpeta `KnownFolder` del sistema (`FOLDERID_Screenshots` vía `SHGetKnownFolderPath`, con respaldo a `%UserProfile%\Pictures\Screenshots`) y una carpeta adicional opcional configurada por el usuario. El `FileSystemWatcher` existe y permanece activo únicamente cuando la función está habilitada en Ajustes y la carpeta existe; al desactivarla, se detiene y destruye (`Dispose`) de inmediato sin dejar bucles de sondeo (*zero polling*).
+  2. **Espera asíncrona de escritura y cero bloqueo de archivo (Reglas de Oro 4 y 10):** Los archivos recién creados o renombrados desde archivos temporales pueden tardar decenas de milisegundos en terminar de escribirse. Se debe verificar la estabilidad de escritura fuera del hilo de UI y decodificar la miniatura en memoria (`BitmapCacheOption.OnLoad`, `DecodePixelWidth <= 320`, `Freeze()`) cerrando inmediatamente el `FileStream`, de modo que el archivo en disco jamás quede bloqueado y pueda borrarse o moverse libremente tras la vista previa.
+  3. **Operaciones seguras sobre archivos:** El arrastre (*Drag & Drop*) debe usar estrictamente `DragDropEffects.Copy` (jamás `Move`); el envío a la Papelera exige doble confirmación explícita en la UI y utiliza `SHFileOperationW` con `FO_DELETE | FOF_ALLOWUNDO` (jamás eliminación permanente `File.Delete`); y solo se actúa sobre rutas canónicas validadas dentro de las carpetas vigiladas, rechazando enlaces simbólicos (*symlinks* / *reparse points*) que escapen de dichas carpetas.
+  4. **Privacidad absoluta en logs y memoria:** En Serilog solo se registran extensión, tamaño en bytes y dimensiones; nunca nombres de usuario, rutas completas ni nombres de archivo. La miniatura vive únicamente en memoria RAM mientras el aviso está activo y se libera (`CurrentThumbnail = null`) al cerrarse.
+
+- **Decisiones Técnicas:**
+  1. **Política Pura en Core (`OpenDynamic.Core.Screenshots`) (Regla de Oro 5):**
+     - `ScreenshotFileFilter`: Validador puro y determinista sin dependencias de WPF ni Win32. Acepta exclusivamente extensiones de imagen permitidas (`.png`, `.jpg`, `.jpeg`, `.bmp`, `.gif`, `.webp`), descarta archivos temporales o parciales (`.tmp`, `.partial`, `.crdownload`, `.part`, nombres con `~` o prefijo `.`), rechaza archivos con tamaño $\le 0$ o anteriores al inicio de la vigilancia (`fileTimestampUtc < watchStartedUtc`), y valida la contención canónica dentro de las carpetas vigiladas (`IsPathWithinWatchedFolders` y `ValidateSafeImageFileOnDisk`), rechazando enlaces simbólicos o puntos de reanálisis (`FileAttributes.ReparsePoint` / `ResolveLinkTarget`) cuyo destino salga de las carpetas vigiladas.
+     - `FileStabilityPolicy` y `FileStabilityTracker`: Política determinista inyectada con `TimeProvider`. Un archivo se considera completo cuando su tamaño ($> 0$) permanece inalterado durante `300 ms` y puede abrirse en modo de lectura compartida (`FileShare.Read`), con un tiempo máximo de espera de `3 s` tras el cual se descarta sin bloquear el hilo de interfaz.
+     - `ScreenshotHistory` y `ScreenshotEntry`: Historial volátil en memoria RAM (capacidad por defecto de 5 rutas, retención temporal configurable por defecto de 30 minutos, vaciado al cerrar la app, bloquear sesión o suspender el equipo). Evalúa dinámicamente la existencia del archivo para marcar entradas faltantes como `"No disponible"` y permitir quitarlas de la lista.
+  2. **Vigilancia Reactiva y Decodificación No Bloqueante (`ScreenshotWatcherService`):**
+     - Resuelve `FOLDERID_Screenshots` (`{B7BEDE81-DF94-4682-A7D8-57A52620B86F}`) mediante P/Invoke a `SHGetKnownFolderPath` en `shell32.dll` (liberando el puntero con `Marshal.FreeCoTaskMem`), con respaldo a `%UserProfile%\Pictures\Screenshots`.
+     - Escucha eventos `Created` y `Renamed` con deduplicación por ruta en vuelo (`_inFlightPaths`) y ventana antirrebote de `1500 ms` (`_recentlyProcessedUtc`) para evitar notificaciones duplicadas cuando herramientas como Recortes crean un archivo temporal y lo renombran.
+     - `TryLoadFrozenBitmapFromDisk`: Lee los bytes del archivo en un bloque `using (var fileStream = new FileStream(..., FileShare.ReadWrite | FileShare.Delete))` hacia un `MemoryStream` local y cierra el descriptor del sistema operativo inmediatamente. Sobre el `MemoryStream` en RAM obtiene las dimensiones reales (`BitmapDecoder`) y construye el `BitmapImage` con `BitmapCacheOption.OnLoad`, `DecodePixelWidth = 320` y `Freeze()`. El archivo en disco queda 100% libre de bloqueos.
+  3. **Integración con Portapapeles sin Auto-Disparo (`ClipboardService.CopyImageToClipboardAsync`):**
+     - La acción **Copiar imagen** decodifica el bitmap completo congelado en memoria y lo escribe en el portapapeles de Windows con hasta 3 reintentos de `50 ms` ante `CLIPBRD_E_CANT_OPEN`.
+     - Registra `GetClipboardSequenceNumber()` y la marca temporal interna en `ClipboardService` para que el listener `WM_CLIPBOARDUPDATE` de la Fase 14 ignore este cambio propio y no emita un aviso duplicado.
+  4. **Widget de Muesca (`ScreenshotWidget`, Prioridad 75) y Flujo de Doble Confirmación de Papelera:**
+     - Registrado con prioridad `75` (`ActivityPriority.Screenshot`), ubicándose por debajo de Volumen (`80`) y por encima de Red (`65`), Dispositivos (`60`) y Portapapeles (`55`).
+     - Duración transitoria por defecto de `6.0 s` en modo compacto; se pausa automáticamente mientras el cursor permanece sobre la muesca (`OnViewMouseEnter` / `OnViewMouseLeave`) o al expandir la vista (`OnExpand`). Al colapsarse (`OnCollapse`), libera `CurrentThumbnail = null`.
+     - **Arrastrar y Soltar Seguro:** Inicia `DragDrop.DoDragDrop` con un `DataObject(DataFormats.FileDrop, new[] { entry.FilePath })` y estrictamente `DragDropEffects.Copy` (nunca `Move`).
+     - **Envío a Papelera con Doble Confirmación:** El botón `Papelera` transita por dos pasos explícitos en la interfaz (`Paso 1/2: ¿Enviar captura a la Papelera?` $\rightarrow$ `Continuar` $\rightarrow$ `Paso 2/2: Confirmación final: ¿Reciclar archivo?` $\rightarrow$ `Sí, reciclar`) antes de invocar `NativeMethods.SendFileToRecycleBin`, que ejecuta `SHFileOperationW` con `FO_DELETE | FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_SILENT | FOF_NOERRORUI`.
+  5. **Ajustes, Documentación de Limitación de `Win+Shift+S` y Migración v14 (Regla de Oro 9):**
+     - Promovido `AppSettings.CurrentSchemaVersion` de `13` a `14` con migración automática v13 $\rightarrow$ v14 en `SettingsService.cs`.
+     - Añadida tarjeta **"📸 Vista Previa de Capturas de Pantalla"** en `SettingsWindow.xaml` con aviso explícito documentando que `Win + Shift + S` por sí solo solo copia al portapapeles sin crear archivo en disco (atendido por la Fase 14), mientras que `Win + Impr Pant` y las capturas guardadas en archivo sí activan esta vista previa.
+
+- **Consecuencias y Verificación:**
+  - 586 pruebas unitarias automáticas en verde (100% de la suite; 61 nuevas pruebas unitarias y de seguridad/privacidad añadidas en la Fase 21).
+  - Cero bloqueos de archivo tras la vista previa, cero rutas/nombres de archivo en logs y 0% CPU en reposo cuando la función está en espera o desactivada.
+  - Compilación Release limpia con 0 errores y 0 advertencias (`TreatWarningsAsErrors`).
+
+
