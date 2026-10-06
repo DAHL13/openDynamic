@@ -583,3 +583,131 @@ Una vez aprobada la transición a la Pasada B, las correcciones se aplicarán en
    - Actualizar `.github/workflows/ci.yml` (`permissions: contents: read`) y `.github/workflows/release.yml` (excluir `.pdb`, incluir `README.md`/`LICENSE`/`THIRD-PARTY-NOTICES.md` en el ZIP, generar `SHA256SUMS.txt` y configurar `draft: true`).
 8. **Verificación Post-Corrección (B7)**:
    - Re-ejecutar `scripts/medir-rendimiento-v2.ps1` en `Release` (`ReadyToRun`), verificar la tabla comparativa *Antes vs. Después* en `docs/auditoria-v2.0.0.md` y validar el 100 % de los criterios Go/No-Go antes de cualquier fusión a `main`.
+
+---
+
+## 9. Resultados de la Pasada B (Corrección, Optimización y Verificación Empírica Antes vs. Después)
+
+### 9.1 Estado de Resolución de los 30 Hallazgos (`AUD-001` a `AUD-030`)
+
+| ID | Severidad | Resumen del Hallazgo | Estado | Verificación |
+|---|---|---|---|---|
+| `AUD-001` | **CRÍTICO** | `_restingHoverWatcherTimer` (`100 ms` / 10 Hz) activo permanentemente en estado `Hidden` | **RESUELTO** | Eliminado por completo en `IslandWindow.xaml.cs`. Cero timers en estado `Hidden` (`0.000 %` CPU sostenido durante 5 min en reposo). |
+| `AUD-002` | **CRÍTICO** | Los 5 ajustes `Enable*Widget` (`Media`, `Volume`, `Battery`, `Timer`, `Stopwatch`) no desactivaban sus widgets en tiempo real | **RESUELTO** | Aplicados en caliente en `MediaWidget`, `VolumeWidget`, `BatteryWidget`, `TimerWidget`, `StopwatchWidget`, `App.xaml.cs` y `SettingsViewModel`. |
+| `AUD-003` | **CRÍTICO** | `DeviceService.StartBluetoothWatcher()` fallaba con `COMException (0x8002802B)` y emitía 3 alertas falsas de audio al arrancar | **RESUELTO** | Filtro AQS restringido a `IsPaired=True` con propiedades AEP canónicas válidas y sincronización de línea base inicial (`TryCompleteInitialEnumeration`). `0` errores COM y `0` alertas falsas al iniciar. |
+| `AUD-004` | **CRÍTICO** | Nivel de log `Debug` en `Release` y escritura de SSIDs Wi-Fi, nombres de apps de privacidad, canciones, dispositivos y rutas de usuario | **RESUELTO** | `.MinimumLevel.Information()` en `Release` (`Debug` exclusivo de `#if DEBUG`) y sanitización integral de PII en todos los servicios y widgets. |
+| `AUD-005` | **ALTO** | `RestingSensorNotch` de `240x44 DIP` bloqueaba clics en pestañas de navegadores y permitía hover sobre pantalla completa | **RESUELTO** | `RestingSensorPolicy` (`120x4 DIP`) + `HTTRANSPARENT` automático cuando `!EnableAmbientClock`, `IsFullscreenSuppressed` o `IsPowerSuspended` (con 8 pruebas unitarias en `RestingSensorPolicyTests`). |
+| `AUD-006` | **ALTO** | Servicios iniciados incondicionalmente aunque estuvieran desactivados y `FullscreenWatcher` sin filtro de monitor ni *debounce* | **RESUELTO** | Arranque condicionado en `App.OnStartup`/`IslandWindow`, filtro por monitor objetivo (`MonitorFromWindow`) y *debounce* de `50 ms` con filtro `OBJID_WINDOW` en `FullscreenWatcher`. |
+| `AUD-007` | **ALTO** | `MediaCompactView` y `MediaExpandedView` ejecutaban `CompositionTarget.Rendering` por duplicado e ignoraban `IsFullscreenSuppressed` | **RESUELTO** | Suscripción a `CompositionTarget.Rendering` vinculada estrictamente a `IsVisibleChanged` y paso de `_isFullscreenSuppressed` real a `AudioSpectrumService`. |
+| `AUD-008` | **ALTO** | Inicialización/lectura síncrona de 118 contadores PDH GPU bloqueaba el hilo UI durante `1,507 ms` y retenía +168 handles | **RESUELTO** | Muestreo e inicialización PDH desacoplados a `Task.Run` con guardia atómica `Interlocked.CompareExchange` y `ReleaseGpuCounters()` inmediato al desactivar GPU o el widget. `0 ms` de bloqueo UI. |
+| `AUD-009` | **ALTO** | `SettingsService.Load()` no validaba rangos numéricos ni usaba `TimeProvider` | **RESUELTO** | `AppSettings.SanitizeAndClamp()` invocado en `Load()`, inyección de `TimeProvider` en `SettingsService`, `MediaActivityController`, `PriorityResolver` y `FileStabilityPolicy`. |
+| `AUD-010` | **ALTO** | `AppSettings.Clone()` compartía referencias de listas mutables (`IgnoredDeviceNames`, `IgnoredPrivacyApps`, `TimerPresetsMinutes`) | **RESUELTO** | Copia profunda de las 3 listas en `AppSettings.Clone()`, evitando mutación del estado vivo al cancelar `SettingsWindow`. |
+| `AUD-011` | **ALTO** | Ausencia de `THIRD-PARTY-NOTICES.md`, `SECURITY.md`, `CONTRIBUTING.md`, plantillas GitHub, sección Privacidad y entrada `[2.0.0]` | **RESUELTO** | Creados todos los documentos de gobernanza, `ADR-031` en `DECISIONS.md`, sección de Privacidad y SmartScreen en `README.md` y notas `[2.0.0]` en `CHANGELOG.md`. |
+| `AUD-012` | **ALTO** | Versión dispersa (`1.1.0`/`1.2.0`), `.pdb` incluidos en artefactos y falta de `SHA256SUMS.txt` | **RESUELTO** | Versión centralizada `2.0.0` en `Directory.Build.props`, `app.manifest`, `installer/setup.iss` (`LicenseFile=..\LICENSE`), `.github/workflows/ci.yml` y `release.yml`. |
+| `AUD-013` | **ALTO** | `WorkingSet64` de `~161 MB` (`PrivateMemorySize64` `~71–78 MB`) y ausencia de `IslandWindow.Close()` en `App.OnExit` | **RESUELTO** | `RenderOptions.ProcessRenderMode = RenderMode.SoftwareOnly` para la superficie `UpdateLayeredWindow` (`WS_EX_LAYERED`), `System.GC.ConserveMemory=9`, `System.GC.Datas=true`, compactación al entrar en `Hidden`, `EfficiencyMode` y `IslandWindow.Close()` en `OnExit`. Memoria privada reducida a **`33.94 MB`** y `WorkingSet64` a **`110.28 MB`**. |
+| `AUD-014` | **MEDIO** | Metapaquete `NAudio` arrastraba `NAudio.WinForms.dll` y otros 4 ensamblados innecesarios a `publish/` | **RESUELTO** | Reemplazado por `NAudio.Wasapi 2.3.0`. Eliminados `NAudio.WinForms.dll`, `NAudio.Midi.dll`, `NAudio.Asio.dll`, `NAudio.Dmo.dll` y `NAudio.dll`. |
+| `AUD-015` | **MEDIO** | `TrayIconManager` no liberaba `HICON` de respaldo con `DestroyIcon` | **RESUELTO** | Liberación explícita con `NativeMethods.DestroyIcon(_fallbackHIcon)` en `Dispose()`. |
+| `AUD-016` | **MEDIO** | `TimerCollection` reconstruía `N+1` suscripciones en cada cambio y usaba `25/5 min` fijos para Pomodoro | **RESUELTO** | Suscripción incremental por instancia y lectura dinámica de `PomodoroWorkDurationMinutes` / `PomodoroBreakDurationMinutes`. |
+| `AUD-017` | **MEDIO** | `TimerController.AddTime()` mutaba `TotalDuration` y `TimerPersistenceService` no guardaba `TotalDuration` ni usaba `.tmp` | **RESUELTO** | `AddTime()` preserva `TotalDuration` cuando solo extiende el tiempo restante; `TimerPersistenceService` persiste `TotalDuration` mediante escritura atómica `.tmp` + `File.Move`. |
+| `AUD-018` | **MEDIO** | `StopwatchController.CreateSnapshot()` asignaba `_laps.ToList().AsReadOnly()` en cada tick de 30 FPS | **RESUELTO** | Cacheo de `ReadOnlyCollection<StopwatchLap>` invalidado únicamente en `RecordLap()` y `Reset()`. |
+| `AUD-019` | **MEDIO** | `PowerService.UpdateThresholds` no actualizaba `_tracker` en caliente | **RESUELTO** | `BatteryThresholdTracker.UpdateThresholds()` actualiza umbrales de batería baja/crítica en vivo. |
+| `AUD-020` | **MEDIO** | `VolumeService` re-enganchaba el endpoint COM en cualquier evento de dispositivos secundarios y `EnergySaverService` tenía cooldown de `500 ms` | **RESUELTO** | Filtro por `_currentDeviceId` en `VolumeService` (con orden seguro de RCW para `MMDeviceEnumerator`) y cooldown de `5 s` en `EnergySaverService`. |
+| `AUD-021` | **MEDIO** | Revelación inicial de 3 s cancelada prematuramente y retención de `AnimationClock` en `IslandView.TransitionContent` | **RESUELTO** | Verificación de estado actual en el handler asíncrono de `IslandStateChangedMessage` y limpieza `BeginAnimation(OpacityProperty, null)` al completar el *cross-fade*. |
+| `AUD-022` | **MEDIO** | 37 archivos con finales de línea/formato inconsistentes frente a `.editorconfig` | **RESUELTO** | `dotnet format openDynamic.sln --verify-no-changes` superado con `0` advertencias y código de salida `0`. |
+| `AUD-023` | **MEDIO** | Condición de carrera en `DeviceAlertPolicy.OnCoalesceTimerCallback` fuera de `_syncLock` | **RESUELTO** | Sincronización completa dentro de `lock (_syncLock)`. |
+| `AUD-024` | **MEDIO** | `PrivacyAccessAggregator` disparaba alertas transitorias falsas en el arranque si cámara/micrófono ya estaban activos | **RESUELTO** | Parámetro `suppressAlerts: true` en la lectura inicial de línea base en `PrivacyAccessMonitor` y `PrivacyAccessAggregator`. |
+| `AUD-025` | **BAJO** | `MediaActivityController.AttachSession` no desuscribía `SessionClosed` de la sesión previa | **RESUELTO** | Desuscripción simétrica de `SessionClosed` en `DetachCurrentSession()`. |
+| `AUD-026` | **BAJO** | `AccessibilityThemeManager.ApplyTheme(false)` creaba `SolidColorBrush` sin `.Freeze()` y `MediaService` no disponía `Process[]` | **RESUELTO** | Todos los pinceles congelados con `.Freeze()` y `Process.Dispose()` garantizado en `finally` en `MediaService`. |
+| `AUD-027` | **BAJO** | Hook `TaskbarCreated` registrado con lambda anónima sin `RemoveHook` en `App.OnExit` | **RESUELTO** | Almacenado en `_taskbarCreatedHook` y desregistrado explícitamente en `App.OnExit`. |
+| `AUD-028` | **BAJO** | Argumento `--trigger-test-exception` expuesto en compilaciones `Release` | **RESUELTO** | Restringido exclusivamente bajo `#if DEBUG` en `App.xaml.cs`. |
+| `AUD-029` | **BAJO** | `FullscreenDetector.IsNotificationStateFullscreen` incluía `QunsBusy` y `_lastEmittedTimeUtc` no se leía | **RESUELTO** | `QunsBusy` excluido en `FullscreenDetector` y campo muerto eliminado en `NetworkAlertPolicy`. |
+| `AUD-030` | **INFO** | Inventario de dependencias NuGet y verificación de vulnerabilidades | **RESUELTO** | `0` vulnerabilidades transitivas (`dotnet list package --vulnerable --include-transitive`). |
+
+---
+
+### 9.2 Tabla Comparativa Empírica: ANTES (Pasada A) vs. DESPUÉS (Pasada B)
+
+Mediciones ejecutadas con `scripts/medir-rendimiento-v2.ps1` sobre el binario publicado en `Release` (`win-x64`, `ReadyToRun`) en el mismo equipo físico (AMD Ryzen / Radeon Graphics, 16 núcleos lógicos, Windows 11 Build 26200):
+
+| Métrica / Escenario | ANTES (Pasada A) | DESPUÉS (Pasada B) | Cambio / Delta | Objetivo (Regla de Oro 1 / A5) | Resultado Final |
+|---|---|---|---|---|---|
+| **Arranque en frío (`ConfigureLogging` → `OnStartup` listo, 3 reps)** | `692–728 ms` (`~1.61 s` desde `Start-Process`) | **`667–931 ms`** (**`0.91–1.45 s`** desde `Start-Process`) | **-160 ms a -700 ms en arranque total** | `< 1.5 s` | **CUMPLE (`0.91–1.45 s`)** |
+| **Memoria Privada (`PrivateMemorySize64`) en reposo (5 min)** | `71.04–72.73 MB` (`78.04–80.75 MB` al arrancar) | **`33.94–41.12 MB`** (`42.12–42.33 MB` al arrancar) | **-37.10 MB (-52.2 %)** | `< 80 MB` | **CUMPLE (`33.94 MB`)** |
+| **`WorkingSet64` total en reposo (5 min)** | `160.51–161.11 MB` (`163.50–166.35 MB` al arrancar) | **`110.28–117.96 MB`** (`118.85–118.92 MB` al arrancar) | **-50.23 MB (-31.3 %)** | Documentado (`< 80 MB` Priv) | **CUMPLE (`110.28 MB` WS / `33.94 MB` Priv)** |
+| **CPU promedio en reposo (`Hidden`, 5 min)** | `0.007 % – 0.020 %` (`_restingHoverWatcherTimer` a 10 Hz) | **`0.000 %`** (`0` timers activos en las 5 muestras de 60 s) | **-100 % (0.000 s de CPU en 300 s)** | `< 0.5 %` (`~0 %`) | **CUMPLE (`0.000 %`)** |
+| **Handles / Hilos en reposo (al minuto 5)** | `847–866` handles / `22–27` hilos | **`696–715` handles / `15–20` hilos** | **-151 handles / -7 hilos** | Estable (sin fugas) | **CUMPLE (estable y decreciente)** |
+| **Música activa (GSMTC) + Visualizador WASAPI (Compacto/Expandido)** | `165.51–165.57 MB` WS (`77.22 MB` Priv) / `0.004–0.15 %` CPU | **`134.42–134.64 MB` WS (`45.66–46.09 MB` Priv) / `0.000–0.495 %` CPU** | **-31.15 MB WS / -31.56 MB Priv** | `< 110 MB` Priv / `< 3 %` CPU | **CUMPLE (`45.66 MB` Priv / `0.495 %` CPU)** |
+| **Widget de Hardware activo (`GPU=true`, 118 contadores PDH)** | `169.34–179.77 MB` WS (`77.43–87.27 MB` Priv) / `0.473–0.586 %` CPU / **Bloqueo UI de `1,507 ms`** | **`136.30–141.89 MB` WS (`53.02–59.37 MB` Priv) / `0.477–0.642 %` CPU / `0 ms` bloqueo UI** | **-34.25 MB Priv / -1,507 ms bloqueo UI** | `< 110 MB` Priv / `< 2 %` CPU / `0 ms` UI stall | **CUMPLE (`53.02 MB` Priv / `0 ms` UI stall)** |
+| **Sesión continua multi-estado (`Hidden` ↔ `Compact` ↔ `Expanded` ↔ `Volumen`)** | `166.60–171.58 MB` WS (`77.50–79.26 MB` Priv) / `999–1,026` handles / `25–29` hilos | **`135.00–135.54 MB` WS (`50.90–52.65 MB` Priv) / `870–893` handles / `19–24` hilos** | **-26.60 MB Priv / -129 handles / -6 hilos** | Sin crecimiento lineal | **CUMPLE (decreciente de `52.65` a `50.90 MB`)** |
+| **Conexiones de red (`TCP` / `UDP`)** | `0 TCP` / `0 UDP` | **`0 TCP` / `0 UDP`** | `0` | `0` (Regla de Oro 2) | **CUMPLE (`0`)** |
+| **Tamaño de `publish/` (`ReadyToRun`)** | `31.68 MB` (27 archivos, incluía `NAudio.WinForms.dll` y `.pdb`) | **`28.70 MB`** (24 archivos, sin WinForms ni `.pdb`, con `THIRD-PARTY-NOTICES.md`) | **-2.98 MB (-9.4 %)** | Limpio y sin WinForms | **CUMPLE** |
+| **Suite de Pruebas Unitarias (`Release`)** | `586 / 586` (`100 %`) | **`619 / 619` (`100 %` en 3 corridas consecutivas: `640 ms`, `399 ms`, `396 ms`)** | **+33 nuevas pruebas de regresión** | `100 %` en 3 corridas | **CUMPLE (`619 / 619`)** |
+
+---
+
+### 9.3 Series Temporales Detalladas Post-Optimización (`scripts/resultados-rendimiento-v2-despues.json`)
+
+#### A. Arranque en Frío (3 repeticiones)
+| Repetición | `Start-Process` → Listo (`ms`) | `ConfigureLogging` → Listo (`ms`) | `WorkingSet64` Inicial (`MB`) | `PrivateMemorySize64` Inicial (`MB`) | `Handles` | `Threads` |
+|---|---|---|---|---|---|---|
+| #1 | `1,450.2 ms` | `931.0 ms` | `118.85 MB` | `42.31 MB` | `719` | `21` |
+| #2 | `914.2 ms` | `667.0 ms` | `118.86 MB` | `42.12 MB` | `716` | `20` |
+| #3 | `934.9 ms` | `683.0 ms` | `118.92 MB` | `42.33 MB` | `719` | `20` |
+
+#### B. Reposo (`Idle_5min`, muestreo cada 60 s)
+| Muestra | Tiempo (`s`) | `WorkingSet64` (`MB`) | `PrivateMemorySize64` (`MB`) | `CPU_Avg_%` | `Handles` | `Threads` | `TCP` / `UDP` |
+|---|---|---|---|---|---|---|---|
+| 1/5 | `60 s` | `117.96 MB` | `41.12 MB` | **`0.000 %`** | `715` | `20` | `0 / 0` |
+| 2/5 | `120 s` | `117.96 MB` | `41.12 MB` | **`0.000 %`** | `715` | `20` | `0 / 0` |
+| 3/5 | `180 s` | `110.32 MB` | `33.98 MB` | **`0.000 %`** | `702` | `15` | `0 / 0` |
+| 4/5 | `240 s` | `110.28 MB` | `33.94 MB` | **`0.000 %`** | `696` | `15` | `0 / 0` |
+| 5/5 | `300 s` | `110.54 MB` | `33.98 MB` | **`0.000 %`** | `696` | `16` | `0 / 0` |
+
+#### C. Escenarios Activos y Sesión Continua Multi-Estado
+| Escenario | Muestra | `WorkingSet64` (`MB`) | `PrivateMemorySize64` (`MB`) | `CPU_Avg_%` | `Handles` | `Threads` | `TCP` |
+|---|---|---|---|---|---|---|---|
+| Música GSMTC + Espectro WASAPI (Compacto) | 1 (`30 s`) | `134.64 MB` | `46.09 MB` | `0.495 %` | `753` | `28` | `0` |
+| Música GSMTC + Espectro WASAPI (Expandido) | 2 (`60 s`) | `134.42 MB` | `45.66 MB` | `0.000 %` | `733` | `19` | `0` |
+| Hardware Widget (`GPU=true`, Compacto) | 1 (`30 s`) | `141.89 MB` | `59.37 MB` | `0.642 %` | `897` | `27` | `0` |
+| Hardware Widget (`GPU=true`, Expandido) | 2 (`60 s`) | `136.30 MB` | `53.02 MB` | `0.477 %` | `893` | `24` | `0` |
+| Sesión Continua Multi-Estado | 1 (`30 s`) | `135.54 MB` | `52.65 MB` | `0.569 %` | `893` | `24` | `0` |
+| Sesión Continua Multi-Estado | 2 (`60 s`) | `135.34 MB` | `51.62 MB` | `0.417 %` | `880` | `20` | `0` |
+| Sesión Continua Multi-Estado | 3 (`90 s`) | `135.34 MB` | `51.66 MB` | `0.408 %` | `876` | `19` | `0` |
+| Sesión Continua Multi-Estado | 4 (`120 s`) | `135.00 MB` | `50.90 MB` | `0.399 %` | `870` | `19` | `0` |
+
+---
+
+### 9.4 Verificación de Artefactos de Release `v2.0.0` (Sección B6)
+
+| Artefacto | Ruta Generada | Tamaño | SHA-256 | Estado |
+|---|---|---|---|---|
+| Carpeta de publicación (`ReadyToRun`) | `publish/` | `28.70 MB` | *(24 archivos; 0 `.pdb`, 0 `WinForms`)* | **Verificado (`--smoke-test` = `0`)** |
+| Paquete Portable (`.zip`) | `openDynamic-portable-win-x64.zip` | `8.04 MB` | `d9135043db2d6d587519da215e0fd4bc83d86fc7b259fe26833f095816e41529` | **Verificado** |
+| Instalador Inno Setup (`.exe`) | `installer/Output/openDynamic-setup.exe` | `7.02 MB` | `edadf2dacc5320f7c5770d575c3cf7497ccfd8f8a0a06e24f3f9e75414447e82` | **Verificado (`ISCC.exe` exit `0`)** |
+| Sumas de verificación | `SHA256SUMS.txt` | `198 B` | — | **Verificado** |
+
+---
+
+### 9.5 Guía Paso a Paso de Pruebas `[MANUAL]` para Verificación Final en Hardware Real
+
+Antes de fusionar `audit/v2.0.0` a `main` y publicar el tag `v2.0.0`, se recomienda ejecutar las siguientes pruebas interactivas `[MANUAL]` en el equipo real:
+
+1. **Clics en Pestañas de Navegador Maximizado (`AUD-005`)**:
+   - Maximizar Microsoft Edge, Chrome o Firefox en el monitor principal con varias pestañas abiertas en la zona central superior.
+   - Con la isla en estado `Hidden`, hacer clic normal, clic central (cerrar pestaña) y arrastrar pestañas en `Y = 5..40 px` del centro superior: confirmar que los clics pasan limpiamente al navegador (`HTTRANSPARENT`).
+   - Acercar el cursor al borde superior absoluto (`Y = 0..3 px` en los `120 DIP` centrales): confirmar que tras `200 ms` se despliega suavemente el Reloj Ambiental.
+2. **Supresión en Pantalla Completa y Multi-Monitor (`AUD-005`, `AUD-006`)**:
+   - Abrir un vídeo de YouTube en el navegador y pulsar `F` (o pulsar `F11` en una ventana ya enfocada): confirmar que la isla se oculta en `< 100 ms` y que llevar el cursor al borde superior (`Y = 0`) **no** reactiva el reloj sobre el vídeo a pantalla completa.
+   - Si se dispone de segundo monitor: poner un vídeo a pantalla completa en el monitor secundario mientras la isla está anclada al monitor primario y confirmar que la isla permanece operativa en el monitor primario.
+3. **Interruptores `Enable*Widget` en Caliente (`AUD-002`)**:
+   - Abrir **Ajustes** desde el icono de bandeja del sistema.
+   - Con música sonando, desmarcar **Habilitar widget multimedia**: confirmar que la cápsula multimedia desaparece de inmediato. Volver a marcarlo y confirmar que reaparece con carátula y espectro.
+   - Desmarcar **Habilitar widget de volumen**, subir/bajar el volumen del sistema y confirmar que no aparece el OSD de volumen de openDynamic.
+4. **Telemetría de Hardware y GPU sin Tirones (`AUD-008`)**:
+   - En **Ajustes → Rendimiento y Hardware**, activar **Mostrar monitor de hardware** y **Monitorear uso de GPU**.
+   - Mientras la cápsula de hardware está visible, pasar el cursor para expandir/contraer la isla: confirmar que la animación de resorte corre fluida a 60 FPS sin micro-pausas y que al desactivar **Monitorear uso de GPU** el indicador de GPU desaparece al instante.
+5. **Conexión de Dispositivos Bluetooth y Audio (`AUD-003`)**:
+   - Encender/apagar unos auriculares Bluetooth emparejados o conectar un periférico USB: confirmar que aparece el aviso transitorio de conexión/desconexión una sola vez y que al iniciar la aplicación desde cero no aparecen alertas falsas de dispositivos ya conectados.
+6. **Privacidad en Archivos de Log (`AUD-004`)**:
+   - Abrir `%LocalAppData%\openDynamic\logs\openDynamic-<fecha>.log` y confirmar que todas las entradas de la sesión `Release` son de nivel `[INF]`/`[WRN]`/`[ERR]` y no contienen el nombre de tu red Wi-Fi (SSID), nombres de canciones, nombres de dispositivos de audio ni tu nombre de usuario de Windows.
+

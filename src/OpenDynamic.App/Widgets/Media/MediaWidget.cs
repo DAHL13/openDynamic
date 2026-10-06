@@ -451,6 +451,8 @@ public sealed class MediaWidget : IslandWidgetBase
     {
         try
         {
+            if (!_settings.EnableMediaWidget) return;
+
             var session = _hookedSession;
             if (session == null) return;
 
@@ -703,6 +705,9 @@ public sealed class MediaWidget : IslandWidgetBase
         }
         else
         {
+            _ = _mediaService.InitializeAsync();
+            HookCurrentSession(_mediaService.CurrentSession);
+            UpdateSessionProperties();
             UpdateSessionState();
             UpdateVisualizerState();
         }

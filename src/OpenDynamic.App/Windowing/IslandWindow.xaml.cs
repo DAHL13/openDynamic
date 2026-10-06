@@ -384,6 +384,9 @@ public partial class IslandWindow : Window
         {
             IslandHostView.Visibility = Visibility.Collapsed;
             Log.Debug("IslandWindow: Exit animations completed. View collapsed.");
+
+            System.Runtime.GCSettings.LargeObjectHeapCompactionMode = System.Runtime.GCLargeObjectHeapCompactionMode.CompactOnce;
+            GC.Collect(generation: 2, mode: GCCollectionMode.Aggressive, blocking: true, compacting: true);
         }
 
         // Reconfirm StateMachine is strictly Hidden when settled

@@ -27,6 +27,12 @@ public partial class App : Application
         // Run without requiring an active window
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
+        // AUD-013: IslandWindow uses AllowsTransparency="True" (WS_EX_LAYERED / UpdateLayeredWindow),
+        // which requires a CPU-side GDI DIB section on every frame. Using SoftwareOnly renders directly
+        // into the system-memory bitmap without loading ~33 MB of D3D9/vendor GPU driver DLLs,
+        // avoiding ~50 MB of private staging buffers, 13 driver threads, and PCIe GPU-to-CPU readback stalls.
+        System.Windows.Media.RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
+
         LoggingConfiguration.ConfigureLogging();
         RegisterGlobalExceptionHandlers();
         AccessibilityThemeManager.Initialize();
@@ -72,9 +78,13 @@ public partial class App : Application
 
         var orchestrator = Services.GetRequiredService<Orchestration.IslandOrchestrator>();
 
-        // Initialize Media GSMTC Service & Register MediaWidget
+        // Initialize Media GSMTC Service (only when EnableMediaWidget is enabled) & Register MediaWidget
+        var startupSettings = Services.GetRequiredService<Core.Settings.AppSettings>();
         var mediaService = Services.GetRequiredService<Services.MediaService>();
-        _ = mediaService.InitializeAsync();
+        if (startupSettings.EnableMediaWidget)
+        {
+            _ = mediaService.InitializeAsync();
+        }
 
         var mediaWidget = Services.GetRequiredService<Widgets.Media.MediaWidget>();
         orchestrator.RegisterWidget(mediaWidget);

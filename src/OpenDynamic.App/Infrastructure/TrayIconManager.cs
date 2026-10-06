@@ -78,10 +78,20 @@ public sealed class TrayIconManager : IDisposable
                 Application.Current.Resources["OpenDynamicTaskbarIcon"] = _taskbarIcon;
             }
 
+            // Enable Windows EcoQoS / Efficiency Mode for background overlay power efficiency
+            try
+            {
+                H.NotifyIcon.EfficiencyMode.EfficiencyModeUtilities.SetEfficiencyMode(true);
+            }
+            catch
+            {
+                // Ignore if OS version does not support EcoQoS
+            }
+
             // Explicitly force creation of native taskbar icon (Shell_NotifyIcon NIM_ADD)
             try
             {
-                _taskbarIcon.ForceCreate();
+                _taskbarIcon.ForceCreate(enablesEfficiencyMode: true);
                 Log.Information("System tray icon initialized successfully using H.NotifyIcon.Wpf.");
             }
             catch (InvalidOperationException ex)

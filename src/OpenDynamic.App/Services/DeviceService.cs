@@ -411,9 +411,10 @@ public sealed class DeviceService : IDisposable
     {
         try
         {
-            // AQS filter for Bluetooth Association Endpoints (Protocol ID: {e0cbf06c-cdb8-4d60-bb43-dd344be4706f})
-            // AUD-003: Only pass valid canonical AEP property keys supported by AssociationEndpoint watchers on Windows 10/11.
-            string aqs = "System.Devices.Aep.ProtocolId:=\"{e0cbf06c-cdb8-4d60-bb43-dd344be4706f}\"";
+            // AQS filter for paired Bluetooth Association Endpoints (Protocol ID: {e0cbf06c-cdb8-4d60-bb43-dd344be4706f})
+            // AUD-003: Restrict to IsPaired=True so Windows monitors paired device connection state without triggering active radio inquiry scanning,
+            // and only pass canonical AEP property keys supported by AssociationEndpoint watchers on Windows 10/11.
+            string aqs = "System.Devices.Aep.ProtocolId:=\"{e0cbf06c-cdb8-4d60-bb43-dd344be4706f}\" AND System.Devices.Aep.IsPaired:=System.StructuredQueryType.Boolean#True";
             try
             {
                 _bluetoothWatcher = DeviceInformation.CreateWatcher(

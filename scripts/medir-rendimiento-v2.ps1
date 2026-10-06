@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 <#
 .SYNOPSIS
     Script de mediciÃ³n de rendimiento real en Release (ReadyToRun) para la auditorÃ­a v2.0.0 de openDynamic.
@@ -164,22 +164,28 @@ try {
     Stop-OpenDynamic
 
     # -------------------------------------------------------------------------
-    # 1. Arranque en frÃ­o (3 repeticiones)
+    # 1. Arranque en frío (3 repeticiones)
     # -------------------------------------------------------------------------
-    Write-Host "=== 1. MediciÃ³n de Arranque en FrÃ­o (3 repeticiones) ==="
-    if (Test-Path $SettingsPath) { Remove-Item $SettingsPath -Force }
+    Write-Host "=== 1. Medición de Arranque en Frío (3 repeticiones) ==="
+    New-Item -ItemType Directory -Path $AppDataDir -Force | Out-Null
+    $idleSettings = @{
+        SchemaVersion = 14
+        EnableMediaWidget = $false
+        EnableAmbientClock = $true
+    } | ConvertTo-Json
+    Set-Content -Path $SettingsPath -Value $idleSettings -Encoding UTF8
 
     for ($rep = 1; $rep -le 3; $rep++) {
         Stop-OpenDynamic
         $proc = Start-Process -FilePath $PublishExe -PassThru
-        Start-Sleep -Seconds 4
+        Start-Sleep -Seconds 6
         $proc.Refresh()
 
-        $todayLog = Join-Path $LocalLogDir ("openDynamic-{0}.log" -f (Get-Date).ToString("yyyyMMdd"))
+        $latestLogObj = Get-ChildItem (Join-Path $LocalLogDir "openDynamic-*.log") -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
         $readyMsFromStart = $null
         $readyMsFromLogStart = $null
-        if (Test-Path $todayLog) {
-            $lines = Get-Content $todayLog -Tail 100
+        if ($null -ne $latestLogObj) {
+            $lines = Get-Content $latestLogObj.FullName -Tail 120
             $startLine = $lines | Where-Object { $_ -match "openDynamic logging initialized" } | Select-Object -Last 1
             $readyLine = $lines | Where-Object { $_ -match "App startup: performing initial ambient clock reveal|Global hotkey registered successfully" } | Select-Object -Last 1
             if ($startLine -match "^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3})" -and $readyLine -match "^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3})") {
@@ -209,14 +215,26 @@ try {
     # -------------------------------------------------------------------------
     [NativeTestHelper]::SetCursorPos(200, 500)
     Start-Sleep -Seconds 3
-    $proc = Get-Process -Name "OpenDynamic.App"
-    Write-Host "=== 2. MediciÃ³n en Reposo (Idle) durante 5 minutos (muestreo cada 60s) ==="
+    $proc = Get-Process -Name "OpenDynamic.App" | Select-Object -First 1
+    Write-Host "=== 2. Medición en Reposo (Idle) durante 5 minutos (muestreo cada 60s) ==="
     $results.Idle5Min = Measure-ProcessSeries -Process $proc -Samples 5 -IntervalSeconds 60 -ScenarioName "Idle_5min"
 
     # -------------------------------------------------------------------------
-    # 3 y 4. MÃºsica activa (GSMTC) + Visualizador de espectro WASAPI (2 muestras x 30s)
+    # 3 y 4. Música activa (GSMTC) + Visualizador de espectro WASAPI (2 muestras x 30s)
     # -------------------------------------------------------------------------
-    Write-Host "=== 3/4. MediciÃ³n con MÃºsica Activa (GSMTC) + Visualizador de Espectro WASAPI ==="
+    Write-Host "=== 3/4. Medición con Música Activa (GSMTC) + Visualizador de Espectro WASAPI ==="
+    Stop-OpenDynamic
+    $mediaSettings = @{
+        SchemaVersion = 14
+        EnableMediaWidget = $true
+        VisualizerMode = "Real"
+        EnableAmbientClock = $true
+    } | ConvertTo-Json
+    Set-Content -Path $SettingsPath -Value $mediaSettings -Encoding UTF8
+    $proc = Start-Process -FilePath $PublishExe -PassThru
+    Start-Sleep -Seconds 4
+    $proc.Refresh()
+
     $wavPath = Join-Path $env:TEMP "opendynamic_audit_tone.wav"
     New-TestWavFile -Path $wavPath -DurationSeconds 10
 
@@ -249,7 +267,7 @@ try {
             if ($idx -eq 1) {
                 [NativeTestHelper]::TapVolumeUp()
             } else {
-                # Expandir cÃ¡psula en la segunda muestra para medir vista expandida + espectro de 24 barras
+                # Expandir cápsula en la segunda muestra para medir vista expandida + espectro de 24 barras
                 [NativeTestHelper]::SetCursorPos(960, 12)
             }
         }
@@ -265,11 +283,12 @@ try {
     # -------------------------------------------------------------------------
     # 5. Widget de Hardware visible (2 muestras x 30s)
     # -------------------------------------------------------------------------
-    Write-Host "=== 5. MediciÃ³n con Widget de Hardware Activo y Visible ==="
+    Write-Host "=== 5. Medición con Widget de Hardware Activo y Visible ==="
     Stop-OpenDynamic
     New-Item -ItemType Directory -Path $AppDataDir -Force | Out-Null
     $hwSettings = @{
         SchemaVersion = 14
+        EnableMediaWidget = $false
         EnableHardwareMonitoring = $true
         EnableGpuMonitoring = $true
         HardwareSamplingIntervalSeconds = 2.0

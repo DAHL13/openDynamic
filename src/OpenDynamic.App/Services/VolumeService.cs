@@ -59,6 +59,7 @@ public interface IMMNotificationClient
 public sealed class VolumeService : IVolumeController, IMMNotificationClient, IDisposable
 {
     private readonly object _syncLock = new();
+    private MMDeviceEnumerator? _deviceEnumerator;
     private IMMDeviceEnumerator? _nativeEnumerator;
     private MMDevice? _currentDevice;
     private string? _currentDeviceId;
@@ -115,6 +116,10 @@ public sealed class VolumeService : IVolumeController, IMMNotificationClient, ID
         {
             try
             {
+                // Instantiate MMDeviceEnumerator first so the CLR binds CLSID BCDE0395-E52F-467C-8E3D-C4579291692E
+                // to NAudio's MMDeviceEnumeratorComObject before Type.GetTypeFromCLSID is queried.
+                _deviceEnumerator = new MMDeviceEnumerator();
+
                 // Register native COM IMMNotificationClient for hot device changes
                 var enumeratorType = Type.GetTypeFromCLSID(new Guid("BCDE0395-E52F-467C-8E3D-C4579291692E"));
                 if (enumeratorType != null)
@@ -185,8 +190,8 @@ public sealed class VolumeService : IVolumeController, IMMNotificationClient, ID
                 }
             }
 
-            // Retrieve default multimedia audio rendering device safely with a fresh enumerator
-            using var enumerator = new MMDeviceEnumerator();
+            // Retrieve default multimedia audio rendering device using the shared enumerator
+            var enumerator = _deviceEnumerator ??= new MMDeviceEnumerator();
             MMDevice? device = null;
             try
             {
@@ -471,6 +476,22 @@ public sealed class VolumeService : IVolumeController, IMMNotificationClient, ID
                 {
                     _currentDevice = null;
                     _currentDeviceId = null;
+                }
+            }
+
+            if (_deviceEnumerator != null)
+            {
+                try
+                {
+                    _deviceEnumerator.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(ex, "Error disposing MMDeviceEnumerator.");
+                }
+                finally
+                {
+                    _deviceEnumerator = null;
                 }
             }
 

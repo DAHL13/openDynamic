@@ -69,6 +69,7 @@ public sealed class MediaService : IMediaService
             lock (_lock)
             {
                 if (_isDisposed) return false;
+                if (_sessionManager != null) return true;
                 if (_isInitializing) return false;
                 _isInitializing = true;
             }
