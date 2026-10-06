@@ -230,6 +230,11 @@ public sealed class TimerWidget : IslandWidgetBase
 
     public void Start(TimeSpan? duration = null, TimerMode? mode = null)
     {
+        if (!_settings.EnableTimerWidget)
+        {
+            return;
+        }
+
         _isCompletedAlert = false;
         PrimaryController.Start(duration, mode);
 
@@ -257,6 +262,11 @@ public sealed class TimerWidget : IslandWidgetBase
 
     public void Resume()
     {
+        if (!_settings.EnableTimerWidget)
+        {
+            return;
+        }
+
         PrimaryController.Resume();
         _timingCoordinator.EvaluateTimerState();
         _persistenceService?.Save(_timerCollection.Timers);
@@ -324,6 +334,11 @@ public sealed class TimerWidget : IslandWidgetBase
 
     public void ApplyQuickPreset(int minutes)
     {
+        if (!_settings.EnableTimerWidget)
+        {
+            return;
+        }
+
         var duration = TimeSpan.FromMinutes(minutes);
 
         if (_timerCollection.Timers.Count < _timerCollection.MaxTimers)
@@ -351,6 +366,36 @@ public sealed class TimerWidget : IslandWidgetBase
         Log.Information("[TimerWidget] Applied preset {Minutes}m.", minutes);
     }
 
+    /// <summary>
+    /// Applies live changes to EnableTimerWidget.
+    /// When disabled, stops all running timers and deactivates the widget.
+    /// </summary>
+    public void ApplyEnabledState(bool enabled)
+    {
+        if (!enabled)
+        {
+            _isCompletedAlert = false;
+            _alertTimer.Stop();
+
+            foreach (var timer in _timerCollection.Timers)
+            {
+                if (timer.State is TimerState.Running or TimerState.Paused)
+                {
+                    timer.Reset();
+                }
+            }
+
+            IsActive = false;
+            IsTransient = false;
+            TransientDuration = null;
+
+            _timingCoordinator.EvaluateTimerState();
+            _persistenceService?.Save(_timerCollection.Timers);
+            RebuildDisplayTimers();
+            UpdatePresentation();
+        }
+    }
+
     public void DeleteTimer(string id)
     {
         _timerCollection.RemoveTimer(id);
@@ -372,6 +417,11 @@ public sealed class TimerWidget : IslandWidgetBase
 
     private void OnCollectionAlertTriggered(object? sender, TimerAlert alert)
     {
+        if (!_settings.EnableTimerWidget)
+        {
+            return;
+        }
+
         _isCompletedAlert = true;
         _currentAlertTitle = "¡Tiempo cumplido!";
         _currentAlertSubtitle = alert.Label;
@@ -457,6 +507,10 @@ public sealed class TimerWidget : IslandWidgetBase
         {
             DisplayTimers.Add(new TimerDisplayItem(timer, () =>
             {
+                if (!_settings.EnableTimerWidget)
+                {
+                    timer.Reset();
+                }
                 _timingCoordinator.EvaluateTimerState();
                 _persistenceService?.Save(_timerCollection.Timers);
                 UpdatePresentation();
@@ -466,7 +520,7 @@ public sealed class TimerWidget : IslandWidgetBase
 
     private void RestorePersistedTimers()
     {
-        if (_persistenceService == null) return;
+        if (_persistenceService == null || !_settings.EnableTimerWidget) return;
 
         try
         {

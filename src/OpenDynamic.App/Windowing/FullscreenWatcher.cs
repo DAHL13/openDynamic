@@ -17,6 +17,8 @@ public sealed class FullscreenWatcher : IDisposable
     private readonly NativeMethods.WinEventProc _winEventProc;
     private IntPtr _foregroundHookHandle = IntPtr.Zero;
     private IntPtr _locationChangeHookHandle = IntPtr.Zero;
+    private IntPtr _islandHwnd = IntPtr.Zero;
+    private long _lastLocationEvalTick;
     private bool _isFullscreenActive;
     private bool _isDisposed;
 
@@ -34,6 +36,15 @@ public sealed class FullscreenWatcher : IDisposable
     {
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _winEventProc = OnWinEvent;
+    }
+
+    /// <summary>
+    /// Associates the IslandWindow HWND so fullscreen detection only suppresses the island
+    /// when the fullscreen window is on the same display monitor as the island (AUD-006).
+    /// </summary>
+    public void SetIslandWindowHandle(IntPtr islandHwnd)
+    {
+        _islandHwnd = islandHwnd;
     }
 
     /// <summary>
@@ -137,6 +148,12 @@ public sealed class FullscreenWatcher : IDisposable
                 _locationChangeHookHandle = IntPtr.Zero;
             }
         }
+
+        if (_isFullscreenActive)
+        {
+            _isFullscreenActive = false;
+            FullscreenChanged?.Invoke(this, false);
+        }
     }
 
     private void OnWinEvent(
@@ -153,12 +170,19 @@ public sealed class FullscreenWatcher : IDisposable
             IntPtr targetHwnd = (hwnd != IntPtr.Zero && NativeMethods.IsWindow(hwnd)) ? hwnd : NativeMethods.GetForegroundWindow();
             EvaluateFullscreenState(targetHwnd);
         }
-        else if (eventType == NativeMethods.EVENT_OBJECT_LOCATIONCHANGE && idObject == NativeMethods.OBJID_WINDOW)
+        else if (eventType == NativeMethods.EVENT_OBJECT_LOCATIONCHANGE && idObject == NativeMethods.OBJID_WINDOW && idChild == 0)
         {
+            long now = Environment.TickCount64;
+            if (now - _lastLocationEvalTick < 50)
+            {
+                return;
+            }
+
             // Efficiency filter: only evaluate if the resizing/moving window is currently the foreground window
             IntPtr foregroundHwnd = NativeMethods.GetForegroundWindow();
             if (hwnd == foregroundHwnd || hwnd == IntPtr.Zero)
             {
+                _lastLocationEvalTick = now;
                 EvaluateFullscreenState(foregroundHwnd);
             }
         }
@@ -190,45 +214,51 @@ public sealed class FullscreenWatcher : IDisposable
                 foregroundHwnd = NativeMethods.GetForegroundWindow();
             }
 
+            IntPtr foregroundMonitor = foregroundHwnd != IntPtr.Zero
+                ? NativeMethods.MonitorFromWindow(foregroundHwnd, NativeMethods.MONITOR_DEFAULTTONEAREST)
+                : IntPtr.Zero;
+            IntPtr islandMonitor = (_islandHwnd != IntPtr.Zero && NativeMethods.IsWindow(_islandHwnd))
+                ? NativeMethods.MonitorFromWindow(_islandHwnd, NativeMethods.MONITOR_DEFAULTTONEAREST)
+                : IntPtr.Zero;
+
+            bool isOnTargetMonitor = islandMonitor == IntPtr.Zero || foregroundMonitor == IntPtr.Zero || foregroundMonitor == islandMonitor;
+
             // 1. Check SHQueryUserNotificationState
             int hr = NativeMethods.SHQueryUserNotificationState(out var queryState);
             int qunsValue = (int)queryState;
 
-            // Direct3D exclusive fullscreen or presentation mode
-            if (hr == 0 && (qunsValue == Core.Windowing.FullscreenDetector.QUNS_RUNNING_D3D_FULL_SCREEN ||
-                            qunsValue == Core.Windowing.FullscreenDetector.QUNS_PRESENTATION_MODE))
+            // Direct3D exclusive fullscreen or presentation mode on the island's monitor
+            if (hr == 0 && isOnTargetMonitor &&
+                (qunsValue == Core.Windowing.FullscreenDetector.QUNS_RUNNING_D3D_FULL_SCREEN ||
+                 qunsValue == Core.Windowing.FullscreenDetector.QUNS_PRESENTATION_MODE))
             {
                 isFullscreen = true;
             }
             // For QUNS_BUSY or normal window check:
             // In Windows 10/11, Focus Assist / Do Not Disturb sets QUNS_BUSY (2) even when idling on the desktop.
-            // Therefore, verify whether a valid foreground window actually exists and its bounds cover the display monitor.
-            else if (foregroundHwnd != IntPtr.Zero && NativeMethods.IsWindow(foregroundHwnd))
+            // Therefore, verify whether a valid foreground window actually exists on the target monitor and covers it.
+            else if (isOnTargetMonitor && foregroundHwnd != IntPtr.Zero && NativeMethods.IsWindow(foregroundHwnd))
             {
                 IntPtr shellHwnd = NativeMethods.GetShellWindow();
                 IntPtr desktopHwnd = NativeMethods.GetDesktopWindow();
                 bool isShellOrDesktop = foregroundHwnd == shellHwnd || foregroundHwnd == desktopHwnd;
 
-                if (!isShellOrDesktop)
+                if (!isShellOrDesktop && foregroundMonitor != IntPtr.Zero)
                 {
                     if (NativeMethods.GetWindowRect(foregroundHwnd, out var windowRect))
                     {
-                        IntPtr hMonitor = NativeMethods.MonitorFromWindow(foregroundHwnd, NativeMethods.MONITOR_DEFAULTTONEAREST);
-                        if (hMonitor != IntPtr.Zero)
+                        var mi = new NativeMethods.MONITORINFO
                         {
-                            var mi = new NativeMethods.MONITORINFO
-                            {
-                                cbSize = Marshal.SizeOf<NativeMethods.MONITORINFO>()
-                            };
+                            cbSize = Marshal.SizeOf<NativeMethods.MONITORINFO>()
+                        };
 
-                            if (NativeMethods.GetMonitorInfo(hMonitor, ref mi))
-                            {
-                                var rc = mi.rcMonitor;
-                                isFullscreen = Core.Windowing.FullscreenDetector.IsWindowBoundsFullscreen(
-                                    windowRect.Left, windowRect.Top, windowRect.Right, windowRect.Bottom,
-                                    rc.Left, rc.Top, rc.Right, rc.Bottom,
-                                    isShellOrDesktop);
-                            }
+                        if (NativeMethods.GetMonitorInfo(foregroundMonitor, ref mi))
+                        {
+                            var rc = mi.rcMonitor;
+                            isFullscreen = Core.Windowing.FullscreenDetector.IsWindowBoundsFullscreen(
+                                windowRect.Left, windowRect.Top, windowRect.Right, windowRect.Bottom,
+                                rc.Left, rc.Top, rc.Right, rc.Bottom,
+                                isShellOrDesktop);
                         }
                     }
                 }

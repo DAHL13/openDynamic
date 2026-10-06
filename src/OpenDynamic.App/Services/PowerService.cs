@@ -93,6 +93,17 @@ public sealed class PowerService : IBatteryMonitor, IDisposable
     }
 
     /// <summary>
+    /// Updates the low and critical battery alert thresholds in real time.
+    /// </summary>
+    public void UpdateThresholds(int lowThresholdPercent, int criticalThresholdPercent)
+    {
+        lock (_syncLock)
+        {
+            _tracker.UpdateThresholds(lowThresholdPercent, criticalThresholdPercent);
+        }
+    }
+
+    /// <summary>
     /// Queries the native system power status via GetSystemPowerStatus and evaluates alerts.
     /// </summary>
     public void RefreshPowerStatus(bool isInitial = false)
@@ -104,6 +115,8 @@ public sealed class PowerService : IBatteryMonitor, IDisposable
         {
             try
             {
+                _tracker.UpdateThresholds(_settings.BatteryLowThresholdPercent, _settings.BatteryCriticalThresholdPercent);
+
                 if (NativeMethods.GetSystemPowerStatus(out var rawStatus))
                 {
                     // BatteryFlag 128 indicates no system battery (desktop PC)

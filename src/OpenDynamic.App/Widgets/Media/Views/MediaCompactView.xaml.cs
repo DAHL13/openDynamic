@@ -26,6 +26,7 @@ public partial class MediaCompactView : UserControl
 
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
+        IsVisibleChanged += (_, _) => UpdateRenderingSubscription();
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
@@ -46,6 +47,7 @@ public partial class MediaCompactView : UserControl
             (ScaleTransform)Bar11.RenderTransform
         ];
 
+        _widget.PropertyChanged -= OnWidgetPropertyChanged;
         _widget.PropertyChanged += OnWidgetPropertyChanged;
         UpdateRenderingSubscription();
     }
@@ -61,6 +63,7 @@ public partial class MediaCompactView : UserControl
         if (e.PropertyName is nameof(MediaWidget.IsVisualizerActive)
             or nameof(MediaWidget.IsPlaying)
             or nameof(MediaWidget.IsVisibleOnIsland)
+            or nameof(MediaWidget.DisplayMode)
             or nameof(MediaWidget.EqualizerVisibility))
         {
             Dispatcher.InvokeAsync(UpdateRenderingSubscription);
@@ -69,7 +72,10 @@ public partial class MediaCompactView : UserControl
 
     private void UpdateRenderingSubscription()
     {
-        if (_widget.IsVisualizerActive && IsLoaded)
+        if (_widget.IsVisualizerActive &&
+            IsLoaded &&
+            IsVisible &&
+            _widget.DisplayMode == OpenDynamic.Core.Widgets.WidgetDisplayMode.Compact)
         {
             StartRendering();
         }

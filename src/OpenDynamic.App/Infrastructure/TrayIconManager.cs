@@ -27,6 +27,8 @@ public sealed class TrayIconManager : IDisposable
     private readonly ClipboardService? _clipboardService;
 
     private TaskbarIcon? _taskbarIcon;
+    private System.Drawing.Icon? _icon;
+    private IntPtr _fallbackHIcon = IntPtr.Zero;
     private MenuItem? _hardwareMenuItem;
     private bool _isDisposed;
 
@@ -60,11 +62,11 @@ public sealed class TrayIconManager : IDisposable
 
         try
         {
-            var icon = GetOrCreateIcon();
+            _icon = GetOrCreateIcon(out _fallbackHIcon);
             _taskbarIcon = new TaskbarIcon
             {
                 ToolTipText = "openDynamic - Dynamic Island para Windows",
-                Icon = icon
+                Icon = _icon
             };
 
             _taskbarIcon.TrayLeftMouseDown += OnTrayLeftMouseDown;
@@ -111,7 +113,14 @@ public sealed class TrayIconManager : IDisposable
             }
             else
             {
-                _taskbarIcon.ForceCreate(true);
+                try
+                {
+                    _taskbarIcon.ForceCreate(false);
+                }
+                catch (InvalidOperationException)
+                {
+                    _taskbarIcon.ForceCreate(true);
+                }
                 Log.Information("System tray icon recreated successfully.");
             }
         }
@@ -297,15 +306,17 @@ public sealed class TrayIconManager : IDisposable
         return menu;
     }
 
-    private static System.Drawing.Icon GetOrCreateIcon()
+    private static System.Drawing.Icon GetOrCreateIcon(out IntPtr fallbackHIcon)
     {
+        fallbackHIcon = IntPtr.Zero;
+
         try
         {
             string diskPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "app.ico");
             if (File.Exists(diskPath))
             {
                 var icon = new System.Drawing.Icon(diskPath);
-                Log.Information("Loaded tray icon from disk path: {Path}", diskPath);
+                Log.Information("Loaded tray icon from application Resources directory.");
                 return icon;
             }
         }
@@ -354,8 +365,8 @@ public sealed class TrayIconManager : IDisposable
                 g.FillEllipse(dotBrush, 14, 14, 4, 4);
             }
 
-            IntPtr hIcon = bmp.GetHicon();
-            return System.Drawing.Icon.FromHandle(hIcon);
+            fallbackHIcon = bmp.GetHicon();
+            return System.Drawing.Icon.FromHandle(fallbackHIcon);
         }
         catch (Exception ex)
         {
@@ -391,6 +402,38 @@ public sealed class TrayIconManager : IDisposable
             finally
             {
                 _taskbarIcon = null;
+            }
+        }
+
+        if (_icon != null)
+        {
+            try
+            {
+                _icon.Dispose();
+            }
+            catch
+            {
+                // Ignore GDI icon disposal errors
+            }
+            finally
+            {
+                _icon = null;
+            }
+        }
+
+        if (_fallbackHIcon != IntPtr.Zero)
+        {
+            try
+            {
+                Native.NativeMethods.DestroyIcon(_fallbackHIcon);
+            }
+            catch
+            {
+                // Ignore native handle cleanup errors
+            }
+            finally
+            {
+                _fallbackHIcon = IntPtr.Zero;
             }
         }
 

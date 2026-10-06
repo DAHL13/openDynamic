@@ -21,7 +21,9 @@ public sealed class HardwareWidget : IslandWidgetBase
     private readonly HardwareService _hardwareService;
     private readonly AppSettings _settings;
     private readonly IResourceProfileProvider? _resourceProfileProvider;
+    private readonly Dispatcher _dispatcher;
     private DispatcherTimer? _sampleTimer;
+    private int _isSamplingInFlight;
 
     private double _cpuUsagePercent;
     private double _ramUsagePercent;
@@ -125,12 +127,14 @@ public sealed class HardwareWidget : IslandWidgetBase
     public HardwareWidget(
         HardwareService hardwareService,
         AppSettings settings,
-        IResourceProfileProvider? resourceProfileProvider = null)
+        IResourceProfileProvider? resourceProfileProvider = null,
+        Dispatcher? dispatcher = null)
         : base(settings?.DefaultHardwarePriority ?? ActivityPriority.Hardware)
     {
         _hardwareService = hardwareService ?? throw new ArgumentNullException(nameof(hardwareService));
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _resourceProfileProvider = resourceProfileProvider;
+        _dispatcher = dispatcher ?? (System.Windows.Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher);
     }
 
     public override void Initialize()
@@ -186,7 +190,24 @@ public sealed class HardwareWidget : IslandWidgetBase
         CurrentActivity = null;
 
         UpdateSamplingTimerState();
+        _hardwareService.ReleaseGpuCounters();
         Log.Information("HardwareWidget: Telemetry monitoring disabled.");
+    }
+
+    /// <summary>
+    /// Applies live changes to EnableGpuMonitoring.
+    /// </summary>
+    public void ApplyGpuMonitoringSetting(bool enabled)
+    {
+        if (!enabled)
+        {
+            _hardwareService.ReleaseGpuCounters();
+            GpuUsagePercent = null;
+        }
+        else if (IsActive && IsVisibleOnIsland)
+        {
+            SampleNow();
+        }
     }
 
     /// <summary>
@@ -275,21 +296,40 @@ public sealed class HardwareWidget : IslandWidgetBase
         SampleNow();
     }
 
+    /// <summary>
+    /// Offloads hardware and PDH GPU sampling to a background worker with a non-overlapping guard (AUD-008),
+    /// marshaling the resulting snapshot back to the UI thread without ever blocking the WPF Dispatcher.
+    /// </summary>
     private void SampleNow()
     {
-        try
+        if (Interlocked.CompareExchange(ref _isSamplingInFlight, 1, 0) != 0)
         {
-            var snap = _hardwareService.Sample();
-            CpuUsagePercent = snap.CpuUsagePercent;
-            RamUsagePercent = snap.RamUsagePercent;
-            UsedRamGb = snap.UsedRamGb;
-            TotalRamGb = snap.TotalRamGb;
-            GpuUsagePercent = snap.GpuUsagePercent;
+            return;
         }
-        catch (Exception ex)
+
+        _ = Task.Run(() =>
         {
-            Log.Error(ex, "Error sampling hardware metrics in HardwareWidget.");
-        }
+            try
+            {
+                var snap = _hardwareService.Sample();
+                _dispatcher.InvokeAsync(() =>
+                {
+                    CpuUsagePercent = snap.CpuUsagePercent;
+                    RamUsagePercent = snap.RamUsagePercent;
+                    UsedRamGb = snap.UsedRamGb;
+                    TotalRamGb = snap.TotalRamGb;
+                    GpuUsagePercent = snap.GpuUsagePercent;
+                });
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Error sampling hardware metrics in HardwareWidget.");
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _isSamplingInFlight, 0);
+            }
+        });
     }
 
     public override UserControl CreateCompactView()
@@ -323,6 +363,8 @@ public sealed class HardwareWidget : IslandWidgetBase
                 _sampleTimer.Tick -= OnSampleTimerTick;
                 _sampleTimer = null;
             }
+
+            _hardwareService.ReleaseGpuCounters();
         }
 
         base.Dispose(disposing);

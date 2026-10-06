@@ -31,6 +31,13 @@ public static class AccessibilityThemeManager
         }
     }
 
+    private static SolidColorBrush CreateFrozenBrush(Color color)
+    {
+        var brush = new SolidColorBrush(color);
+        brush.Freeze();
+        return brush;
+    }
+
     public static void ApplyTheme(bool isHighContrast)
     {
         var resources = Application.Current?.Resources;
@@ -39,7 +46,7 @@ public static class AccessibilityThemeManager
         if (isHighContrast)
         {
             // High contrast: map to dynamic system colors with 1 DIP border; notch background remains solid
-            resources["AppCapsuleBackgroundBrush"] = new SolidColorBrush(Colors.Black);
+            resources["AppCapsuleBackgroundBrush"] = CreateFrozenBrush(Colors.Black);
             resources["AppBorderBrush"] = SystemColors.WindowTextBrush;
             resources["AppNotchBorderThickness"] = new Thickness(1);
             resources["AppTextPrimaryBrush"] = SystemColors.WindowTextBrush;
@@ -52,20 +59,15 @@ public static class AccessibilityThemeManager
         else
         {
             // Standard dark theme: ensure crisp, permanent 1 DIP perimeter border (#55FFFFFF) and neutral white accent
-            var borderBrush = new SolidColorBrush(Color.FromArgb(0x55, 0xFF, 0xFF, 0xFF));
-            borderBrush.Freeze();
-            var accentBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0xFF, 0xFF));
-            accentBrush.Freeze();
-
-            resources["AppCapsuleBackgroundBrush"] = new SolidColorBrush(Colors.Black);
-            resources["AppBorderBrush"] = borderBrush;
+            resources["AppCapsuleBackgroundBrush"] = CreateFrozenBrush(Colors.Black);
+            resources["AppBorderBrush"] = CreateFrozenBrush(Color.FromArgb(0x55, 0xFF, 0xFF, 0xFF));
             resources["AppNotchBorderThickness"] = new Thickness(1, 0, 1, 1);
-            resources["AppTextPrimaryBrush"] = new SolidColorBrush(Color.FromRgb(0xFF, 0xFF, 0xFF));
-            resources["AppTextSecondaryBrush"] = new SolidColorBrush(Color.FromRgb(0xAA, 0xAA, 0xAA));
-            resources["AppTextMutedBrush"] = new SolidColorBrush(Color.FromRgb(0x8E, 0x8E, 0x93));
-            resources["AppControlBackgroundBrush"] = new SolidColorBrush(Color.FromRgb(0x2C, 0x2C, 0x2E));
-            resources["AppAccentBrush"] = accentBrush;
-            resources["AppAccentTextBrush"] = new SolidColorBrush(Colors.Black);
+            resources["AppTextPrimaryBrush"] = CreateFrozenBrush(Color.FromRgb(0xFF, 0xFF, 0xFF));
+            resources["AppTextSecondaryBrush"] = CreateFrozenBrush(Color.FromRgb(0xAA, 0xAA, 0xAA));
+            resources["AppTextMutedBrush"] = CreateFrozenBrush(Color.FromRgb(0x8E, 0x8E, 0x93));
+            resources["AppControlBackgroundBrush"] = CreateFrozenBrush(Color.FromRgb(0x2C, 0x2C, 0x2E));
+            resources["AppAccentBrush"] = CreateFrozenBrush(Color.FromRgb(0xFF, 0xFF, 0xFF));
+            resources["AppAccentTextBrush"] = CreateFrozenBrush(Colors.Black);
         }
 
         Log.Information("AccessibilityThemeManager: Theme applied (HighContrast={IsHighContrast})", isHighContrast);

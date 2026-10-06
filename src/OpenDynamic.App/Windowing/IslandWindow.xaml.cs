@@ -237,8 +237,12 @@ public partial class IslandWindow : Window
 
         if (_fullscreenWatcher != null)
         {
+            _fullscreenWatcher.SetIslandWindowHandle(_hwnd);
             _fullscreenWatcher.FullscreenChanged += OnFullscreenChanged;
-            _fullscreenWatcher.Start();
+            if (_settings.HideOnFullscreen)
+            {
+                _fullscreenWatcher.Start();
+            }
         }
 
         _networkService?.Start();
@@ -277,6 +281,22 @@ public partial class IslandWindow : Window
         {
             _windowPositioner.PositionWindow(_hwnd);
             _windowPositioner.ReassertTopmost(_hwnd);
+        }
+
+        if (_fullscreenWatcher != null)
+        {
+            _fullscreenWatcher.SetIslandWindowHandle(_hwnd);
+            if (_settings.HideOnFullscreen)
+            {
+                _fullscreenWatcher.Start();
+            }
+            else
+            {
+                _fullscreenWatcher.Stop();
+                _orchestrator.ResumeFromFullscreen();
+                var mediaWidget = _orchestrator.RegisteredWidgets.OfType<Widgets.Media.MediaWidget>().FirstOrDefault();
+                mediaWidget?.SetFullscreenSuppressed(false);
+            }
         }
 
         UpdatePrivacyDots(_privacyMonitor?.CurrentState ?? Core.Privacy.PrivacyAccessState.Empty);
@@ -581,11 +601,6 @@ public partial class IslandWindow : Window
             Log.Information("SystemParameters.ClientAreaAnimation static property changed reactively: {Value}", SystemParameters.ClientAreaAnimation);
             UpdateMotionProfileLive();
         }
-        else if (e.PropertyName == nameof(SystemParameters.HighContrast))
-        {
-            Log.Information("SystemParameters.HighContrast static property changed reactively: {Value}", SystemParameters.HighContrast);
-            UpdateHighContrastThemeLive();
-        }
     }
 
     private void HandlePowerBroadcast(IntPtr wParam, IntPtr lParam)
@@ -736,6 +751,9 @@ public partial class IslandWindow : Window
 
         Dispatcher.InvokeAsync(() =>
         {
+            var mediaWidget = _orchestrator.RegisteredWidgets.OfType<Widgets.Media.MediaWidget>().FirstOrDefault();
+            mediaWidget?.SetFullscreenSuppressed(isFullscreen);
+
             if (isFullscreen)
             {
                 Log.Information("Fullscreen detected. Suppressing island and collapsing view.");

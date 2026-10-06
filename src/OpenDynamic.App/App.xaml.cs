@@ -122,9 +122,13 @@ public partial class App : Application
         var screenshotWidget = Services.GetRequiredService<Widgets.Screenshot.ScreenshotWidget>();
         orchestrator.RegisterWidget(screenshotWidget);
 
-        // Register PrivacyWidget (Priority 85, Transient) & Start PrivacyAccessMonitor
+        // Register PrivacyWidget (Priority 85, Transient) & Start PrivacyAccessMonitor if enabled
+        var privacySettings = Services.GetRequiredService<Core.Settings.AppSettings>();
         var privacyMonitor = Services.GetRequiredService<Services.PrivacyAccessMonitor>();
-        privacyMonitor.Start();
+        if (privacySettings.EnableMicrophoneIndicator || privacySettings.EnableCameraIndicator || privacySettings.EnablePrivacyAlerts)
+        {
+            privacyMonitor.Start();
+        }
 
         var privacyWidget = Services.GetRequiredService<Widgets.Privacy.PrivacyWidget>();
         orchestrator.RegisterWidget(privacyWidget);

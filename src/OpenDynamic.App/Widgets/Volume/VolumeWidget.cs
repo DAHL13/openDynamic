@@ -137,6 +137,11 @@ public sealed class VolumeWidget : IslandWidgetBase
                 DeviceName = vs.CurrentDeviceFriendlyName;
             }
 
+            if (!_settings.EnableVolumeWidget)
+            {
+                return;
+            }
+
             // Trigger transient activation (2 seconds, Priority 80)
             var duration = TimeSpan.FromSeconds(_settings.VolumeTransientDurationSeconds);
             Activate(transientDuration: duration, priorityOverride: _settings.DefaultVolumePriority);
@@ -145,6 +150,19 @@ public sealed class VolumeWidget : IslandWidgetBase
             Log.Information("VolumeWidget transient activated on island: Volume={Volume:P0}, Muted={Muted}, Device='{Device}', Priority={Priority}",
                 VolumeLevel, IsMuted, DeviceName, _settings.DefaultVolumePriority);
         });
+    }
+
+    /// <summary>
+    /// Applies live changes to EnableVolumeWidget.
+    /// </summary>
+    public void ApplyEnabledState(bool enabled)
+    {
+        if (!enabled)
+        {
+            _transientTimer?.Stop();
+            _transientTimer = null;
+            Deactivate();
+        }
     }
 
     /// <summary>

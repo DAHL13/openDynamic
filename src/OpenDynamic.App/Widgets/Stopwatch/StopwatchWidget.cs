@@ -96,6 +96,11 @@ public sealed class StopwatchWidget : IslandWidgetBase
 
     public void Start()
     {
+        if (!_settings.EnableStopwatchWidget)
+        {
+            return;
+        }
+
         _controller.Start();
         Priority = _settings.DefaultStopwatchPriority;
         IsTransient = false;

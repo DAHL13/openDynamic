@@ -7,8 +7,8 @@ namespace OpenDynamic.Core.Power;
 /// </summary>
 public sealed class BatteryThresholdTracker
 {
-    private readonly int _lowThresholdPercent;
-    private readonly int _criticalThresholdPercent;
+    private int _lowThresholdPercent;
+    private int _criticalThresholdPercent;
     private readonly int _hysteresisPercent;
 
     private bool _isInitialized;
@@ -36,6 +36,17 @@ public sealed class BatteryThresholdTracker
         _lowThresholdPercent = lowThresholdPercent;
         _criticalThresholdPercent = criticalThresholdPercent;
         _hysteresisPercent = Math.Max(0, hysteresisPercent);
+    }
+
+    /// <summary>
+    /// Updates the low and critical battery thresholds in real time, ensuring critical remains strictly below low.
+    /// </summary>
+    public void UpdateThresholds(int lowThresholdPercent, int criticalThresholdPercent)
+    {
+        int clampedLow = Math.Clamp(lowThresholdPercent, 5, 95);
+        int clampedCritical = Math.Clamp(criticalThresholdPercent, 1, clampedLow - 1);
+        _lowThresholdPercent = clampedLow;
+        _criticalThresholdPercent = clampedCritical;
     }
 
     /// <summary>

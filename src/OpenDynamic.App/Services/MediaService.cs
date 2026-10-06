@@ -233,19 +233,36 @@ public sealed class MediaService : IMediaService
                 processes = Process.GetProcessesByName(stripped);
             }
 
-            foreach (var proc in processes)
+            try
             {
-                var handle = proc.MainWindowHandle;
-                if (handle != IntPtr.Zero && NativeMethods.IsWindowVisible(handle))
+                foreach (var proc in processes)
                 {
-                    NativeMethods.ShowWindow(handle, NativeMethods.SW_RESTORE);
-                    NativeMethods.SetForegroundWindow(handle);
-                    Log.Information("Activated main window for media app '{ProcName}' (HWND: {Handle}).", procName, handle);
-                    return true;
+                    var handle = proc.MainWindowHandle;
+                    if (handle != IntPtr.Zero && NativeMethods.IsWindowVisible(handle))
+                    {
+                        NativeMethods.ShowWindow(handle, NativeMethods.SW_RESTORE);
+                        NativeMethods.SetForegroundWindow(handle);
+                        Log.Information("Activated main window for media app '{ProcName}' (HWND: {Handle}).", procName, handle);
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+            finally
+            {
+                foreach (var proc in processes)
+                {
+                    try
+                    {
+                        proc.Dispose();
+                    }
+                    catch
+                    {
+                        // Ignore process disposal error
+                    }
                 }
             }
-
-            return false;
         }
         catch (Exception ex)
         {
