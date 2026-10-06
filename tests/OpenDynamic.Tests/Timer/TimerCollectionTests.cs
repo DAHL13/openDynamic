@@ -193,4 +193,22 @@ public sealed class TimerCollectionTests
 
         Assert.Equal(TimerState.Completed, snapshot.State);
     }
+
+    [Fact]
+    public void AddTimer_InheritsConfiguredPomodoroDurations()
+    {
+        var clock = new FakeTimeProvider();
+        using var collection = new TimerCollection(
+            clock,
+            pomodoroWorkDuration: TimeSpan.FromMinutes(45),
+            pomodoroBreakDuration: TimeSpan.FromMinutes(15));
+
+        var secondTimer = collection.AddTimer("Deep Work", TimeSpan.FromMinutes(10));
+        secondTimer.SetMode(TimerMode.PomodoroWork);
+
+        Assert.Equal(TimeSpan.FromMinutes(45), secondTimer.TotalDuration);
+
+        secondTimer.SetMode(TimerMode.PomodoroBreak);
+        Assert.Equal(TimeSpan.FromMinutes(15), secondTimer.TotalDuration);
+    }
 }

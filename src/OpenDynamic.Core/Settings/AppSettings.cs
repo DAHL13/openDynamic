@@ -85,7 +85,7 @@ public sealed class AppSettings
     /// <see cref="MotionMode.Reduced"/> suppresses bouncing and decorative animations.
     /// <see cref="MotionMode.Full"/> enables complete spring physics.
     /// </summary>
-    [JsonConverter(typeof(JsonStringEnumConverter<MotionMode>))]
+    [JsonConverter(typeof(LenientEnumConverter<MotionMode>))]
     public MotionMode MotionMode { get; set; } = MotionMode.Auto;
 
     #endregion
@@ -135,7 +135,7 @@ public sealed class AppSettings
     /// <see cref="AudioVisualizerMode.Real"/> performs real-time WASAPI loopback capture and native FFT analysis.
     /// Default is <see cref="AudioVisualizerMode.Real"/>.
     /// </summary>
-    [JsonConverter(typeof(JsonStringEnumConverter<AudioVisualizerMode>))]
+    [JsonConverter(typeof(LenientEnumConverter<AudioVisualizerMode>))]
     public AudioVisualizerMode VisualizerMode { get; set; } = AudioVisualizerMode.Real;
 
     /// <summary>
@@ -524,7 +524,7 @@ public sealed class AppSettings
     /// Preferred time format for the clock (Auto, TwelveHour, TwentyFourHour).
     /// Default is Auto (follows system culture).
     /// </summary>
-    [JsonConverter(typeof(JsonStringEnumConverter<ClockTimeFormat>))]
+    [JsonConverter(typeof(LenientEnumConverter<ClockTimeFormat>))]
     public ClockTimeFormat ClockTimeFormat { get; set; } = ClockTimeFormat.Auto;
 
     /// <summary>
@@ -651,7 +651,7 @@ public sealed class AppSettings
             TimerPresetsMinutes = new List<int>(this.TimerPresetsMinutes ?? new List<int> { 1, 5, 10, 15 }),
             EnableStopwatchWidget = this.EnableStopwatchWidget,
             DefaultStopwatchPriority = this.DefaultStopwatchPriority,
-            ToggleIslandHotkey = this.ToggleIslandHotkey,
+            ToggleIslandHotkey = this.ToggleIslandHotkey ?? "Win+Ctrl+I",
             EnableGlobalHotkeys = this.EnableGlobalHotkeys,
             StartWithWindows = this.StartWithWindows,
             MotionMode = this.MotionMode,
@@ -661,7 +661,7 @@ public sealed class AppSettings
             EnableDeviceAlerts = this.EnableDeviceAlerts,
             DefaultDevicePriority = this.DefaultDevicePriority,
             DeviceTransientDurationSeconds = this.DeviceTransientDurationSeconds,
-            IgnoredDeviceNames = new List<string>(this.IgnoredDeviceNames),
+            IgnoredDeviceNames = new List<string>(this.IgnoredDeviceNames ?? Enumerable.Empty<string>()),
             EnableClipboardWidget = this.EnableClipboardWidget,
             DefaultClipboardPriority = this.DefaultClipboardPriority,
             ClipboardTransientDurationSeconds = this.ClipboardTransientDurationSeconds,
@@ -673,7 +673,7 @@ public sealed class AppSettings
             EnablePrivacyAlerts = this.EnablePrivacyAlerts,
             DefaultPrivacyPriority = this.DefaultPrivacyPriority,
             PrivacyTransientDurationSeconds = this.PrivacyTransientDurationSeconds,
-            IgnoredPrivacyApps = new List<string>(this.IgnoredPrivacyApps),
+            IgnoredPrivacyApps = new List<string>(this.IgnoredPrivacyApps ?? Enumerable.Empty<string>()),
             EnableAmbientClock = this.EnableAmbientClock,
             ClockTimeFormat = this.ClockTimeFormat,
             ClockShowSeconds = this.ClockShowSeconds,
@@ -697,6 +697,108 @@ public sealed class AppSettings
             EnableScreenshotTrashAction = this.EnableScreenshotTrashAction,
             AdditionalScreenshotFolder = this.AdditionalScreenshotFolder ?? string.Empty
         };
+    }
+
+    /// <summary>
+    /// Sanitizes and clamps all numeric ranges, enum values, strings, and collections to valid domain bounds.
+    /// </summary>
+    public void SanitizeAndClamp()
+    {
+        TargetMonitorIndex = Math.Max(0, TargetMonitorIndex);
+        OffsetX = double.IsFinite(OffsetX) ? Math.Clamp(OffsetX, -2000.0, 2000.0) : 0.0;
+        OffsetY = double.IsFinite(OffsetY) ? Math.Clamp(OffsetY, 0.0, 500.0) : 0.0;
+        CapsuleWidth = double.IsFinite(CapsuleWidth) ? Math.Clamp(CapsuleWidth, 120.0, 500.0) : 200.0;
+        CapsuleHeight = double.IsFinite(CapsuleHeight) ? Math.Clamp(CapsuleHeight, 24.0, 120.0) : 36.0;
+        CapsuleCornerRadius = double.IsFinite(CapsuleCornerRadius) ? Math.Clamp(CapsuleCornerRadius, 0.0, CapsuleHeight) : 14.0;
+        ScaleFactor = double.IsFinite(ScaleFactor) ? Math.Clamp(ScaleFactor, 0.5, 2.5) : 1.0;
+
+        if (!Enum.IsDefined(typeof(MotionMode), MotionMode))
+        {
+            MotionMode = MotionMode.Auto;
+        }
+
+        if (!Enum.IsDefined(typeof(AudioVisualizerMode), VisualizerMode))
+        {
+            VisualizerMode = AudioVisualizerMode.Real;
+        }
+
+        if (!Enum.IsDefined(typeof(ClockTimeFormat), ClockTimeFormat))
+        {
+            ClockTimeFormat = ClockTimeFormat.Auto;
+        }
+
+        MediaPauseGracePeriodSeconds = Math.Clamp(MediaPauseGracePeriodSeconds, 1, 300);
+        MediaGestureSensitivity = double.IsFinite(MediaGestureSensitivity) ? Math.Clamp(MediaGestureSensitivity, 20.0, 500.0) : 120.0;
+
+        DefaultMediaPriority = Math.Clamp(DefaultMediaPriority, 1, 100);
+        DefaultVolumePriority = Math.Clamp(DefaultVolumePriority, 1, 100);
+        DefaultBatteryPriority = Math.Clamp(DefaultBatteryPriority, 1, 100);
+        DefaultEnergySaverPriority = Math.Clamp(DefaultEnergySaverPriority, 1, 100);
+        DefaultHardwarePriority = Math.Clamp(DefaultHardwarePriority, 1, 100);
+        DefaultTimerPriority = Math.Clamp(DefaultTimerPriority, 1, 100);
+        DefaultTimerAlertPriority = Math.Clamp(DefaultTimerAlertPriority, 1, 100);
+        DefaultStopwatchPriority = Math.Clamp(DefaultStopwatchPriority, 1, 100);
+        DefaultNetworkPriority = Math.Clamp(DefaultNetworkPriority, 1, 100);
+        DefaultDevicePriority = Math.Clamp(DefaultDevicePriority, 1, 100);
+        DefaultClipboardPriority = Math.Clamp(DefaultClipboardPriority, 1, 100);
+        DefaultPrivacyPriority = Math.Clamp(DefaultPrivacyPriority, 1, 100);
+        DefaultAmbientClockPriority = Math.Clamp(DefaultAmbientClockPriority, 1, 100);
+        DefaultScreenshotPriority = Math.Clamp(DefaultScreenshotPriority, 1, 100);
+
+        VolumeTransientDurationSeconds = double.IsFinite(VolumeTransientDurationSeconds) ? Math.Clamp(VolumeTransientDurationSeconds, 0.5, 30.0) : 2.0;
+        BatteryChargerTransientDurationSeconds = double.IsFinite(BatteryChargerTransientDurationSeconds) ? Math.Clamp(BatteryChargerTransientDurationSeconds, 0.5, 30.0) : 3.0;
+        BatteryWarningTransientDurationSeconds = double.IsFinite(BatteryWarningTransientDurationSeconds) ? Math.Clamp(BatteryWarningTransientDurationSeconds, 0.5, 30.0) : 3.0;
+        EnergySaverTransientDurationSeconds = double.IsFinite(EnergySaverTransientDurationSeconds) ? Math.Clamp(EnergySaverTransientDurationSeconds, 0.5, 30.0) : 3.0;
+        TimerAlertTransientDurationSeconds = double.IsFinite(TimerAlertTransientDurationSeconds) ? Math.Clamp(TimerAlertTransientDurationSeconds, 0.5, 30.0) : 5.0;
+        NetworkTransientDurationSeconds = double.IsFinite(NetworkTransientDurationSeconds) ? Math.Clamp(NetworkTransientDurationSeconds, 0.5, 30.0) : 3.0;
+        DeviceTransientDurationSeconds = double.IsFinite(DeviceTransientDurationSeconds) ? Math.Clamp(DeviceTransientDurationSeconds, 0.5, 30.0) : 3.0;
+        ClipboardTransientDurationSeconds = double.IsFinite(ClipboardTransientDurationSeconds) ? Math.Clamp(ClipboardTransientDurationSeconds, 0.5, 30.0) : 2.0;
+        PrivacyTransientDurationSeconds = double.IsFinite(PrivacyTransientDurationSeconds) ? Math.Clamp(PrivacyTransientDurationSeconds, 0.5, 30.0) : 3.0;
+        ScreenshotTransientDurationSeconds = double.IsFinite(ScreenshotTransientDurationSeconds) ? Math.Clamp(ScreenshotTransientDurationSeconds, 0.5, 30.0) : 6.0;
+
+        BatteryCriticalThresholdPercent = Math.Clamp(BatteryCriticalThresholdPercent, 1, 50);
+        BatteryLowThresholdPercent = Math.Clamp(BatteryLowThresholdPercent, BatteryCriticalThresholdPercent + 1, 90);
+
+        HardwareSamplingIntervalSeconds = double.IsFinite(HardwareSamplingIntervalSeconds) ? Math.Clamp(HardwareSamplingIntervalSeconds, 0.5, 60.0) : 2.0;
+        EnergySaverHardwareSamplingIntervalSeconds = double.IsFinite(EnergySaverHardwareSamplingIntervalSeconds) ? Math.Clamp(EnergySaverHardwareSamplingIntervalSeconds, 1.0, 60.0) : 5.0;
+
+        PomodoroWorkDurationMinutes = Math.Clamp(PomodoroWorkDurationMinutes, 1, 180);
+        PomodoroBreakDurationMinutes = Math.Clamp(PomodoroBreakDurationMinutes, 1, 60);
+
+        if (TimerPresetsMinutes == null || TimerPresetsMinutes.Count == 0)
+        {
+            TimerPresetsMinutes = new List<int> { 1, 5, 10, 15 };
+        }
+        else
+        {
+            var sanitizedPresets = TimerPresetsMinutes
+                .Select(m => Math.Clamp(m, 1, 180))
+                .Distinct()
+                .Take(8)
+                .ToList();
+
+            TimerPresetsMinutes = sanitizedPresets.Count > 0 ? sanitizedPresets : new List<int> { 1, 5, 10, 15 };
+        }
+
+        ClipboardHistoryCapacity = Math.Clamp(ClipboardHistoryCapacity, 1, 10);
+        ClipboardExpirationMinutes = Math.Clamp(ClipboardExpirationMinutes, 1, 1440);
+        ScreenshotHistoryCapacity = Math.Clamp(ScreenshotHistoryCapacity, 1, 20);
+        ScreenshotHistoryRetentionMinutes = Math.Clamp(ScreenshotHistoryRetentionMinutes, 1, 1440);
+
+        IgnoredDeviceNames = (IgnoredDeviceNames ?? new List<string>())
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .Select(s => s.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        IgnoredPrivacyApps = (IgnoredPrivacyApps ?? new List<string>())
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .Select(s => s.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        AdditionalScreenshotFolder ??= string.Empty;
+        ToggleIslandHotkey = string.IsNullOrWhiteSpace(ToggleIslandHotkey) ? "Win+Ctrl+I" : ToggleIslandHotkey.Trim();
     }
 
     /// <summary>
@@ -745,7 +847,7 @@ public sealed class AppSettings
         TimerPresetsMinutes = new List<int>(other.TimerPresetsMinutes ?? new List<int> { 1, 5, 10, 15 });
         EnableStopwatchWidget = other.EnableStopwatchWidget;
         DefaultStopwatchPriority = other.DefaultStopwatchPriority;
-        ToggleIslandHotkey = other.ToggleIslandHotkey;
+        ToggleIslandHotkey = other.ToggleIslandHotkey ?? "Win+Ctrl+I";
         EnableGlobalHotkeys = other.EnableGlobalHotkeys;
         StartWithWindows = other.StartWithWindows;
         EnableNetworkAlerts = other.EnableNetworkAlerts;
@@ -789,5 +891,50 @@ public sealed class AppSettings
         ScreenshotHistoryRetentionMinutes = other.ScreenshotHistoryRetentionMinutes;
         EnableScreenshotTrashAction = other.EnableScreenshotTrashAction;
         AdditionalScreenshotFolder = other.AdditionalScreenshotFolder ?? string.Empty;
+    }
+}
+
+/// <summary>
+/// Lenient JSON enum converter that falls back to the domain default when an unrecognized string or integer is encountered.
+/// </summary>
+public sealed class LenientEnumConverter<TEnum> : System.Text.Json.Serialization.JsonConverter<TEnum>
+    where TEnum : struct, Enum
+{
+    public override TEnum Read(ref System.Text.Json.Utf8JsonReader reader, Type typeToConvert, System.Text.Json.JsonSerializerOptions options)
+    {
+        if (reader.TokenType == System.Text.Json.JsonTokenType.String)
+        {
+            string? text = reader.GetString();
+            if (!string.IsNullOrWhiteSpace(text) &&
+                Enum.TryParse<TEnum>(text, ignoreCase: true, out var parsed) &&
+                Enum.IsDefined(typeof(TEnum), parsed))
+            {
+                return parsed;
+            }
+        }
+        else if (reader.TokenType == System.Text.Json.JsonTokenType.Number && reader.TryGetInt32(out int num))
+        {
+            var value = (TEnum)Enum.ToObject(typeof(TEnum), num);
+            if (Enum.IsDefined(typeof(TEnum), value))
+            {
+                return value;
+            }
+        }
+        else
+        {
+            reader.Skip();
+        }
+
+        if (typeof(TEnum) == typeof(AudioVisualizerMode))
+        {
+            return (TEnum)(object)AudioVisualizerMode.Real;
+        }
+
+        return default;
+    }
+
+    public override void Write(System.Text.Json.Utf8JsonWriter writer, TEnum value, System.Text.Json.JsonSerializerOptions options)
+    {
+        writer.WriteStringValue(value.ToString());
     }
 }

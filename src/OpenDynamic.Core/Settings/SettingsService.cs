@@ -13,9 +13,10 @@ public sealed class SettingsService : ISettingsService
     private readonly object _syncLock = new();
     private readonly Action<string, Exception?>? _warningLogger;
     private readonly int _debounceMilliseconds;
+    private readonly TimeProvider _timeProvider;
     private readonly JsonSerializerOptions _jsonOptions;
 
-    private System.Threading.Timer? _debounceTimer;
+    private ITimer? _debounceTimer;
     private bool _isSavePending;
     private bool _isDisposed;
 
@@ -45,13 +46,16 @@ public sealed class SettingsService : ISettingsService
     /// <param name="customFilePath">Optional custom file path for testing or override.</param>
     /// <param name="warningLogger">Optional logging callback for warnings and corruption notices.</param>
     /// <param name="debounceMilliseconds">Debounce interval in milliseconds. Defaults to 500 ms.</param>
+    /// <param name="timeProvider">Optional time provider for deterministic timer testing.</param>
     public SettingsService(
         string? customFilePath = null,
         Action<string, Exception?>? warningLogger = null,
-        int debounceMilliseconds = 500)
+        int debounceMilliseconds = 500,
+        TimeProvider? timeProvider = null)
     {
         _warningLogger = warningLogger;
         _debounceMilliseconds = Math.Max(10, debounceMilliseconds);
+        _timeProvider = timeProvider ?? TimeProvider.System;
 
         if (!string.IsNullOrWhiteSpace(customFilePath))
         {
@@ -94,11 +98,17 @@ public sealed class SettingsService : ISettingsService
             try
             {
                 string json = File.ReadAllText(SettingsFilePath);
+                bool hasExplicitSchemaVersion = HasSchemaVersionProperty(json);
                 var loaded = JsonSerializer.Deserialize<AppSettings>(json, _jsonOptions);
 
                 if (loaded == null)
                 {
                     throw new JsonException("Deserialized AppSettings instance was null.");
+                }
+
+                if (!hasExplicitSchemaVersion)
+                {
+                    loaded.SchemaVersion = 0;
                 }
 
                 // Check schema version migration
@@ -235,18 +245,15 @@ public sealed class SettingsService : ISettingsService
                         loaded.AdditionalScreenshotFolder ??= string.Empty;
                     }
 
-                    loaded.IgnoredPrivacyApps ??= new List<string>();
-                    loaded.IgnoredDeviceNames ??= new List<string>();
-                    loaded.AdditionalScreenshotFolder ??= string.Empty;
                     loaded.SchemaVersion = AppSettings.CurrentSchemaVersion;
+                    loaded.SanitizeAndClamp();
                     CurrentSettings = loaded;
                     WriteSettingsToDisk(CurrentSettings);
                 }
                 else
                 {
-                    loaded.IgnoredPrivacyApps ??= new List<string>();
-                    loaded.IgnoredDeviceNames ??= new List<string>();
-                    loaded.AdditionalScreenshotFolder ??= string.Empty;
+                    loaded.SchemaVersion = AppSettings.CurrentSchemaVersion;
+                    loaded.SanitizeAndClamp();
                     CurrentSettings = loaded;
                 }
 
@@ -255,7 +262,7 @@ public sealed class SettingsService : ISettingsService
             catch (Exception ex) when (ex is JsonException or FormatException or IOException)
             {
                 _warningLogger?.Invoke(
-                    $"Settings file at '{SettingsFilePath}' was corrupt or unreadable. Backing up to '{BackupFilePath}' and regenerating defaults.",
+                    "Settings file was corrupt or unreadable. Backing up to .bak and regenerating defaults.",
                     ex);
 
                 BackupCorruptFile();
@@ -266,6 +273,25 @@ public sealed class SettingsService : ISettingsService
                 SettingsChanged?.Invoke(this, CurrentSettings);
             }
         }
+    }
+
+    private static bool HasSchemaVersionProperty(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        if (doc.RootElement.ValueKind != JsonValueKind.Object)
+        {
+            throw new JsonException("Settings root JSON element must be an object.");
+        }
+
+        foreach (var prop in doc.RootElement.EnumerateObject())
+        {
+            if (string.Equals(prop.Name, nameof(AppSettings.SchemaVersion), StringComparison.OrdinalIgnoreCase))
+            {
+                return prop.Value.ValueKind == JsonValueKind.Number;
+            }
+        }
+
+        return false;
     }
 
     /// <inheritdoc />
@@ -282,14 +308,15 @@ public sealed class SettingsService : ISettingsService
             if (_isDisposed) return;
 
             _isSavePending = true;
+            var dueTime = TimeSpan.FromMilliseconds(_debounceMilliseconds);
 
             if (_debounceTimer == null)
             {
-                _debounceTimer = new System.Threading.Timer(OnDebounceTimerElapsed, null, _debounceMilliseconds, Timeout.Infinite);
+                _debounceTimer = _timeProvider.CreateTimer(OnDebounceTimerElapsed, null, dueTime, Timeout.InfiniteTimeSpan);
             }
             else
             {
-                _debounceTimer.Change(_debounceMilliseconds, Timeout.Infinite);
+                _debounceTimer.Change(dueTime, Timeout.InfiniteTimeSpan);
             }
         }
     }
@@ -301,7 +328,7 @@ public sealed class SettingsService : ISettingsService
         {
             if (_isDisposed) return;
 
-            _debounceTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+            _debounceTimer?.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
             _isSavePending = false;
 
             WriteSettingsToDisk(CurrentSettings);
@@ -340,7 +367,7 @@ public sealed class SettingsService : ISettingsService
         }
         catch (Exception ex)
         {
-            _warningLogger?.Invoke($"Failed to write settings to '{SettingsFilePath}'.", ex);
+            _warningLogger?.Invoke("Failed to write settings to disk.", ex);
         }
     }
 
@@ -355,7 +382,7 @@ public sealed class SettingsService : ISettingsService
         }
         catch (Exception ex)
         {
-            _warningLogger?.Invoke($"Failed to create backup copy at '{BackupFilePath}'.", ex);
+            _warningLogger?.Invoke("Failed to create backup copy of corrupt settings file.", ex);
         }
     }
 

@@ -30,7 +30,18 @@ public sealed class TimerController : ITimerController
     public TimerMode Mode => _mode;
     public TimerState State => _state;
     public TimeSpan TotalDuration => _totalDuration;
-    public TimeSpan RemainingTime => _remainingTime;
+    public TimeSpan RemainingTime
+    {
+        get
+        {
+            if (_state == TimerState.Running && _targetEndTimeUtc.HasValue)
+            {
+                var diff = _targetEndTimeUtc.Value - _timeProvider.GetUtcNow();
+                return diff > TimeSpan.Zero ? diff : TimeSpan.Zero;
+            }
+            return _remainingTime;
+        }
+    }
     public DateTimeOffset? TargetEndTimeUtc => _targetEndTimeUtc;
 
     public TimerSnapshot CurrentSnapshot => CreateSnapshot();
@@ -79,6 +90,47 @@ public sealed class TimerController : ITimerController
         _remainingTime = _totalDuration;
         _targetEndTimeUtc = _timeProvider.GetUtcNow() + _totalDuration;
         _state = TimerState.Running;
+
+        var snapshot = CreateSnapshot();
+        Tick?.Invoke(this, snapshot);
+    }
+
+    /// <summary>
+    /// Restores a running timer from persisted state while preserving its original TotalDuration.
+    /// </summary>
+    public void RestoreRunning(TimeSpan totalDuration, DateTimeOffset targetEndTimeUtc, TimerMode mode = TimerMode.Standard)
+    {
+        _mode = mode;
+        var diff = targetEndTimeUtc - _timeProvider.GetUtcNow();
+        if (diff <= TimeSpan.Zero)
+        {
+            _totalDuration = totalDuration > TimeSpan.Zero ? totalDuration : GetDurationForMode(mode);
+            _remainingTime = TimeSpan.Zero;
+            _targetEndTimeUtc = null;
+            _state = TimerState.Completed;
+            return;
+        }
+
+        _totalDuration = totalDuration >= diff ? totalDuration : diff;
+        _remainingTime = diff;
+        _targetEndTimeUtc = targetEndTimeUtc;
+        _state = TimerState.Running;
+
+        var snapshot = CreateSnapshot();
+        Tick?.Invoke(this, snapshot);
+    }
+
+    /// <summary>
+    /// Restores a paused timer from persisted state while preserving both TotalDuration and RemainingTime.
+    /// </summary>
+    public void RestorePaused(TimeSpan totalDuration, TimeSpan remainingTime, TimerMode mode = TimerMode.Standard)
+    {
+        _mode = mode;
+        var safeRemaining = remainingTime > TimeSpan.Zero ? remainingTime : GetDurationForMode(mode);
+        _totalDuration = totalDuration >= safeRemaining ? totalDuration : safeRemaining;
+        _remainingTime = safeRemaining;
+        _targetEndTimeUtc = null;
+        _state = TimerState.Paused;
 
         var snapshot = CreateSnapshot();
         Tick?.Invoke(this, snapshot);
@@ -169,12 +221,44 @@ public sealed class TimerController : ITimerController
         if (_state == TimerState.Running && _targetEndTimeUtc.HasValue)
         {
             _targetEndTimeUtc = _targetEndTimeUtc.Value + additionalTime;
-            _totalDuration += additionalTime;
+            if (additionalTime > TimeSpan.Zero)
+            {
+                _totalDuration += additionalTime;
+            }
+
+            var liveRem = RemainingTime;
+            if (_totalDuration < liveRem)
+            {
+                _totalDuration = liveRem;
+            }
             if (_totalDuration < TimeSpan.FromSeconds(1))
             {
                 _totalDuration = TimeSpan.FromSeconds(1);
             }
             UpdateTick();
+        }
+        else if (_state == TimerState.Paused)
+        {
+            _remainingTime += additionalTime;
+            if (additionalTime > TimeSpan.Zero)
+            {
+                _totalDuration += additionalTime;
+            }
+            if (_remainingTime < TimeSpan.Zero)
+            {
+                _remainingTime = TimeSpan.Zero;
+            }
+            if (_remainingTime > _totalDuration)
+            {
+                _totalDuration = _remainingTime;
+            }
+            if (_totalDuration < TimeSpan.FromSeconds(1))
+            {
+                _totalDuration = TimeSpan.FromSeconds(1);
+            }
+
+            var snapshot = CreateSnapshot();
+            Tick?.Invoke(this, snapshot);
         }
         else
         {
@@ -229,21 +313,22 @@ public sealed class TimerController : ITimerController
 
     private TimerSnapshot CreateSnapshot()
     {
+        var effectiveRemaining = RemainingTime;
         double progressRatio = 0.0;
         double remainingRatio = 1.0;
 
         if (_totalDuration > TimeSpan.Zero)
         {
             double totalSecs = _totalDuration.TotalSeconds;
-            double remSecs = Math.Clamp(_remainingTime.TotalSeconds, 0.0, totalSecs);
+            double remSecs = Math.Clamp(effectiveRemaining.TotalSeconds, 0.0, totalSecs);
             remainingRatio = remSecs / totalSecs;
             progressRatio = 1.0 - remainingRatio;
         }
 
-        string formatted = FormatTime(_remainingTime);
+        string formatted = FormatTime(effectiveRemaining);
 
         return new TimerSnapshot(
-            _remainingTime,
+            effectiveRemaining,
             _totalDuration,
             _targetEndTimeUtc,
             _mode,

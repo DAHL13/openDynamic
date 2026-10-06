@@ -13,6 +13,7 @@ public class PrivacyAccessAggregator : IPrivacyAccessAggregator
 
     private readonly HashSet<string> _activeMicApps = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _activeCamApps = new(StringComparer.OrdinalIgnoreCase);
+    private List<PrivacyAccessEntry> _lastRawEntries = new();
 
     private PrivacyAccessState _currentState = PrivacyAccessState.Empty;
 
@@ -63,6 +64,8 @@ public class PrivacyAccessAggregator : IPrivacyAccessAggregator
     {
         ArgumentNullException.ThrowIfNull(ignoredApps);
 
+        List<PrivacyAccessEntry>? snapshotToReevaluate = null;
+
         lock (_syncLock)
         {
             _ignoredApps.Clear();
@@ -73,13 +76,24 @@ public class PrivacyAccessAggregator : IPrivacyAccessAggregator
                     _ignoredApps.Add(app.Trim());
                 }
             }
+
+            if (_lastRawEntries.Count > 0)
+            {
+                snapshotToReevaluate = new List<PrivacyAccessEntry>(_lastRawEntries);
+            }
+        }
+
+        if (snapshotToReevaluate != null)
+        {
+            ProcessEntries(snapshotToReevaluate, suppressAlerts: true);
         }
     }
 
-    public PrivacyAccessState ProcessEntries(IEnumerable<PrivacyAccessEntry> rawEntries)
+    public PrivacyAccessState ProcessEntries(IEnumerable<PrivacyAccessEntry> rawEntries, bool suppressAlerts = false)
     {
         ArgumentNullException.ThrowIfNull(rawEntries);
 
+        var materializedEntries = rawEntries.ToList();
         var newMicApps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var newCamApps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var alertList = new List<PrivacyAccessChange>();
@@ -90,7 +104,9 @@ public class PrivacyAccessAggregator : IPrivacyAccessAggregator
 
         lock (_syncLock)
         {
-            foreach (var entry in rawEntries)
+            _lastRawEntries = materializedEntries;
+
+            foreach (var entry in materializedEntries)
             {
                 if (entry == null || !entry.IsInUse)
                 {
@@ -118,63 +134,66 @@ public class PrivacyAccessAggregator : IPrivacyAccessAggregator
                 }
             }
 
-            // Detect Microphone transitions
-            // Started
-            foreach (var app in newMicApps)
+            if (!suppressAlerts)
             {
-                if (!_activeMicApps.Contains(app))
+                // Detect Microphone transitions
+                // Started
+                foreach (var app in newMicApps)
                 {
-                    alertList.Add(new PrivacyAccessChange
+                    if (!_activeMicApps.Contains(app))
                     {
-                        Resource = PrivacyResourceType.Microphone,
-                        EventKind = PrivacyAccessEventKind.Started,
-                        AppName = app,
-                        TimestampUtc = now
-                    });
+                        alertList.Add(new PrivacyAccessChange
+                        {
+                            Resource = PrivacyResourceType.Microphone,
+                            EventKind = PrivacyAccessEventKind.Started,
+                            AppName = app,
+                            TimestampUtc = now
+                        });
+                    }
                 }
-            }
-            // Stopped
-            foreach (var app in _activeMicApps)
-            {
-                if (!newMicApps.Contains(app))
+                // Stopped
+                foreach (var app in _activeMicApps)
                 {
-                    alertList.Add(new PrivacyAccessChange
+                    if (!newMicApps.Contains(app))
                     {
-                        Resource = PrivacyResourceType.Microphone,
-                        EventKind = PrivacyAccessEventKind.Stopped,
-                        AppName = app,
-                        TimestampUtc = now
-                    });
+                        alertList.Add(new PrivacyAccessChange
+                        {
+                            Resource = PrivacyResourceType.Microphone,
+                            EventKind = PrivacyAccessEventKind.Stopped,
+                            AppName = app,
+                            TimestampUtc = now
+                        });
+                    }
                 }
-            }
 
-            // Detect Camera transitions
-            // Started
-            foreach (var app in newCamApps)
-            {
-                if (!_activeCamApps.Contains(app))
+                // Detect Camera transitions
+                // Started
+                foreach (var app in newCamApps)
                 {
-                    alertList.Add(new PrivacyAccessChange
+                    if (!_activeCamApps.Contains(app))
                     {
-                        Resource = PrivacyResourceType.Camera,
-                        EventKind = PrivacyAccessEventKind.Started,
-                        AppName = app,
-                        TimestampUtc = now
-                    });
+                        alertList.Add(new PrivacyAccessChange
+                        {
+                            Resource = PrivacyResourceType.Camera,
+                            EventKind = PrivacyAccessEventKind.Started,
+                            AppName = app,
+                            TimestampUtc = now
+                        });
+                    }
                 }
-            }
-            // Stopped
-            foreach (var app in _activeCamApps)
-            {
-                if (!newCamApps.Contains(app))
+                // Stopped
+                foreach (var app in _activeCamApps)
                 {
-                    alertList.Add(new PrivacyAccessChange
+                    if (!newCamApps.Contains(app))
                     {
-                        Resource = PrivacyResourceType.Camera,
-                        EventKind = PrivacyAccessEventKind.Stopped,
-                        AppName = app,
-                        TimestampUtc = now
-                    });
+                        alertList.Add(new PrivacyAccessChange
+                        {
+                            Resource = PrivacyResourceType.Camera,
+                            EventKind = PrivacyAccessEventKind.Stopped,
+                            AppName = app,
+                            TimestampUtc = now
+                        });
+                    }
                 }
             }
 
@@ -226,6 +245,7 @@ public class PrivacyAccessAggregator : IPrivacyAccessAggregator
         {
             _activeMicApps.Clear();
             _activeCamApps.Clear();
+            _lastRawEntries.Clear();
             _currentState = PrivacyAccessState.Empty;
             emptyState = _currentState;
         }

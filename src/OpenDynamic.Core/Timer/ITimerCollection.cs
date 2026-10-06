@@ -5,7 +5,7 @@ namespace OpenDynamic.Core.Timer;
 /// Selects the primary timer (the one ending earliest among running timers) and coordinates
 /// alert sequencing for completed timers. Adheres to Golden Rule 5 (pure domain in Core).
 /// </summary>
-public interface ITimerCollection
+public interface ITimerCollection : IDisposable
 {
     /// <summary>
     /// Maximum allowed concurrent timers.

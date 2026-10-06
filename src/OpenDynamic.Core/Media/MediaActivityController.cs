@@ -71,7 +71,7 @@ public sealed class MediaActivityController : IDisposable
 
     private void OnSessionClosed(object? sender, EventArgs e)
     {
-        HandleSessionTerminated();
+        DetachSession();
     }
 
     private void UpdateFromCurrentSession()

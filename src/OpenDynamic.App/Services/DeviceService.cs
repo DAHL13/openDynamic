@@ -253,6 +253,8 @@ public sealed class DeviceService : IDisposable
                 _audioNotificationHandle = IntPtr.Zero;
             }
         }
+
+        _policy.ResetEnumeration();
     }
 
     /// <summary>

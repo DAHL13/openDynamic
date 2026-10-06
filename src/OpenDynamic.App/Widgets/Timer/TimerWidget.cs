@@ -530,31 +530,35 @@ public sealed class TimerWidget : IslandWidgetBase
             // Restore active/paused timers
             foreach (var rec in result.RestoredTimers)
             {
+                var totalDuration = TimeSpan.FromSeconds(rec.TotalDurationSeconds);
                 if (rec.Id == "primary")
                 {
                     // Primary already exists
                     var primary = _timerCollection.PrimaryTimer;
                     primary.Label = rec.Label;
-                    primary.SetMode(rec.Mode, TimeSpan.FromSeconds(rec.TotalDurationSeconds));
                     if (rec.State == TimerState.Running && rec.TargetEndTimeUtc.HasValue)
                     {
-                        var remaining = rec.TargetEndTimeUtc.Value - DateTimeOffset.UtcNow;
-                        if (remaining > TimeSpan.Zero)
-                        {
-                            primary.Start(remaining, rec.Mode);
-                        }
+                        primary.RestoreRunning(totalDuration, rec.TargetEndTimeUtc.Value, rec.Mode);
+                    }
+                    else if (rec.State == TimerState.Paused)
+                    {
+                        primary.RestorePaused(totalDuration, TimeSpan.FromSeconds(rec.RemainingSeconds), rec.Mode);
+                    }
+                    else
+                    {
+                        primary.SetMode(rec.Mode, totalDuration);
                     }
                 }
                 else if (_timerCollection.Timers.Count < _timerCollection.MaxTimers)
                 {
-                    var timer = _timerCollection.AddTimer(rec.Label, TimeSpan.FromSeconds(rec.TotalDurationSeconds), rec.Mode);
+                    var timer = _timerCollection.AddTimer(rec.Label, totalDuration, rec.Mode);
                     if (rec.State == TimerState.Running && rec.TargetEndTimeUtc.HasValue)
                     {
-                        var remaining = rec.TargetEndTimeUtc.Value - DateTimeOffset.UtcNow;
-                        if (remaining > TimeSpan.Zero)
-                        {
-                            timer.Start(remaining, rec.Mode);
-                        }
+                        timer.RestoreRunning(totalDuration, rec.TargetEndTimeUtc.Value, rec.Mode);
+                    }
+                    else if (rec.State == TimerState.Paused)
+                    {
+                        timer.RestorePaused(totalDuration, TimeSpan.FromSeconds(rec.RemainingSeconds), rec.Mode);
                     }
                 }
             }

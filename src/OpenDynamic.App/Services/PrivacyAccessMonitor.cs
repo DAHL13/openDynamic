@@ -156,8 +156,8 @@ public sealed class PrivacyAccessMonitor : IPrivacyAccessMonitor
         RegisterKeyNotification(_micKey, _micEvent);
         RegisterKeyNotification(_camKey, _camEvent);
 
-        // Immediate snapshot evaluation on startup
-        ReadAndProcessConsentStore();
+        // Immediate snapshot evaluation on startup (establish baseline state without firing transient toast alerts)
+        ReadAndProcessConsentStore(suppressAlerts: true);
 
         var waitList = new List<WaitHandle>();
         if (_stopEvent != null) waitList.Add(_stopEvent);
@@ -188,7 +188,7 @@ public sealed class PrivacyAccessMonitor : IPrivacyAccessMonitor
             }
 
             // Passive registry read triggered strictly by kernel event
-            ReadAndProcessConsentStore();
+            ReadAndProcessConsentStore(suppressAlerts: false);
         }
     }
 
@@ -216,7 +216,7 @@ public sealed class PrivacyAccessMonitor : IPrivacyAccessMonitor
         }
     }
 
-    private void ReadAndProcessConsentStore()
+    private void ReadAndProcessConsentStore(bool suppressAlerts = false)
     {
         var entries = new List<PrivacyAccessEntry>();
 
@@ -232,7 +232,7 @@ public sealed class PrivacyAccessMonitor : IPrivacyAccessMonitor
                 ReadResourceEntries(_camKey, PrivacyResourceType.Camera, entries);
             }
 
-            _aggregator.ProcessEntries(entries);
+            _aggregator.ProcessEntries(entries, suppressAlerts);
         }
         catch (Exception ex)
         {

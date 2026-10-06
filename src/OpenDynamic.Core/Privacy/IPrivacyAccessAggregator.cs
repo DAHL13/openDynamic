@@ -30,7 +30,7 @@ public interface IPrivacyAccessAggregator
     /// <summary>
     /// Processes a set of raw sensor usage entries from Windows ConsentStore or mock test data.
     /// </summary>
-    PrivacyAccessState ProcessEntries(IEnumerable<PrivacyAccessEntry> rawEntries);
+    PrivacyAccessState ProcessEntries(IEnumerable<PrivacyAccessEntry> rawEntries, bool suppressAlerts = false);
 
     /// <summary>
     /// Dynamically updates the collection of ignored applications.

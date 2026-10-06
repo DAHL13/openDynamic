@@ -16,10 +16,11 @@ public sealed class NetworkAlertPolicy : IDisposable
 
     private readonly ITimer _debounceTimer;
 
+    private const int MaxAlertHistoryEntries = 128;
+
     private bool _isInitialized;
     private NetworkSnapshot _currentSnapshot = NetworkSnapshot.Disconnected;
     private NetworkSnapshot? _lastEmittedSnapshot;
-    private DateTimeOffset _lastEmittedTimeUtc = DateTimeOffset.MinValue;
     private readonly Dictionary<string, DateTimeOffset> _lastEmittedAlertTimes = new();
     private DateTimeOffset _suppressUntilUtc = DateTimeOffset.MinValue;
     private NetworkSnapshot? _pendingSnapshot;
@@ -101,8 +102,7 @@ public sealed class NetworkAlertPolicy : IDisposable
         {
             _currentSnapshot = initialSnapshot;
             _lastEmittedSnapshot = initialSnapshot;
-            _lastEmittedTimeUtc = _timeProvider.GetUtcNow();
-            _lastEmittedAlertTimes[$"{(int)initialSnapshot.State}:{initialSnapshot.NetworkName ?? ""}"] = _lastEmittedTimeUtc;
+            _lastEmittedAlertTimes[$"{(int)initialSnapshot.State}:{initialSnapshot.NetworkName ?? ""}"] = _timeProvider.GetUtcNow();
             _isInitialized = true;
             _pendingSnapshot = null;
             _debounceTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
@@ -248,9 +248,13 @@ public sealed class NetworkAlertPolicy : IDisposable
             return null;
         }
 
+        if (_lastEmittedAlertTimes.Count >= MaxAlertHistoryEntries)
+        {
+            _lastEmittedAlertTimes.Clear();
+        }
+
         _lastEmittedAlertTimes[alertKey] = now;
         _lastEmittedSnapshot = pending;
-        _lastEmittedTimeUtc = now;
         return pending;
     }
 

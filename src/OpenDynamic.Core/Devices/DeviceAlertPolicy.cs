@@ -8,6 +8,9 @@ namespace OpenDynamic.Core.Devices;
 /// </summary>
 public sealed class DeviceAlertPolicy : IDisposable
 {
+    private const int MaxCooldownEntries = 256;
+    private const int MaxKnownDevices = 512;
+
     private readonly object _syncLock = new();
     private readonly TimeProvider _timeProvider;
     private readonly TimeSpan _coalesceDuration;
@@ -17,8 +20,9 @@ public sealed class DeviceAlertPolicy : IDisposable
     private readonly HashSet<string> _ignoredDevices = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _knownConnectedDevices = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, DateTimeOffset> _lastEmittedAlertTimes = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, (DeviceEvent Event, ITimer Timer)> _pendingCoalesce = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, (DeviceEvent Event, ITimer Timer, long Generation)> _pendingCoalesce = new(StringComparer.OrdinalIgnoreCase);
 
+    private long _nextCoalesceGeneration;
     private bool _isEnumerationCompleted;
     private DateTimeOffset _suppressUntilUtc = DateTimeOffset.MinValue;
     private bool _isDisposed;
@@ -110,6 +114,23 @@ public sealed class DeviceAlertPolicy : IDisposable
     }
 
     /// <summary>
+    /// Resets enumeration baseline and clears pending coalesce timers when watchers are stopped.
+    /// </summary>
+    public void ResetEnumeration()
+    {
+        lock (_syncLock)
+        {
+            _isEnumerationCompleted = false;
+            _knownConnectedDevices.Clear();
+            foreach (var (_, timer, _) in _pendingCoalesce.Values)
+            {
+                timer.Dispose();
+            }
+            _pendingCoalesce.Clear();
+        }
+    }
+
+    /// <summary>
     /// Notifies the policy that the system resumed from sleep.
     /// Suppresses all device alerts for 10 seconds to avoid wakeup flurry notices.
     /// </summary>
@@ -121,7 +142,7 @@ public sealed class DeviceAlertPolicy : IDisposable
             _suppressUntilUtc = now + _suspendSuppressionDuration;
 
             // Clear any active coalesce timers
-            foreach (var (_, timer) in _pendingCoalesce.Values)
+            foreach (var (_, timer, _) in _pendingCoalesce.Values)
             {
                 timer.Dispose();
             }
@@ -136,7 +157,7 @@ public sealed class DeviceAlertPolicy : IDisposable
     {
         lock (_syncLock)
         {
-            foreach (var (_, timer) in _pendingCoalesce.Values)
+            foreach (var (_, timer, _) in _pendingCoalesce.Values)
             {
                 timer.Dispose();
             }
@@ -166,6 +187,10 @@ public sealed class DeviceAlertPolicy : IDisposable
             {
                 if (devEvent.Type == DeviceEventType.Connected)
                 {
+                    if (_knownConnectedDevices.Count >= MaxKnownDevices)
+                    {
+                        _knownConnectedDevices.Clear();
+                    }
                     _knownConnectedDevices.Add(devEvent.DeviceId);
                 }
                 else
@@ -182,6 +207,10 @@ public sealed class DeviceAlertPolicy : IDisposable
             {
                 if (devEvent.Type == DeviceEventType.Connected)
                 {
+                    if (_knownConnectedDevices.Count >= MaxKnownDevices)
+                    {
+                        _knownConnectedDevices.Clear();
+                    }
                     _knownConnectedDevices.Add(devEvent.DeviceId);
                 }
                 else
@@ -199,13 +228,14 @@ public sealed class DeviceAlertPolicy : IDisposable
                 _pendingCoalesce.Remove(key);
             }
 
+            long generation = ++_nextCoalesceGeneration;
             var timer = _timeProvider.CreateTimer(
                 OnCoalesceTimerElapsed,
-                key,
+                new CoalesceTimerState(key, generation),
                 _coalesceDuration,
                 Timeout.InfiniteTimeSpan);
 
-            _pendingCoalesce[key] = (devEvent, timer);
+            _pendingCoalesce[key] = (devEvent, timer, generation);
         }
     }
 
@@ -220,7 +250,7 @@ public sealed class DeviceAlertPolicy : IDisposable
         {
             if (_isDisposed) return;
 
-            foreach (var (key, (devEvent, timer)) in _pendingCoalesce.ToList())
+            foreach (var (key, (devEvent, timer, _)) in _pendingCoalesce.ToList())
             {
                 timer.Dispose();
                 _pendingCoalesce.Remove(key);
@@ -241,7 +271,7 @@ public sealed class DeviceAlertPolicy : IDisposable
 
     private void OnCoalesceTimerElapsed(object? state)
     {
-        if (state is not string deviceId) return;
+        if (state is not CoalesceTimerState timerState) return;
 
         DeviceEvent? toEmit = null;
 
@@ -249,10 +279,11 @@ public sealed class DeviceAlertPolicy : IDisposable
         {
             if (_isDisposed) return;
 
-            if (_pendingCoalesce.TryGetValue(deviceId, out var item))
+            if (_pendingCoalesce.TryGetValue(timerState.DeviceId, out var item) &&
+                item.Generation == timerState.Generation)
             {
                 item.Timer.Dispose();
-                _pendingCoalesce.Remove(deviceId);
+                _pendingCoalesce.Remove(timerState.DeviceId);
 
                 toEmit = EvaluateFinalEventLocked(item.Event);
             }
@@ -263,6 +294,8 @@ public sealed class DeviceAlertPolicy : IDisposable
             AlertTriggered?.Invoke(this, toEmit);
         }
     }
+
+    private sealed record CoalesceTimerState(string DeviceId, long Generation);
 
     private DeviceEvent? EvaluateFinalEventLocked(DeviceEvent devEvent)
     {
@@ -302,6 +335,10 @@ public sealed class DeviceAlertPolicy : IDisposable
         // Update tracking state
         if (devEvent.Type == DeviceEventType.Connected)
         {
+            if (_knownConnectedDevices.Count >= MaxKnownDevices)
+            {
+                _knownConnectedDevices.Clear();
+            }
             _knownConnectedDevices.Add(devEvent.DeviceId);
         }
         else
@@ -309,8 +346,40 @@ public sealed class DeviceAlertPolicy : IDisposable
             _knownConnectedDevices.Remove(devEvent.DeviceId);
         }
 
+        if (_lastEmittedAlertTimes.Count >= MaxCooldownEntries)
+        {
+            PruneCooldownEntriesLocked(now);
+        }
+
         _lastEmittedAlertTimes[alertSignature] = now;
         return devEvent;
+    }
+
+    private void PruneCooldownEntriesLocked(DateTimeOffset now)
+    {
+        var expiredKeys = _lastEmittedAlertTimes
+            .Where(kvp => (now - kvp.Value) >= _cooldownDuration)
+            .Select(kvp => kvp.Key)
+            .ToList();
+
+        foreach (var k in expiredKeys)
+        {
+            _lastEmittedAlertTimes.Remove(k);
+        }
+
+        if (_lastEmittedAlertTimes.Count >= MaxCooldownEntries)
+        {
+            var oldest = _lastEmittedAlertTimes
+                .OrderBy(kvp => kvp.Value)
+                .Take(_lastEmittedAlertTimes.Count / 2)
+                .Select(kvp => kvp.Key)
+                .ToList();
+
+            foreach (var k in oldest)
+            {
+                _lastEmittedAlertTimes.Remove(k);
+            }
+        }
     }
 
     private bool IsIgnoredLocked(DeviceEvent devEvent)
@@ -337,7 +406,7 @@ public sealed class DeviceAlertPolicy : IDisposable
             if (_isDisposed) return;
             _isDisposed = true;
 
-            foreach (var (_, timer) in _pendingCoalesce.Values)
+            foreach (var (_, timer, _) in _pendingCoalesce.Values)
             {
                 timer.Dispose();
             }

@@ -360,4 +360,58 @@ public sealed class PrivacyAccessAggregatorTests
         Assert.False(aggregator.CurrentState.IsCameraActive);
         Assert.True(resetRaised);
     }
+
+    [Fact]
+    public void ProcessEntries_WithSuppressAlerts_UpdatesStateWithoutEmittingTransientAlerts()
+    {
+        var aggregator = new PrivacyAccessAggregator(timeProvider: _timeProvider);
+        var alerts = new List<PrivacyAccessChange>();
+        aggregator.AccessAlertTriggered += (_, e) => alerts.Add(e);
+
+        var entries = new[]
+        {
+            new PrivacyAccessEntry
+            {
+                Resource = PrivacyResourceType.Microphone,
+                AppId = "obs64.exe",
+                DisplayName = "OBS Studio",
+                LastUsedTimeStart = 2000L,
+                LastUsedTimeStop = 0L
+            }
+        };
+
+        var state = aggregator.ProcessEntries(entries, suppressAlerts: true);
+
+        Assert.True(state.IsMicrophoneActive);
+        Assert.Empty(alerts);
+    }
+
+    [Fact]
+    public void UpdateIgnoredApps_ImmediatelyUpdatesCurrentStateAndRaisesStateChanged()
+    {
+        var aggregator = new PrivacyAccessAggregator(timeProvider: _timeProvider);
+        var entries = new[]
+        {
+            new PrivacyAccessEntry
+            {
+                Resource = PrivacyResourceType.Microphone,
+                AppId = "discord.exe",
+                DisplayName = "Discord",
+                LastUsedTimeStart = 1000L,
+                LastUsedTimeStop = 0L
+            }
+        };
+
+        aggregator.ProcessEntries(entries);
+        Assert.True(aggregator.CurrentState.IsMicrophoneActive);
+
+        PrivacyAccessState? updatedState = null;
+        aggregator.StateChanged += (_, state) => updatedState = state;
+
+        aggregator.UpdateIgnoredApps(new[] { "Discord" });
+
+        Assert.NotNull(updatedState);
+        Assert.False(updatedState!.IsMicrophoneActive);
+        Assert.False(aggregator.CurrentState.IsMicrophoneActive);
+    }
 }

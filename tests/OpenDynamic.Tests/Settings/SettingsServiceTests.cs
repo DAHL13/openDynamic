@@ -471,10 +471,11 @@ public sealed class SettingsServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task SaveDebounced_CollapsesMultipleRapidCalls_WritesOnlyAfterDelay()
+    public void SaveDebounced_CollapsesMultipleRapidCalls_WritesOnlyAfterDelay()
     {
         string filePath = Path.Combine(_testDirectory, "settings.json");
-        using var service = new SettingsService(filePath, debounceMilliseconds: 120);
+        var fakeClock = new OpenDynamic.Tests.Timer.FakeTimeProvider();
+        using var service = new SettingsService(filePath, debounceMilliseconds: 120, timeProvider: fakeClock);
 
         service.Load();
         Assert.Equal(200.0, service.CurrentSettings.CapsuleWidth);
@@ -482,19 +483,22 @@ public sealed class SettingsServiceTests : IDisposable
         // Rapid changes in slider simulation
         service.CurrentSettings.CapsuleWidth = 205.0;
         service.SaveDebounced();
+        fakeClock.Advance(TimeSpan.FromMilliseconds(50));
 
         service.CurrentSettings.CapsuleWidth = 210.0;
         service.SaveDebounced();
+        fakeClock.Advance(TimeSpan.FromMilliseconds(50));
 
         service.CurrentSettings.CapsuleWidth = 215.0;
         service.SaveDebounced();
 
-        // Immediately after, disk file has not been written with 215 yet
+        // Immediately after (and even 100ms after last call), disk file has not been written with 215 yet
+        fakeClock.Advance(TimeSpan.FromMilliseconds(100));
         string immediatelyAfter = File.ReadAllText(filePath);
         Assert.DoesNotContain("215", immediatelyAfter);
 
-        // Wait for debounce period (120ms + buffer)
-        await Task.Delay(250);
+        // Advance past debounce period (120ms total since last call)
+        fakeClock.Advance(TimeSpan.FromMilliseconds(30));
 
         string afterDebounce = File.ReadAllText(filePath);
         Assert.Contains("215", afterDebounce);
@@ -906,5 +910,141 @@ public sealed class SettingsServiceTests : IDisposable
 
         Assert.NotNull(loggedNotice);
         Assert.Contains("v13 to v14", loggedNotice);
+    }
+
+    [Fact]
+    public void Load_WhenSchemaVersionIs1_FromV1Release_MigratesCleanlyToCurrentSchemaVersion()
+    {
+        string filePath = Path.Combine(_testDirectory, "settings_v1_full.json");
+        const string v1Json = """
+        {
+          "SchemaVersion": 1,
+          "CapsuleWidth": 200.0,
+          "CapsuleHeight": 36.0,
+          "CapsuleCornerRadius": 18.0,
+          "OffsetX": 0.0,
+          "OffsetY": 8.0,
+          "TargetMonitorIndex": -1,
+          "ScaleFactor": 1.0,
+          "MotionMode": "Full",
+          "EnableMediaWidget": true,
+          "DefaultMediaPriority": 30,
+          "MediaPauseGracePeriodSeconds": 30,
+          "EnableVolumeWidget": true,
+          "DefaultVolumePriority": 80,
+          "VolumeTransientDurationSeconds": 1.8,
+          "EnableBatteryWidget": true,
+          "DefaultBatteryPriority": 90,
+          "BatteryChargerTransientDurationSeconds": 3.0,
+          "BatteryWarningTransientDurationSeconds": 5.0,
+          "BatteryLowThresholdPercent": 20,
+          "BatteryCriticalThresholdPercent": 10,
+          "HideOnFullscreen": true,
+          "EnableHardwareMonitoring": false,
+          "DefaultHardwarePriority": 10,
+          "HardwareSamplingIntervalSeconds": 2.0,
+          "EnableGpuMonitoring": false,
+          "EnableTimerWidget": true,
+          "DefaultTimerPriority": 50,
+          "DefaultTimerAlertPriority": 95,
+          "TimerAlertTransientDurationSeconds": 5.0,
+          "PomodoroWorkDurationMinutes": 25,
+          "PomodoroBreakDurationMinutes": 5,
+          "EnableGlobalHotkeys": true,
+          "ToggleIslandHotkey": "Win+Ctrl+I",
+          "StartWithWindows": false
+        }
+        """;
+
+        File.WriteAllText(filePath, v1Json);
+
+        using var service = new SettingsService(filePath, debounceMilliseconds: 100);
+        service.Load();
+
+        Assert.Equal(AppSettings.CurrentSchemaVersion, service.CurrentSettings.SchemaVersion);
+        Assert.Equal(0.0, service.CurrentSettings.OffsetY); // Migrated from v1 (8.0 -> 0.0)
+        Assert.Equal(OpenDynamic.Core.Audio.Spectrum.AudioVisualizerMode.Real, service.CurrentSettings.VisualizerMode);
+        Assert.True(service.CurrentSettings.EnableAmbientClock);
+        Assert.True(service.CurrentSettings.EnableEnergySaverAlerts);
+        Assert.True(service.CurrentSettings.EnableScreenshotWidget);
+        Assert.False(service.CurrentSettings.EnableClipboardWidget);
+    }
+
+    [Fact]
+    public void Load_WhenSchemaVersionPropertyIsMissing_MigratesAndPersistsCurrentSchemaVersion()
+    {
+        string filePath = Path.Combine(_testDirectory, "settings_no_schema.json");
+        const string noSchemaJson = """
+        {
+          "CapsuleWidth": 180.0,
+          "CapsuleHeight": 36.0,
+          "OffsetY": 8.0
+        }
+        """;
+
+        File.WriteAllText(filePath, noSchemaJson);
+
+        using var service = new SettingsService(filePath, debounceMilliseconds: 100);
+        service.Load();
+
+        Assert.Equal(AppSettings.CurrentSchemaVersion, service.CurrentSettings.SchemaVersion);
+        Assert.Equal(180.0, service.CurrentSettings.CapsuleWidth);
+        Assert.Equal(0.0, service.CurrentSettings.OffsetY);
+
+        string persistedJson = File.ReadAllText(filePath);
+        Assert.Contains($"\"SchemaVersion\": {AppSettings.CurrentSchemaVersion}", persistedJson);
+    }
+
+    [Fact]
+    public void Load_WhenValuesAreOutOfRangeOrInvalidEnums_SanitizesAndClampsGracefully()
+    {
+        string filePath = Path.Combine(_testDirectory, "settings_out_of_range.json");
+        const string invalidJson = """
+        {
+          "SchemaVersion": 14,
+          "CapsuleWidth": -50.0,
+          "CapsuleHeight": 9999.0,
+          "CapsuleCornerRadius": -10.0,
+          "OffsetX": 99999.0,
+          "OffsetY": -100.0,
+          "TargetMonitorIndex": -99,
+          "ScaleFactor": -2.0,
+          "MotionMode": "SuperBrokenMode",
+          "VisualizerMode": "NonExistentVisualizer",
+          "ClockTimeFormat": "InvalidClockFormat",
+          "BatteryLowThresholdPercent": 10,
+          "BatteryCriticalThresholdPercent": 50,
+          "HardwareSamplingIntervalSeconds": 0.001,
+          "ClipboardHistoryCapacity": 0,
+          "ScreenshotHistoryCapacity": 999,
+          "ToggleIslandHotkey": "   ",
+          "IgnoredPrivacyApps": null,
+          "IgnoredDeviceNames": null
+        }
+        """;
+
+        File.WriteAllText(filePath, invalidJson);
+
+        using var service = new SettingsService(filePath, debounceMilliseconds: 100);
+        service.Load();
+
+        var s = service.CurrentSettings;
+        Assert.Equal(120.0, s.CapsuleWidth);
+        Assert.Equal(120.0, s.CapsuleHeight);
+        Assert.Equal(0.0, s.CapsuleCornerRadius);
+        Assert.Equal(2000.0, s.OffsetX);
+        Assert.Equal(0.0, s.OffsetY);
+        Assert.Equal(-1, s.TargetMonitorIndex);
+        Assert.Equal(0.5, s.ScaleFactor);
+        Assert.Equal(OpenDynamic.Core.Animation.MotionMode.Full, s.MotionMode);
+        Assert.Equal(OpenDynamic.Core.Audio.Spectrum.AudioVisualizerMode.Real, s.VisualizerMode);
+        Assert.Equal(OpenDynamic.Core.Clock.ClockTimeFormat.Auto, s.ClockTimeFormat);
+        Assert.True(s.BatteryLowThresholdPercent > s.BatteryCriticalThresholdPercent);
+        Assert.Equal(0.5, s.HardwareSamplingIntervalSeconds);
+        Assert.Equal(1, s.ClipboardHistoryCapacity);
+        Assert.Equal(20, s.ScreenshotHistoryCapacity);
+        Assert.Equal("Win+Ctrl+I", s.ToggleIslandHotkey);
+        Assert.NotNull(s.IgnoredPrivacyApps);
+        Assert.NotNull(s.IgnoredDeviceNames);
     }
 }

@@ -209,4 +209,39 @@ public sealed class TimerControllerTests
         Assert.Equal(TimeSpan.FromMinutes(10), controller.RemainingTime);
         Assert.Equal("10:00", controller.CurrentSnapshot.FormattedTime);
     }
+
+    [Fact]
+    public void AddTime_WhilePaused_UpdatesRemainingAndTotalDurationProperly()
+    {
+        var startTime = new DateTimeOffset(2026, 1, 1, 10, 0, 0, TimeSpan.Zero);
+        var clock = new FakeTimeProvider(startTime);
+        var controller = new TimerController(clock);
+
+        controller.Start(TimeSpan.FromMinutes(5));
+        clock.Advance(TimeSpan.FromMinutes(2)); // 3m remaining
+        controller.Pause();
+
+        controller.AddTime(TimeSpan.FromMinutes(1)); // 4m remaining, 6m total
+
+        Assert.Equal(TimeSpan.FromMinutes(4), controller.RemainingTime);
+        Assert.Equal(TimeSpan.FromMinutes(6), controller.TotalDuration);
+    }
+
+    [Fact]
+    public void RestorePaused_PreservesOriginalTotalDurationAndProgress()
+    {
+        var startTime = new DateTimeOffset(2026, 1, 1, 10, 0, 0, TimeSpan.Zero);
+        var clock = new FakeTimeProvider(startTime);
+        var controller = new TimerController(clock);
+
+        controller.RestorePaused(
+            totalDuration: TimeSpan.FromMinutes(10),
+            remainingTime: TimeSpan.FromMinutes(4),
+            mode: TimerMode.Standard);
+
+        Assert.Equal(TimerState.Paused, controller.State);
+        Assert.Equal(TimeSpan.FromMinutes(10), controller.TotalDuration);
+        Assert.Equal(TimeSpan.FromMinutes(4), controller.RemainingTime);
+        Assert.Equal(0.6, controller.CurrentSnapshot.ProgressRatio, precision: 3);
+    }
 }
