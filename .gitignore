@@ -482,3 +482,7 @@ $RECYCLE.BIN/
 *.swp
 
 installer/Output/
+openDynamic-portable-win-x64.zip
+SHA256SUMS.txt
+
+scripts/resultados-rendimiento-v2-*.json

@@ -80,18 +80,18 @@ public sealed class MediaColorService
                 }
                 catch (Exception ex)
                 {
-                    Log.Debug(ex, "Background color extraction failed for '{TrackKey}'.", trackKey);
+                    Log.Debug(ex, "Background color extraction failed.");
                     return RgbColor.DefaultAccent;
                 }
             }).ConfigureAwait(false);
 
             _colorCache[trackKey] = adjustedColor;
-            Log.Debug("Extracted cover accent color {Hex} for track '{TrackKey}'.", adjustedColor.ToHex(), trackKey);
+            Log.Debug("Extracted cover accent color {Hex}.", adjustedColor.ToHex());
             return adjustedColor;
         }
         catch (Exception ex)
         {
-            Log.Debug(ex, "Failed to extract cover accent color for track '{TrackKey}'. Using fallback.", trackKey);
+            Log.Debug(ex, "Failed to extract cover accent color. Using fallback.");
             return RgbColor.DefaultAccent;
         }
     }

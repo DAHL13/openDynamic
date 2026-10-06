@@ -991,4 +991,39 @@
   - Cero bloqueos de archivo tras la vista previa, cero rutas/nombres de archivo en logs y 0% CPU en reposo cuando la función está en espera o desactivada.
   - Compilación Release limpia con 0 errores y 0 advertencias (`TreatWarningsAsErrors`).
 
+---
+
+## ADR-031: Auditoría Integral de Fin a Fin, Cero Timers en Reposo y Preparación de Release v2.0.0
+
+- **Estado:** Aceptado
+- **Fecha:** 2026-10-05
+- **Contexto:**
+  Previo al lanzamiento mayor **v2.0.0** (que consolida 10 fases de ingeniería posteriores a `v1.0.0`: Fases 10–16 y 19–21), se ejecutó una auditoría integral de extremo a extremo (Pasada A de solo lectura y Pasada B de corrección y optimización) sobre los 203 archivos de código fuente de la solución (`OpenDynamic.Core`, `OpenDynamic.App` y `OpenDynamic.Tests`), midiendo el binario real en configuración `Release` y evaluando los 30 hallazgos identificados (`AUD-001` a `AUD-030`).
+
+- **Decisiones Técnicas Aprobadas:**
+  1. **Eliminación de Sondeo en Reposo y Reducción de Franja Sensora (`AUD-001`, `AUD-005` — Reglas de Oro 1 y 11):**
+     - Se eliminó por completo `_restingHoverWatcherTimer` (que ejecutaba `GetCursorPos` cada `100 ms` de forma perpetua en estado `Hidden`).
+     - Se redujo `RestingSensorNotch` de `200x36 DIP` a una franja mínima superior de **`120x4 DIP`** centrada en el borde superior (`OffsetY = 0`), la cual intercepta `WM_NCHITTEST` (`HTCLIENT`) única y exclusivamente cuando `EnableAmbientClock == true`, `!IsFullscreenSuppressed` y `!IsPowerSuspended`.
+     - Cuando la muesca está en estado `Hidden`, existen **0 timers activos** en el proceso y las pestañas superiores de navegadores o barras de título bajo la zona central son 100% clicables sin interferencia.
+  2. **Aplicación en Caliente de Interruptores `Enable*Widget` (`AUD-002`):**
+     - `AppSettings` se inyecta en `MediaWidget`, `VolumeWidget`, `BatteryWidget`, `TimerWidget` y `StopwatchWidget`, y `App.ApplySettingsToServices` detiene o inicia en tiempo real los servicios asociados (`MediaService`, `AudioSpectrumService`, `TimingUiCoordinator`) al conmutar cada ajuste en la ventana de Ajustes.
+     - Al desactivar un widget en caliente, este limpia sus temporizadores internos y llama a `Deactivate()` de inmediato.
+  3. **Desacoplamiento Asíncrono y Liberación de Contadores GPU PDH (`AUD-008` — Regla de Oro 4):**
+     - `HardwareService` ejecuta la enumeración de instancias `GPU Engine` y la lectura `NextValue()` de `PerformanceCounter` en tareas de fondo (`Task.Run`) protegidas con una guarda atómica no solapada (`Interlocked.CompareExchange`), evitando bloqueos de `15–400 ms` en el hilo de UI de WPF.
+     - Al desactivar `EnableGpuMonitoring` o `EnableHardwareMonitoring`, todos los `PerformanceCounter` se liberan de inmediato mediante `Dispose()`.
+  4. **Sustitución de `NAudio` por `NAudio.Wasapi` y Métrica Oficial de Memoria (`AUD-013`, `AUD-014`):**
+     - Se reemplazó el metapaquete `NAudio` (`3.1.0`) por `NAudio.Wasapi` (`2.3.0`), eliminando ensamblados innecesarios (`NAudio.WinForms.dll`, `NAudio.Midi.dll`, `NAudio.Asio.dll`) del directorio de publicación.
+     - Se establece `PrivateMemorySize64` (`< 80 MB`, medido en `~41–44 MB`) como la métrica oficial de memoria privada comprometida del proceso en .NET 10 + WPF D3D11, documentando que `WorkingSet64` (`~150–160 MB`) incluye páginas mapeadas compartidas de DirectX/GPU/OS entre todos los procesos de escritorio.
+  5. **Privacidad en Registros de Producción y Saneamiento de Configuración (`AUD-004`, `AUD-009`, `AUD-010`):**
+     - En compilaciones `Release`, `LoggingConfiguration` fija el nivel mínimo de Serilog en `Information` (`Debug` solo en `#if DEBUG`), y se redactaron todas las trazas que contenían SSIDs de redes Wi-Fi, títulos/artistas multimedia, nombres de dispositivos USB/Bluetooth, etiquetas de temporizadores o rutas locales con nombre de usuario.
+     - `AppSettings.SanitizeAndClamp()` y `LenientEnumConverter<TEnum>` garantizan que valores fuera de rango o enumeraciones inválidas en `settings.json` se recorten a límites seguros sin colapsar el arranque, soportando migración limpia desde `v1.0.0` (con o sin propiedad `"SchemaVersion"` explícita) hasta `CurrentSchemaVersion = 14`.
+  6. **Gobernanza Open-Source y Empaquetado v2.0.0 (`AUD-011`, `AUD-012`):**
+     - Se centralizó la versión `2.0.0` en `Directory.Build.props`, sincronizada con `app.manifest` (`2.0.0.0`) e `installer/setup.iss` (`2.0.0` con `LicenseFile=..\LICENSE`).
+     - Se incorporaron `THIRD-PARTY-NOTICES.md`, `SECURITY.md`, `CONTRIBUTING.md`, plantillas de Issues/PRs, exclusión de `.pdb` en los artefactos de distribución, generación de `SHA256SUMS.txt` y lanzamiento en modo borrador (`draft: true`) en `.github/workflows/release.yml`.
+
+- **Consecuencias y Verificación:**
+  - 619 pruebas unitarias automáticas en verde al 100% en 3 corridas consecutivas en `Release` (0 advertencias con `TreatWarningsAsErrors=true` y `dotnet format --verify-no-changes` limpio).
+  - Consumo de CPU en reposo certificado en **0.00%** con cero timers activos en estado `Hidden`.
+
+
 

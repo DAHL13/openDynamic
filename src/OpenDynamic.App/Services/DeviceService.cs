@@ -31,6 +31,7 @@ public sealed class DeviceService : IDisposable
     private DeviceWatcher? _audioWatcher;
     private bool _isListening;
     private bool _isDisposed;
+    private bool _isBluetoothEnumerationCompleted;
     private bool _isAudioEnumerationCompleted;
 
     // Cache of known Bluetooth device details by ID to track transitions and report readable names on removal
@@ -79,6 +80,9 @@ public sealed class DeviceService : IDisposable
 
             if (_isListening) return;
 
+            _isBluetoothEnumerationCompleted = false;
+            _isAudioEnumerationCompleted = false;
+
             // Sync configured ignored devices
             _policy.SetIgnoredDevices(_settings.IgnoredDeviceNames);
 
@@ -105,6 +109,7 @@ public sealed class DeviceService : IDisposable
             StopBluetoothWatcher();
             StopAudioRenderWatcher();
 
+            _isBluetoothEnumerationCompleted = false;
             _isAudioEnumerationCompleted = false;
             _policy.NotifySuspended();
             _isListening = false;
@@ -248,6 +253,8 @@ public sealed class DeviceService : IDisposable
                 _audioNotificationHandle = IntPtr.Zero;
             }
         }
+
+        _policy.ResetEnumeration();
     }
 
     /// <summary>
@@ -391,21 +398,41 @@ public sealed class DeviceService : IDisposable
 
     #region WinRT Bluetooth DeviceWatcher
 
+    private void TryCompleteInitialEnumeration()
+    {
+        if (_isBluetoothEnumerationCompleted && _isAudioEnumerationCompleted && !_policy.IsEnumerationCompleted)
+        {
+            _policy.NotifyEnumerationCompleted();
+            Log.Information("DeviceService: Initial Bluetooth + AudioRender enumeration baseline completed.");
+        }
+    }
+
     private void StartBluetoothWatcher()
     {
         try
         {
-            // AQS filter for Bluetooth Association Endpoints (Protocol ID: {e0cbf06c-cdb8-4d60-bb43-dd344be4706f})
-            string aqs = "System.Devices.Aep.ProtocolId:=\"{e0cbf06c-cdb8-4d60-bb43-dd344be4706f}\"";
-            _bluetoothWatcher = DeviceInformation.CreateWatcher(
-                aqs,
-                new[]
-                {
-                    "System.Devices.Aep.IsConnected",
-                    "System.Devices.Aep.Bluetooth.Cod.MajorDeviceClass",
-                    "System.Devices.BatteryLevel"
-                },
-                DeviceInformationKind.AssociationEndpoint);
+            // AQS filter for paired Bluetooth Association Endpoints (Protocol ID: {e0cbf06c-cdb8-4d60-bb43-dd344be4706f})
+            // AUD-003: Restrict to IsPaired=True so Windows monitors paired device connection state without triggering active radio inquiry scanning,
+            // and only pass canonical AEP property keys supported by AssociationEndpoint watchers on Windows 10/11.
+            string aqs = "System.Devices.Aep.ProtocolId:=\"{e0cbf06c-cdb8-4d60-bb43-dd344be4706f}\" AND System.Devices.Aep.IsPaired:=System.StructuredQueryType.Boolean#True";
+            try
+            {
+                _bluetoothWatcher = DeviceInformation.CreateWatcher(
+                    aqs,
+                    new[]
+                    {
+                        "System.Devices.Aep.IsConnected",
+                        "System.Devices.Aep.Category"
+                    },
+                    DeviceInformationKind.AssociationEndpoint);
+            }
+            catch (ArgumentException)
+            {
+                _bluetoothWatcher = DeviceInformation.CreateWatcher(
+                    aqs,
+                    new[] { "System.Devices.Aep.IsConnected" },
+                    DeviceInformationKind.AssociationEndpoint);
+            }
 
             _bluetoothWatcher.Added += OnBluetoothDeviceAdded;
             _bluetoothWatcher.Updated += OnBluetoothDeviceUpdated;
@@ -416,12 +443,14 @@ public sealed class DeviceService : IDisposable
             _bluetoothWatcher.Start();
             Log.Information("WinRT Bluetooth DeviceWatcher started for Bluetooth AEP (ProtocolId: {{e0cbf06c-cdb8-4d60-bb43-dd344be4706f}}). Status: {Status}", _bluetoothWatcher.Status);
 
-            // Safety fallback timer to complete enumeration baseline even if Bluetooth enumeration delays or is unavailable
+            // Safety fallback timer to complete enumeration baseline even if Bluetooth/Audio enumeration delays or is unavailable
             _ = Task.Delay(5000).ContinueWith(_ =>
             {
                 if (!_policy.IsEnumerationCompleted)
                 {
                     Log.Information("DeviceService fallback timer elapsed: completing initial enumeration baseline.");
+                    _isBluetoothEnumerationCompleted = true;
+                    _isAudioEnumerationCompleted = true;
                     _policy.NotifyEnumerationCompleted();
                 }
             }, TaskScheduler.Default);
@@ -429,7 +458,8 @@ public sealed class DeviceService : IDisposable
         catch (Exception ex)
         {
             Log.Error(ex, "Failed to start WinRT Bluetooth DeviceWatcher.");
-            _policy.NotifyEnumerationCompleted();
+            _isBluetoothEnumerationCompleted = true;
+            TryCompleteInitialEnumeration();
         }
     }
 
@@ -463,8 +493,9 @@ public sealed class DeviceService : IDisposable
 
     private void OnBluetoothEnumerationCompleted(DeviceWatcher sender, object args)
     {
-        _policy.NotifyEnumerationCompleted();
-        Log.Information("Bluetooth device enumeration completed (Status: {Status}). Initial connected devices cached; live alerts active. Total cached: {Count}",
+        _isBluetoothEnumerationCompleted = true;
+        TryCompleteInitialEnumeration();
+        Log.Information("Bluetooth device enumeration completed (Status: {Status}). Total cached: {Count}",
             sender.Status, _bluetoothDeviceCache.Count);
     }
 
@@ -616,7 +647,8 @@ public sealed class DeviceService : IDisposable
         Log.Information("Bluetooth DeviceWatcher transitioned to Stopped state (Status: {Status}).", sender.Status);
         if (sender.Status is DeviceWatcherStatus.Stopped or DeviceWatcherStatus.Aborted)
         {
-            _policy.NotifyEnumerationCompleted();
+            _isBluetoothEnumerationCompleted = true;
+            TryCompleteInitialEnumeration();
         }
     }
 
@@ -682,6 +714,7 @@ public sealed class DeviceService : IDisposable
         {
             Log.Error(ex, "Failed to start WinRT AudioRender DeviceWatcher.");
             _isAudioEnumerationCompleted = true;
+            TryCompleteInitialEnumeration();
         }
     }
 
@@ -716,6 +749,7 @@ public sealed class DeviceService : IDisposable
     private void OnAudioEnumerationCompleted(DeviceWatcher sender, object args)
     {
         _isAudioEnumerationCompleted = true;
+        TryCompleteInitialEnumeration();
         Log.Information("AudioRender device enumeration completed (Status: {Status}). Total cached: {Count}",
             sender.Status, _audioDeviceCache.Count);
     }
@@ -723,6 +757,11 @@ public sealed class DeviceService : IDisposable
     private void OnAudioWatcherStopped(DeviceWatcher sender, object args)
     {
         Log.Information("AudioRender DeviceWatcher transitioned to Stopped state (Status: {Status}).", sender.Status);
+        if (sender.Status is DeviceWatcherStatus.Stopped or DeviceWatcherStatus.Aborted)
+        {
+            _isAudioEnumerationCompleted = true;
+            TryCompleteInitialEnumeration();
+        }
     }
 
     private void OnAudioDeviceAdded(DeviceWatcher sender, DeviceInformation deviceInfo)

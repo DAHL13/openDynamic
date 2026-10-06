@@ -109,11 +109,13 @@ public sealed class TimerPersistenceService : ITimerPersistenceService
                 }
 
                 string json = JsonSerializer.Serialize(list, _jsonOptions);
-                File.WriteAllText(_filePath, json);
+                string tempFile = _filePath + ".tmp";
+                File.WriteAllText(tempFile, json);
+                File.Move(tempFile, _filePath, overwrite: true);
             }
             catch (Exception ex)
             {
-                _logger?.Invoke($"Could not save timers to '{_filePath}'.", ex);
+                _logger?.Invoke("Could not save persisted timers to disk.", ex);
             }
         }
     }
@@ -170,7 +172,7 @@ public sealed class TimerPersistenceService : ITimerPersistenceService
             }
             catch (Exception ex)
             {
-                _logger?.Invoke($"Could not restore timers from '{_filePath}'.", ex);
+                _logger?.Invoke("Could not restore persisted timers from disk.", ex);
             }
 
             return new TimerRestoreResult(restored, expired);
@@ -190,7 +192,7 @@ public sealed class TimerPersistenceService : ITimerPersistenceService
             }
             catch (Exception ex)
             {
-                _logger?.Invoke($"Could not delete timers file '{_filePath}'.", ex);
+                _logger?.Invoke("Could not delete persisted timers file.", ex);
             }
         }
     }

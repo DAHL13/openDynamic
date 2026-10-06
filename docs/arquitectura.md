@@ -1,6 +1,6 @@
-# Arquitectura Técnica de openDynamic
+# Arquitectura Técnica de openDynamic (v2.0.0)
 
-> **openDynamic** es una implementación de Dynamic Island / Notch superior para Windows 10/11 construida sobre .NET 10 y WPF, diseñada con enfoque de alto rendimiento, animaciones fluidas basadas en física de resortes y consumo mínimo de recursos (< 30 MB RAM, 0.0% CPU en reposo).
+> **openDynamic** es una implementación de Dynamic Island / Upper Notch superior para Windows 10/11 construida sobre .NET 10 y WPF, diseñada con enfoque de alto rendimiento, animaciones fluidas basadas en física de resortes y consumo mínimo de recursos (`PrivateMemorySize64` ~42 MB < 80 MB, 0.00% CPU y 0 timers activos en reposo).
 
 ---
 
@@ -11,7 +11,7 @@ La arquitectura de openDynamic sigue un principio estricto de separación entre 
 ```mermaid
 graph TD
     subgraph OpenDynamic_App["OpenDynamic.App (net10.0-windows10.0.19041.0)"]
-        subgraph UI["Capa de Presentación (WPF)"]
+        subgraph UI["Capa de Presentación (WPF Upper Notch UI)"]
             IW[IslandWindow - Overlay Topmost PerMonitorV2]
             IV[IslandView - Host de Vistas y Clips Geométricos]
             SW[SettingsWindow & SettingsViewModel]
@@ -22,38 +22,53 @@ graph TD
             Orch[IslandOrchestrator]
         end
 
-        subgraph WidgetsApp["Widgets de Sistema"]
-            MW[MusicWidget]
+        subgraph WidgetsApp["12 Widgets Reactivos del Sistema"]
+            MW[MediaWidget]
             VW[VolumeWidget]
             BW[BatteryWidget]
-            HW[HardwareWidget]
+            ESW[EnergySaverWidget]
+            PW[PrivacyWidget]
+            SSW[ScreenshotWidget]
+            NW[NetworkWidget]
+            DW[DeviceWidget]
+            CW[ClipboardWidget]
             TW[TimerWidget]
+            STW[StopwatchWidget]
+            HW[HardwareWidget]
+            ACW[AmbientClockWidget]
         end
 
-        subgraph Services["Servicios de Plataforma (Win32 / WinRT)"]
-            MS[MediaService - GSMTC WinRT]
-            VS[VolumeService - NAudio CoreAudio]
-            PS[PowerService - WM_POWERBROADCAST]
-            HKS[HotkeyService - RegisterHotKey Win32]
-            FSW[FullscreenWatcher - SHQueryUserNotificationState]
+        subgraph Services["Servicios de Plataforma (Win32 / WinRT / WASAPI / WNF)"]
+            MS[MediaService & AudioSpectrumService]
+            VS[VolumeService - NAudio.Wasapi]
+            PS[PowerService & EnergySaverService - WNF/Win32]
+            PAM[PrivacyAccessMonitor - RegNotifyChangeKeyValue]
+            SWS[ScreenshotWatcherService - FileSystemWatcher]
+            NS[NetworkService & DeviceService]
+            CS[ClipboardService - WM_CLIPBOARDUPDATE]
+            HS[HardwareService - Async PDH / Win32]
+            HKS[HotkeyService & FullscreenWatcher]
             AS[AutostartService - Registry HKCU]
         end
 
         subgraph Infra["Infraestructura"]
             DI[Dependency Injection]
-            SI[SingleInstance Mutex]
+            SI[SingleInstance Mutex + EventWaitHandle]
             Tray[TrayIconManager - H.NotifyIcon.Wpf]
-            Log[Serilog Rolling File]
+            Log[Serilog Rolling File - PII Redacted]
         end
     end
 
-    subgraph OpenDynamic_Core["OpenDynamic.Core (net10.0 - Agnóstico de SO)"]
+    subgraph OpenDynamic_Core["OpenDynamic.Core (net10.0 - 100% Puro / Agnóstico de SO)"]
         FSM[IslandStateMachine & IslandState]
         Layout[IslandLayout & CapsuleDimensions]
-        Physics[Spring Physics Engine & Sub-stepping RK4]
-        Resolver[PriorityResolver & IActivitySource]
+        Physics[Spring Physics Engine & MotionProfile]
+        Resolver[PriorityResolver & ActivityActivationMode]
+        FFT[FftProcessor Cooley-Tukey Radix-2 & Spectrum]
+        Policies[Alert Policies & ResourceProfilePolicy]
+        Timing[TimerCollection, TimerController & StopwatchController]
         PosCalc[IslandPositionCalculator]
-        SettingsCore[AppSettings & SettingsService]
+        SettingsCore[AppSettings & SettingsService - Schema v14]
     end
 
     %% Relaciones

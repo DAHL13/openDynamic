@@ -183,8 +183,9 @@ public sealed class PrivacyWidget : IslandWidgetBase
                 ? _settings.DefaultPrivacyPriority
                 : ActivityPriority.Privacy;
 
-            Log.Information("PrivacyWidget transient alert triggered: '{Title}' ({Subtitle}, Duration: {Duration}s, Priority: {Priority})",
-                Title, Subtitle, duration.TotalSeconds, priority);
+            // Privacy: do not log AppName
+            Log.Information("PrivacyWidget transient alert triggered: Resource={Resource}, EventKind={EventKind}, Duration={Duration}s, Priority={Priority}",
+                alert.Resource, alert.EventKind, duration.TotalSeconds, priority);
 
             Activate(transientDuration: duration, priorityOverride: priority);
             ResetTransientTimer(duration);

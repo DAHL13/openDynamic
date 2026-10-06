@@ -106,7 +106,7 @@ public class AutostartServiceCore : IAutostartService
             if (!string.Equals(registeredPath, currentPath, StringComparison.OrdinalIgnoreCase))
             {
                 _logger?.Invoke(
-                    $"Autostart path mismatch detected. Registered: '{registeredPath}', Current: '{currentPath}'. Updating registry.",
+                    "Autostart path mismatch detected. Updating registry with current executable path.",
                     null);
 
                 return SetEnabled(true);

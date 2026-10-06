@@ -1,3 +1,5 @@
+using System.Collections.ObjectModel;
+
 namespace OpenDynamic.Core.Stopwatch;
 
 /// <summary>
@@ -8,16 +10,20 @@ namespace OpenDynamic.Core.Stopwatch;
 /// </summary>
 public sealed class StopwatchController : IStopwatchController
 {
+    public const int MaxLaps = 999;
+
     private readonly TimeProvider _timeProvider;
     private readonly List<StopwatchLap> _laps = new();
+    private ReadOnlyCollection<StopwatchLap> _cachedReadOnlyLaps;
 
     private StopwatchState _state = StopwatchState.Stopped;
     private DateTimeOffset? _sessionStartUtc;
     private TimeSpan _accumulated = TimeSpan.Zero;
     private TimeSpan _lastLapSplit = TimeSpan.Zero;
+    private int _totalLapsRecorded;
 
     public StopwatchState State => _state;
-    public IReadOnlyList<StopwatchLap> Laps => _laps;
+    public IReadOnlyList<StopwatchLap> Laps => _cachedReadOnlyLaps;
 
     public TimeSpan ElapsedTime
     {
@@ -51,6 +57,7 @@ public sealed class StopwatchController : IStopwatchController
     public StopwatchController(TimeProvider? timeProvider = null)
     {
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _cachedReadOnlyLaps = _laps.AsReadOnly();
     }
 
     /// <summary>
@@ -70,6 +77,8 @@ public sealed class StopwatchController : IStopwatchController
         _accumulated = TimeSpan.Zero;
         _lastLapSplit = TimeSpan.Zero;
         _laps.Clear();
+        _totalLapsRecorded = 0;
+        _cachedReadOnlyLaps = _laps.AsReadOnly();
         _sessionStartUtc = _timeProvider.GetUtcNow();
         _state = StopwatchState.Running;
 
@@ -121,6 +130,8 @@ public sealed class StopwatchController : IStopwatchController
         _sessionStartUtc = null;
         _lastLapSplit = TimeSpan.Zero;
         _laps.Clear();
+        _totalLapsRecorded = 0;
+        _cachedReadOnlyLaps = _laps.AsReadOnly();
         _state = StopwatchState.Stopped;
 
         var snapshot = CreateSnapshot();
@@ -147,7 +158,7 @@ public sealed class StopwatchController : IStopwatchController
         }
 
         _lastLapSplit = total;
-        int lapNumber = _laps.Count + 1;
+        int lapNumber = ++_totalLapsRecorded;
 
         var lap = new StopwatchLap(
             lapNumber,
@@ -156,7 +167,13 @@ public sealed class StopwatchController : IStopwatchController
             FormatPrecise(lapDuration),
             FormatPrecise(total));
 
+        if (_laps.Count >= MaxLaps)
+        {
+            _laps.RemoveAt(0);
+        }
+
         _laps.Add(lap);
+        _cachedReadOnlyLaps = _laps.ToList().AsReadOnly();
         LapRecorded?.Invoke(this, lap);
 
         var snapshot = CreateSnapshot();
@@ -178,12 +195,16 @@ public sealed class StopwatchController : IStopwatchController
     private StopwatchSnapshot CreateSnapshot()
     {
         var elapsed = ElapsedTime;
-        var currentLap = CurrentLapTime;
+        var currentLap = elapsed - _lastLapSplit;
+        if (currentLap < TimeSpan.Zero)
+        {
+            currentLap = TimeSpan.Zero;
+        }
 
         return new StopwatchSnapshot(
             elapsed,
             currentLap,
-            _laps.ToList().AsReadOnly(),
+            _cachedReadOnlyLaps,
             _state,
             FormatElapsed(elapsed),
             FormatPrecise(elapsed),

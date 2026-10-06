@@ -230,6 +230,11 @@ public sealed class TimerWidget : IslandWidgetBase
 
     public void Start(TimeSpan? duration = null, TimerMode? mode = null)
     {
+        if (!_settings.EnableTimerWidget)
+        {
+            return;
+        }
+
         _isCompletedAlert = false;
         PrimaryController.Start(duration, mode);
 
@@ -257,6 +262,11 @@ public sealed class TimerWidget : IslandWidgetBase
 
     public void Resume()
     {
+        if (!_settings.EnableTimerWidget)
+        {
+            return;
+        }
+
         PrimaryController.Resume();
         _timingCoordinator.EvaluateTimerState();
         _persistenceService?.Save(_timerCollection.Timers);
@@ -324,6 +334,11 @@ public sealed class TimerWidget : IslandWidgetBase
 
     public void ApplyQuickPreset(int minutes)
     {
+        if (!_settings.EnableTimerWidget)
+        {
+            return;
+        }
+
         var duration = TimeSpan.FromMinutes(minutes);
 
         if (_timerCollection.Timers.Count < _timerCollection.MaxTimers)
@@ -351,6 +366,36 @@ public sealed class TimerWidget : IslandWidgetBase
         Log.Information("[TimerWidget] Applied preset {Minutes}m.", minutes);
     }
 
+    /// <summary>
+    /// Applies live changes to EnableTimerWidget.
+    /// When disabled, stops all running timers and deactivates the widget.
+    /// </summary>
+    public void ApplyEnabledState(bool enabled)
+    {
+        if (!enabled)
+        {
+            _isCompletedAlert = false;
+            _alertTimer.Stop();
+
+            foreach (var timer in _timerCollection.Timers)
+            {
+                if (timer.State is TimerState.Running or TimerState.Paused)
+                {
+                    timer.Reset();
+                }
+            }
+
+            IsActive = false;
+            IsTransient = false;
+            TransientDuration = null;
+
+            _timingCoordinator.EvaluateTimerState();
+            _persistenceService?.Save(_timerCollection.Timers);
+            RebuildDisplayTimers();
+            UpdatePresentation();
+        }
+    }
+
     public void DeleteTimer(string id)
     {
         _timerCollection.RemoveTimer(id);
@@ -372,6 +417,11 @@ public sealed class TimerWidget : IslandWidgetBase
 
     private void OnCollectionAlertTriggered(object? sender, TimerAlert alert)
     {
+        if (!_settings.EnableTimerWidget)
+        {
+            return;
+        }
+
         _isCompletedAlert = true;
         _currentAlertTitle = "¡Tiempo cumplido!";
         _currentAlertSubtitle = alert.Label;
@@ -380,8 +430,9 @@ public sealed class TimerWidget : IslandWidgetBase
             ? _settings.TimerAlertTransientDurationSeconds
             : 5.0);
 
-        Log.Information("TimerWidget transient alert triggered for '{Label}' (Priority {Priority}, Duration {Duration}s).",
-            alert.Label, _settings.DefaultTimerAlertPriority, alertDuration.TotalSeconds);
+        // Privacy: do not log user-defined timer Label
+        Log.Information("TimerWidget transient alert triggered (Priority {Priority}, Duration {Duration}s).",
+            _settings.DefaultTimerAlertPriority, alertDuration.TotalSeconds);
 
         Activate(transientDuration: alertDuration, priorityOverride: _settings.DefaultTimerAlertPriority);
 
@@ -457,6 +508,10 @@ public sealed class TimerWidget : IslandWidgetBase
         {
             DisplayTimers.Add(new TimerDisplayItem(timer, () =>
             {
+                if (!_settings.EnableTimerWidget)
+                {
+                    timer.Reset();
+                }
                 _timingCoordinator.EvaluateTimerState();
                 _persistenceService?.Save(_timerCollection.Timers);
                 UpdatePresentation();
@@ -466,7 +521,7 @@ public sealed class TimerWidget : IslandWidgetBase
 
     private void RestorePersistedTimers()
     {
-        if (_persistenceService == null) return;
+        if (_persistenceService == null || !_settings.EnableTimerWidget) return;
 
         try
         {
@@ -475,39 +530,43 @@ public sealed class TimerWidget : IslandWidgetBase
             // Restore active/paused timers
             foreach (var rec in result.RestoredTimers)
             {
+                var totalDuration = TimeSpan.FromSeconds(rec.TotalDurationSeconds);
                 if (rec.Id == "primary")
                 {
                     // Primary already exists
                     var primary = _timerCollection.PrimaryTimer;
                     primary.Label = rec.Label;
-                    primary.SetMode(rec.Mode, TimeSpan.FromSeconds(rec.TotalDurationSeconds));
                     if (rec.State == TimerState.Running && rec.TargetEndTimeUtc.HasValue)
                     {
-                        var remaining = rec.TargetEndTimeUtc.Value - DateTimeOffset.UtcNow;
-                        if (remaining > TimeSpan.Zero)
-                        {
-                            primary.Start(remaining, rec.Mode);
-                        }
+                        primary.RestoreRunning(totalDuration, rec.TargetEndTimeUtc.Value, rec.Mode);
+                    }
+                    else if (rec.State == TimerState.Paused)
+                    {
+                        primary.RestorePaused(totalDuration, TimeSpan.FromSeconds(rec.RemainingSeconds), rec.Mode);
+                    }
+                    else
+                    {
+                        primary.SetMode(rec.Mode, totalDuration);
                     }
                 }
                 else if (_timerCollection.Timers.Count < _timerCollection.MaxTimers)
                 {
-                    var timer = _timerCollection.AddTimer(rec.Label, TimeSpan.FromSeconds(rec.TotalDurationSeconds), rec.Mode);
+                    var timer = _timerCollection.AddTimer(rec.Label, totalDuration, rec.Mode);
                     if (rec.State == TimerState.Running && rec.TargetEndTimeUtc.HasValue)
                     {
-                        var remaining = rec.TargetEndTimeUtc.Value - DateTimeOffset.UtcNow;
-                        if (remaining > TimeSpan.Zero)
-                        {
-                            timer.Start(remaining, rec.Mode);
-                        }
+                        timer.RestoreRunning(totalDuration, rec.TargetEndTimeUtc.Value, rec.Mode);
+                    }
+                    else if (rec.State == TimerState.Paused)
+                    {
+                        timer.RestorePaused(totalDuration, TimeSpan.FromSeconds(rec.RemainingSeconds), rec.Mode);
                     }
                 }
             }
 
-            // If any expired while closed, notify user once
-            foreach (var exp in result.ExpiredWhileClosed)
+            // If any expired while closed, notify once without logging user-defined labels
+            if (result.ExpiredWhileClosed.Count > 0)
             {
-                Log.Information("[TimerWidget] Timer '{Label}' expired while application was closed.", exp.Label);
+                Log.Information("[TimerWidget] {ExpiredCount} timer(s) expired while application was closed.", result.ExpiredWhileClosed.Count);
             }
 
             if (_timerCollection.AnyRunning)

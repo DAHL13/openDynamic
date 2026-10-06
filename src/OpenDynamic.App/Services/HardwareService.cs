@@ -15,6 +15,7 @@ namespace OpenDynamic.App.Services;
 /// </summary>
 public sealed class HardwareService : IHardwareMonitor, IDisposable
 {
+    private readonly object _sampleLock = new();
     private readonly AppSettings _settings;
     private NativeMethods.FILETIME _prevIdleTime;
     private NativeMethods.FILETIME _prevKernelTime;
@@ -26,7 +27,16 @@ public sealed class HardwareService : IHardwareMonitor, IDisposable
     private PerformanceCounter[]? _gpuCounters;
     private bool _gpuInitializationAttempted;
 
-    public HardwareSnapshot CurrentSnapshot => _currentSnapshot;
+    public HardwareSnapshot CurrentSnapshot
+    {
+        get
+        {
+            lock (_sampleLock)
+            {
+                return _currentSnapshot;
+            }
+        }
+    }
 
     public HardwareService(AppSettings settings)
     {
@@ -40,85 +50,126 @@ public sealed class HardwareService : IHardwareMonitor, IDisposable
     /// </summary>
     public void ResetCpuBaseline()
     {
-        _hasPreviousTimes = false;
+        lock (_sampleLock)
+        {
+            _hasPreviousTimes = false;
+        }
     }
 
     /// <summary>
-    /// Samples current hardware metrics. Safe to call on any thread.
+    /// Releases any initialized GPU performance counters immediately when GPU monitoring or the hardware widget is disabled.
+    /// </summary>
+    public void ReleaseGpuCounters()
+    {
+        lock (_sampleLock)
+        {
+            ReleaseGpuCounters_NoLock();
+        }
+    }
+
+    private void ReleaseGpuCounters_NoLock()
+    {
+        if (_gpuCounters != null)
+        {
+            foreach (var counter in _gpuCounters)
+            {
+                try
+                {
+                    counter.Dispose();
+                }
+                catch
+                {
+                    // Ignore disposal error
+                }
+            }
+            _gpuCounters = null;
+        }
+        _gpuInitializationAttempted = false;
+    }
+
+    /// <summary>
+    /// Samples current hardware metrics. Safe to call on a background thread.
     /// </summary>
     public HardwareSnapshot Sample()
     {
-        double cpuPercent = _currentSnapshot.CpuUsagePercent;
-        double ramPercent = _currentSnapshot.RamUsagePercent;
-        double usedGb = _currentSnapshot.UsedRamGb;
-        double totalGb = _currentSnapshot.TotalRamGb;
-        double? gpuPercent = null;
-
-        // 1. Sample CPU usage via direct Win32 GetSystemTimes (Zero external dependencies)
-        try
+        lock (_sampleLock)
         {
-            if (NativeMethods.GetSystemTimes(out var idleTime, out var kernelTime, out var userTime))
+            double cpuPercent = _currentSnapshot.CpuUsagePercent;
+            double ramPercent = _currentSnapshot.RamUsagePercent;
+            double usedGb = _currentSnapshot.UsedRamGb;
+            double totalGb = _currentSnapshot.TotalRamGb;
+            double? gpuPercent = null;
+
+            // 1. Sample CPU usage via direct Win32 GetSystemTimes (Zero external dependencies)
+            try
             {
-                if (_hasPreviousTimes)
+                if (NativeMethods.GetSystemTimes(out var idleTime, out var kernelTime, out var userTime))
                 {
-                    ulong idleDelta = idleTime.Value - _prevIdleTime.Value;
-                    ulong kernelDelta = kernelTime.Value - _prevKernelTime.Value;
-                    ulong userDelta = userTime.Value - _prevUserTime.Value;
-                    cpuPercent = HardwareCalculator.CalculateCpuUsage(idleDelta, kernelDelta, userDelta);
+                    if (_hasPreviousTimes)
+                    {
+                        ulong idleDelta = idleTime.Value - _prevIdleTime.Value;
+                        ulong kernelDelta = kernelTime.Value - _prevKernelTime.Value;
+                        ulong userDelta = userTime.Value - _prevUserTime.Value;
+                        cpuPercent = HardwareCalculator.CalculateCpuUsage(idleDelta, kernelDelta, userDelta);
+                    }
+
+                    _prevIdleTime = idleTime;
+                    _prevKernelTime = kernelTime;
+                    _prevUserTime = userTime;
+                    _hasPreviousTimes = true;
                 }
-
-                _prevIdleTime = idleTime;
-                _prevKernelTime = kernelTime;
-                _prevUserTime = userTime;
-                _hasPreviousTimes = true;
             }
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Error reading CPU times via Win32 GetSystemTimes.");
-        }
-
-        // 2. Sample RAM usage via Win32 GlobalMemoryStatusEx
-        try
-        {
-            var memStatus = new NativeMethods.MEMORYSTATUSEX
+            catch (Exception ex)
             {
-                dwLength = (uint)Marshal.SizeOf<NativeMethods.MEMORYSTATUSEX>()
-            };
-
-            if (NativeMethods.GlobalMemoryStatusEx(ref memStatus))
-            {
-                ramPercent = memStatus.dwMemoryLoad;
-                totalGb = HardwareCalculator.ToGigabytes(memStatus.ullTotalPhys);
-                ulong usedBytes = memStatus.ullTotalPhys > memStatus.ullAvailPhys
-                    ? memStatus.ullTotalPhys - memStatus.ullAvailPhys
-                    : 0;
-                usedGb = HardwareCalculator.ToGigabytes(usedBytes);
+                Log.Error(ex, "Error reading CPU times via Win32 GetSystemTimes.");
             }
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Error reading RAM status via Win32 GlobalMemoryStatusEx.");
-        }
 
-        // 3. Optional GPU monitoring (strictly disabled by default)
-        if (_settings.EnableGpuMonitoring)
-        {
-            gpuPercent = SampleGpuUsageSafe();
-        }
+            // 2. Sample RAM usage via Win32 GlobalMemoryStatusEx
+            try
+            {
+                var memStatus = new NativeMethods.MEMORYSTATUSEX
+                {
+                    dwLength = (uint)Marshal.SizeOf<NativeMethods.MEMORYSTATUSEX>()
+                };
 
-        _currentSnapshot = new HardwareSnapshot(cpuPercent, ramPercent, usedGb, totalGb, gpuPercent);
-        return _currentSnapshot;
+                if (NativeMethods.GlobalMemoryStatusEx(ref memStatus))
+                {
+                    ramPercent = memStatus.dwMemoryLoad;
+                    totalGb = HardwareCalculator.ToGigabytes(memStatus.ullTotalPhys);
+                    ulong usedBytes = memStatus.ullTotalPhys > memStatus.ullAvailPhys
+                        ? memStatus.ullTotalPhys - memStatus.ullAvailPhys
+                        : 0;
+                    usedGb = HardwareCalculator.ToGigabytes(usedBytes);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Error reading RAM status via Win32 GlobalMemoryStatusEx.");
+            }
+
+            // 3. Optional GPU monitoring (strictly disabled by default)
+            if (_settings.EnableGpuMonitoring)
+            {
+                gpuPercent = SampleGpuUsageSafe_NoLock();
+            }
+            else if (_gpuCounters != null)
+            {
+                ReleaseGpuCounters_NoLock();
+            }
+
+            _currentSnapshot = new HardwareSnapshot(cpuPercent, ramPercent, usedGb, totalGb, gpuPercent);
+            return _currentSnapshot;
+        }
     }
 
-    private double? SampleGpuUsageSafe()
+    private double? SampleGpuUsageSafe_NoLock()
     {
         try
         {
             if (!_gpuInitializationAttempted)
             {
                 _gpuInitializationAttempted = true;
-                InitializeGpuCounters();
+                InitializeGpuCounters_NoLock();
             }
 
             if (_gpuCounters == null || _gpuCounters.Length == 0)
@@ -148,7 +199,7 @@ public sealed class HardwareService : IHardwareMonitor, IDisposable
         }
     }
 
-    private void InitializeGpuCounters()
+    private void InitializeGpuCounters_NoLock()
     {
         try
         {
@@ -183,20 +234,6 @@ public sealed class HardwareService : IHardwareMonitor, IDisposable
 
     public void Dispose()
     {
-        if (_gpuCounters != null)
-        {
-            foreach (var counter in _gpuCounters)
-            {
-                try
-                {
-                    counter.Dispose();
-                }
-                catch
-                {
-                    // Ignore disposal error
-                }
-            }
-            _gpuCounters = null;
-        }
+        ReleaseGpuCounters();
     }
 }

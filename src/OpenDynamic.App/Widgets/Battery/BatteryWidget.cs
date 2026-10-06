@@ -122,6 +122,11 @@ public sealed class BatteryWidget : IslandWidgetBase
             HasBattery = e.Snapshot.HasBattery;
             AlertKind = e.AlertKind;
 
+            if (!_settings.EnableBatteryWidget)
+            {
+                return;
+            }
+
             TimeSpan duration;
 
             switch (e.AlertKind)
@@ -173,6 +178,20 @@ public sealed class BatteryWidget : IslandWidgetBase
             Activate(transientDuration: duration, priorityOverride: _settings.DefaultBatteryPriority);
             ResetTransientTimer(duration);
         });
+    }
+
+    /// <summary>
+    /// Applies live changes to EnableBatteryWidget.
+    /// </summary>
+    public void ApplyEnabledState(bool enabled)
+    {
+        if (!enabled)
+        {
+            _transientTimer?.Stop();
+            _transientTimer = null;
+            _wasExpanded = false;
+            Deactivate();
+        }
     }
 
     private bool _wasExpanded;

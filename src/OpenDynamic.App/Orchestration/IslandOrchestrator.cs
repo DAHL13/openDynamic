@@ -108,6 +108,14 @@ public sealed class IslandOrchestrator : IDisposable
     /// </summary>
     public void SetHovering(bool isHovering)
     {
+        // AUD-005: never let hover reveal the island over a fullscreen app or during power suspension.
+        // (Clearing hover is always allowed.)
+        if (isHovering && (_isFullscreenSuppressed || _isPowerSuspended))
+        {
+            Log.Debug("IslandOrchestrator: Hover activation ignored (fullscreen or power suppression active).");
+            return;
+        }
+
         if (_isHovering == isHovering && !(!isHovering && _activePrimaryWidget?.ActivationMode == ActivityActivationMode.OnHover)) return;
         _isHovering = isHovering;
         Log.Debug("IslandOrchestrator: SetHovering changed to {IsHovering}.", _isHovering);
@@ -453,7 +461,7 @@ public sealed class IslandOrchestrator : IDisposable
     public void UpdateOrchestration()
     {
         if (_disposed || _isPowerSuspended) return;
-        if (_isFullscreenSuppressed && !_isHovering) return;
+        if (_isFullscreenSuppressed) return;
 
         // Cancel previous expiration timer
         _transientTimer?.Stop();
@@ -724,11 +732,8 @@ public sealed class IslandOrchestrator : IDisposable
     {
         if ((_isFullscreenSuppressed || _isPowerSuspended) && targetState != IslandState.Hidden)
         {
-            if (!_isHovering)
-            {
-                Log.Debug("Transition to {TargetState} suppressed because fullscreen or power suspension is active.", targetState);
-                return false;
-            }
+            Log.Debug("Transition to {TargetState} suppressed because fullscreen or power suspension is active.", targetState);
+            return false;
         }
 
         if (_stateMachine.CurrentState == targetState)

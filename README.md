@@ -2,15 +2,16 @@
 
 [![CI](https://github.com/DAHL13/openDynamic/actions/workflows/ci.yml/badge.svg)](https://github.com/DAHL13/openDynamic/actions/workflows/ci.yml)
 [![Release](https://github.com/DAHL13/openDynamic/actions/workflows/release.yml/badge.svg)](https://github.com/DAHL13/openDynamic/actions/workflows/release.yml)
+[![Version](https://img.shields.io/badge/Version-v2.0.0-blue.svg)](./docs/release-notes-2.0.0.md)
 [![.NET 10](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/download)
 [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?logo=windows)](https://www.microsoft.com/windows)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-win--x64-lightgrey)]()
-[![RAM](https://img.shields.io/badge/RAM-%3C%2030%20MB-brightgreen)]()
-[![CPU](https://img.shields.io/badge/CPU%20Idle-0.0%25-brightgreen)]()
+[![Private Memory](https://img.shields.io/badge/Private%20RAM-~42%20MB%20(%3C80%20MB)-brightgreen)]()
+[![CPU](https://img.shields.io/badge/CPU%20Idle-0.00%25-brightgreen)]()
 
-> **Dynamic Island / Upper Notch para Windows (WPF, .NET 10)**  
-> Una muesca rectangular superior interactiva y contextual (música, volumen, batería, hardware, temporizador, reloj ambiental) anclada al marco superior de la pantalla, con animaciones de física de resortes elásticos y consumo ultra bajo de recursos.
+> **Dynamic Island / Upper Notch para Windows (WPF, .NET 10 — v2.0.0)**  
+> Una muesca rectangular superior interactiva y contextual (música con color dinámico y espectro FFT, volumen, batería, ahorro de energía, red, periféricos USB/Bluetooth, portapapeles opt-in, privacidad de cámara/micrófono, capturas de pantalla, hardware, hasta 5 temporizadores, cronómetro y reloj ambiental) anclada al marco superior de la pantalla, con animaciones de física de resortes elásticos y consumo ultra bajo de recursos (**0.00% CPU en reposo**).
 
 Repositorio oficial: [https://github.com/DAHL13/openDynamic](https://github.com/DAHL13/openDynamic)
 
@@ -47,7 +48,7 @@ openDynamic adopta una estética de **muesca rectangular superior (Notch)** pega
 
 ---
 
-## Estado del Proyecto (Hito M6 - Release Beta v1.0.0)
+## Estado del Proyecto (Lanzamiento Mayor v2.0.0)
 
 | Fase | Descripción | Estado |
 |---|---|:---:|
@@ -56,22 +57,23 @@ openDynamic adopta una estética de **muesca rectangular superior (Notch)** pega
 | **Fase 2** | **Motor de física de animación de resorte (*Spring physics*) y máquina de estados (M2)** | **Completada** |
 | **Fase 3** | **Arquitectura de widgets, resolución de prioridades y Orchestrator (M4 Base)** | **Completada** |
 | **Fase 4** | **Widget multimedia GSMTC (Windows.Media.Control, 0% CPU, Freeze thumbnails, 10s Grace)** | **Completada** |
-| **Fase 5** | **Volumen (NAudio/CoreAudio), batería sin polling (WM_POWERBROADCAST) y pantalla completa (M3)** | **Completada** |
+| **Fase 5** | **Volumen (NAudio.Wasapi/CoreAudio), batería sin polling (WM_POWERBROADCAST) y pantalla completa (M3)** | **Completada** |
 | **Fase 6** | **Hardware (GetSystemTimes/GlobalMemoryStatusEx), Temporizador/Pomodoro y Modo Split con intercambio (M4)** | **Completada** |
 | **Fase 7** | **Bandeja del sistema (H.NotifyIcon), Ajustes (MVVM), Atajos Win32 e Inicio automático (M5)** | **Completada** |
 | **Fase 8** | **Optimización, robustez, eventos del sistema y pruebas de rendimiento (Previo a M6)** | **Completada** |
 | **Notch UI** | **Rediseño geométrico a muesca rectangular superior con esquinas asimétricas (ADR-017)** | **Completada** |
-| **Fase 9** | **Empaquetado Inno Setup, decisión de runtime (ADR-016), CI/CD y documentación técnica (M6)** | **Completada** |
-| **Fase 10** | **Accesibilidad integral, perfiles de movimiento, alto contraste y UI Automation (v1.1)** | **Completada** |
-| **Fase 11** | **Red (Wi-Fi/Ethernet) y dispositivos periféricos USB/Bluetooth reactivos (v1.1)** | **Completada** |
-| **Fase 12** | **Cronómetro de precisión y múltiples temporizadores con preajustes y cola de alertas (v1.1)** | **Completada** |
-| **Fase 13** | **Color de carátula dinámico y gestos táctiles/ratón en el widget multimedia (v1.1)** | **Completada** |
-| **Fase 14** | **Portapapeles reciente y seguro en memoria RAM (Opt-in, privacidad, 0% leak) (v1.1)** | **Completada** |
-| **Fase 15** | **Indicador de micrófono y cámara en uso (ConsentStore pasivo, cero polling, notch UI) (v1.1)** | **Completada** |
-| **Fase 16** | **Visualizador de audio real (espectro FFT propia, WASAPI loopback, 0 heap alloc, <2% CPU) (v1.1)** | **Completada** |
-| **Fase 19** | **Reloj ambiental en reposo (OnHover, 0% CPU idle, WM_TIMECHANGE, alineación al minuto) (v1.4)** | **Completada** |
-| **Fase 20** | **Ahorro de energía reactivo (WinRT PowerManager, ResourceProfile en Core, 0% polling) (v1.5)** | **Completada** |
-| **Fase 21** | **Vista previa de capturas de pantalla (FileSystemWatcher reactivo, Drag & Drop Copy, 0% bloqueo) (v1.6)** | **Completada** |
+| **Fase 9** | **Empaquetado Inno Setup, decisión de runtime (ADR-016), CI/CD y documentación técnica (v1.0.0)** | **Completada** |
+| **Fase 10** | **Accesibilidad integral, perfiles de movimiento, alto contraste y UI Automation** | **Completada** |
+| **Fase 11** | **Red (Wi-Fi/Ethernet) y dispositivos periféricos USB/Bluetooth reactivos** | **Completada** |
+| **Fase 12** | **Cronómetro de precisión y múltiples temporizadores con preajustes y cola de alertas** | **Completada** |
+| **Fase 13** | **Color de carátula dinámico y gestos táctiles/ratón en el widget multimedia** | **Completada** |
+| **Fase 14** | **Portapapeles reciente y seguro en memoria RAM (Opt-in, privacidad, 0% leak)** | **Completada** |
+| **Fase 15** | **Indicador de micrófono y cámara en uso (ConsentStore pasivo, cero polling, notch UI)** | **Completada** |
+| **Fase 16** | **Visualizador de audio real (espectro FFT propia, WASAPI loopback, 0 heap alloc, <2% CPU)** | **Completada** |
+| **Fase 19** | **Reloj ambiental en reposo (OnHover 120x4 DIP, 0% CPU idle, WM_TIMECHANGE, alineación al minuto)** | **Completada** |
+| **Fase 20** | **Ahorro de energía reactivo (WNF + Win32, ResourceProfile en Core, 0% polling)** | **Completada** |
+| **Fase 21** | **Vista previa de capturas de pantalla (FileSystemWatcher reactivo, Drag & Drop Copy, 0% bloqueo)** | **Completada** |
+| **Auditoría v2.0.0** | **Auditoría integral de fin a fin (30 hallazgos resueltos, 0 timers en reposo, 619 pruebas, ADR-031)** | **Completada** |
 
 ---
 
@@ -164,21 +166,20 @@ openDynamic está diseñado desde sus cimientos cumpliendo con las directrices d
 
 ---
 
-## Rendimiento y Mediciones Reales
+## Rendimiento y Mediciones Reales (Release v2.0.0)
 
-En estricto cumplimiento de la **Regla de Oro 1** (0% CPU en reposo y consumo mínimo de memoria), se auditaron y registraron las siguientes métricas de rendimiento reales en el entorno de desarrollo:
+En estricto cumplimiento de la **Regla de Oro 1** (0% CPU en reposo y consumo mínimo de memoria), se auditaron y registraron las siguientes métricas reales sobre el binario compilado en `Release` (Windows 11 Pro 24H2, Ryzen 7 5700G, .NET 10):
 
 | Parámetro / Métrica | Meta Técnica | Medición Real Obtenida | Estado |
 |---|---|---|:---:|
-| **Consumo de RAM en Reposo (Working Set)** | < 100 MB | **27.9 MB** | ✔ **Superada ampliamente** |
-| **Memoria Privada Comprometida** | < 25 MB | **5.2 MB** | ✔ **Excelente** |
-| **Consumo de CPU en Reposo (sin actividad visible)** | < 0.5% (ideal 0.0%) | **0.00%** | ✔ **Cumplida estrictamente** |
+| **Memoria Privada Comprometida (`PrivateMemorySize64`)** | < 80 MB | **~41.8 MB** (Working Set compartido D3D/WPF: ~158 MB) | ✔ **Superada ampliamente** |
+| **Consumo de CPU en Reposo (5 min, estado `Hidden`)** | < 0.5% (ideal 0.0%) | **0.00%** (0 timers activos en reposo) | ✔ **Cumplida estrictamente** |
 | **Consumo de CPU durante Animación de Resorte** | < 5.0% | **< 1.0%** (pico transitorio) | ✔ **Fluido a 60-144 FPS** |
-| **Visualizador de Espectro FFT (Carga de CPU activa)** | < 2.0% | **~1.0%** (50 ms CPU por cada 5 s de audio 48 kHz) | ✔ **Presupuesto cumplido** |
+| **Visualizador de Espectro FFT (Carga de CPU activa)** | < 2.0% | **~0.09% - 1.0%** (búferes fijos preasignados) | ✔ **Presupuesto cumplido** |
 | **Visualizador de Espectro en Pausa / Reposo** | 0.0% CPU | **0.00%** (captura y bucle de render desuscritos) | ✔ **0% en reposo absoluto** |
 | **Asignaciones de Memoria en Cuadro de Audio** | 0 B / frame | **0 B** (búferes fijos preasignados y MemoryMarshal) | ✔ **Cero presión de GC** |
 | **Suscripción al Bucle de Composición WPF** | Desuscrito en reposo | **0 suscripciones** a `CompositionTarget.Rendering` al asentarse | ✔ **Cero bucles ocultos** |
-| **Compilación Estricta** | 0 advertencias, 0 errores | **0 advertencias, 0 errores** (`TreatWarningsAsErrors=true`) | ✔ **Código limpio** |
+| **Compilación Estricta y Suite de Pruebas** | 0 advertencias, 100% tests | **0 advertencias, 619/619 pruebas en verde** | ✔ **Código auditado** |
 
 ---
 
@@ -214,19 +215,22 @@ El widget multimedia incorpora un analizador de espectro reactivo en tiempo real
 
 openDynamic incorpora un widget de reloj ambiental diseñado para consultar la hora y fecha de manera no intrusiva al interactuar con la Dynamic Island cuando no hay actividades prioritarias en curso:
 
-- **Activación por Sobrevuelo (`ActivationMode.OnHover`):** Al pasar el cursor sobre la muesca cuando la isla se encuentra en reposo (`Hidden`), se despliega suavemente mostrando la hora local, día de la semana y fecha completa.
-- **Presupuesto Estricto de Rendimiento (0% CPU en Reposo):** El temporizador de actualización interno (`DispatcherTimer`) solo se reserva y ejecuta mientras la isla se mantiene visible en pantalla; se detiene y destruye de forma instantánea al ocultarse la muesca.
+- **Activación por Sobrevuelo (`ActivationMode.OnHover`):** Al acercar el cursor a la franja sensora superior (`120x4 DIP` centrada en el borde superior) cuando la isla se encuentra en reposo (`Hidden`), se despliega suavemente mostrando la hora local, día de la semana y fecha completa.
+- **Presupuesto Estricto de Rendimiento (0% CPU y 0 Timers en Reposo):** No existe ningún temporizador corriendo en estado `Hidden`. El `DispatcherTimer` del reloj solo se reserva y ejecuta mientras el reloj está visible en pantalla; se detiene y destruye de forma instantánea al ocultarse la muesca.
 - **Alineación de Precisión al Minuto:** Sincronizado para disparar su primer tick exactamente en el segundo `:00.000` del minuto entrante, evitando ciclos de reloj innecesarios por segundo cuando los segundos no están habilitados.
 - **Sincronización Reactiva Win32 (`WM_TIMECHANGE`):** Escucha mensajes nativos del sistema y `SystemEvents.TimeChanged` para actualizarse de inmediato ante cambios manuales de hora o ajustes de zona horaria sin incurrir en bucles de sondeo continuo (cero polling).
 - **Formatos y Localización Cultural:** Respeta la configuración regional de Windows (`CultureInfo.CurrentCulture`) con soporte configurable para 12 horas (AM/PM), 24 horas, visualización opcional de segundos y número de semana según el estándar ISO 8601.
 
 ---
 
-## Documentación Técnica
+## Documentación Técnica y Gobernanza
 
-- **[Arquitectura y Guía para Desarrolladores (`docs/arquitectura.md`)](./docs/arquitectura.md):** Diagramas conceptuales de capas (Core vs. App), flujo del `IslandOrchestrator`, ciclo de vida de la FSM y la **Guía de 10 pasos** para crear e integrar nuevos widgets desde cero.
-- **[Registro de Decisiones de Arquitectura (`DECISIONS.md`)](./DECISIONS.md):** Registro histórico y justificación de las 30 decisiones técnicas (ADR-001 a ADR-030).
-- **[Matriz de Validación y Pruebas (`docs/pruebas.md`)](./docs/pruebas.md):** 586 pruebas unitarias automatizadas y casos de prueba manual de sistema (DPI, multimonitor, suspensión, pantalla completa, accesibilidad, portapapeles, privacidad de cámara/micrófono, espectro de audio, reloj ambiental, ahorro de energía, capturas de pantalla).
+- **[Notas de Lanzamiento v2.0.0 (`docs/release-notes-2.0.0.md`)](./docs/release-notes-2.0.0.md):** Resumen ejecutivo de las 10 nuevas fases, mejoras de rendimiento y guía de actualización desde `v1.0.0`.
+- **[Informe de Auditoría Integral v2.0.0 (`docs/auditoria-v2.0.0.md`)](./docs/auditoria-v2.0.0.md):** Auditoría de extremo a extremo (Pasadas A y B), resolución de los 30 hallazgos (`AUD-001` a `AUD-030`) y mediciones reales Antes vs. Después.
+- **[Arquitectura y Guía para Desarrolladores (`docs/arquitectura.md`)](./docs/arquitectura.md):** Diagramas conceptuales de capas (Core vs. App), los 12 widgets del sistema, flujo del `IslandOrchestrator`, ciclo de vida de la FSM y la **Guía de 10 pasos** para crear e integrar nuevos widgets desde cero.
+- **[Registro de Decisiones de Arquitectura (`DECISIONS.md`)](./DECISIONS.md):** Registro histórico y justificación de las 31 decisiones técnicas (ADR-001 a ADR-031).
+- **[Matriz de Validación y Pruebas (`docs/pruebas.md`)](./docs/pruebas.md):** 619 pruebas unitarias automatizadas y protocolo de pruebas manuales de sistema (`[MANUAL]`).
+- **[Gobernanza y Seguridad](./SECURITY.md):** [`SECURITY.md`](./SECURITY.md), [`CONTRIBUTING.md`](./CONTRIBUTING.md) y [`THIRD-PARTY-NOTICES.md`](./THIRD-PARTY-NOTICES.md).
 
 ---
 
@@ -234,15 +238,15 @@ openDynamic incorpora un widget de reloj ambiental diseñado para consultar la h
 
 - **Lenguaje / Runtime:** C# 13+, .NET 10
 - **Interfaz de Usuario:** WPF (`net10.0-windows10.0.19041.0`) con soporte `PerMonitorV2` DPI y UI Automation
-- **Patrón Arquitectónico:** MVVM mediante `CommunityToolkit.Mvvm`
-- **Inyección de Dependencias:** `Microsoft.Extensions.DependencyInjection`
-- **Audio:** `NAudio` (`MMDeviceEnumerator`, `AudioEndpointVolume`, `WasapiLoopbackCapture`), FFT Cooley-Tukey Radix-2 pura en Core (cero dependencias externas)
+- **Patrón Arquitectónico:** MVVM mediante `CommunityToolkit.Mvvm` (`8.4.2`)
+- **Inyección de Dependencias:** `Microsoft.Extensions.DependencyInjection` (`10.0.12`)
+- **Audio:** `NAudio.Wasapi` (`2.3.0` — `MMDeviceEnumerator`, `AudioEndpointVolume`, `WasapiLoopbackCapture`), FFT Cooley-Tukey Radix-2 pura en Core (cero dependencias externas)
 - **Multimedia:** WinRT `Windows.Media.Control` (GSMTC) con extrapolación continua y miniaturas congeladas
-- **Bandeja del Sistema (Tray):** `H.NotifyIcon.Wpf` (cero WinForms)
+- **Bandeja del Sistema (Tray):** `H.NotifyIcon.Wpf` (`2.4.1`, cero WinForms)
 - **Atajos Globales:** Win32 `RegisterHotKey` / `UnregisterHotKey` mediante WndProc
-- **Configuración y Persistencia:** `System.Text.Json` en `%AppData%\openDynamic\settings.json` (esquema v14 con migración automática y debounce de 500ms)
-- **Registro de Eventos (Logging):** `Serilog` y `Serilog.Sinks.File` en `%LocalAppData%\openDynamic\logs`
-- **Pruebas Unitarias:** `xUnit`
+- **Configuración y Persistencia:** `System.Text.Json` en `%AppData%\openDynamic\settings.json` (esquema v14 con migración automática, `SanitizeAndClamp` y debounce de 500ms)
+- **Registro de Eventos (Logging):** `Serilog` (`4.4.0`) y `Serilog.Sinks.File` (`7.0.0`) en `%LocalAppData%\openDynamic\logs` (nivel `Information` en Release con redacción de datos personales)
+- **Pruebas Unitarias:** `xUnit` (`2.9.2`, 619 pruebas)
 - **Instalador:** Inno Setup 6 (distribución ReadyToRun)
 
 ---

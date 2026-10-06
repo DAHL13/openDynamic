@@ -13,6 +13,8 @@ public partial class App : Application
     private SingleInstanceManager? _singleInstance;
     private TrayIconManager? _trayIconManager;
     private Services.IHotkeyService? _hotkeyService;
+    private System.Windows.Interop.HwndSource? _hwndSource;
+    private System.Windows.Interop.HwndSourceHook? _taskbarCreatedHook;
 
     public static new App Current => (App)Application.Current;
 
@@ -24,6 +26,12 @@ public partial class App : Application
 
         // Run without requiring an active window
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
+        // AUD-013: IslandWindow uses AllowsTransparency="True" (WS_EX_LAYERED / UpdateLayeredWindow),
+        // which requires a CPU-side GDI DIB section on every frame. Using SoftwareOnly renders directly
+        // into the system-memory bitmap without loading ~33 MB of D3D9/vendor GPU driver DLLs,
+        // avoiding ~50 MB of private staging buffers, 13 driver threads, and PCIe GPU-to-CPU readback stalls.
+        System.Windows.Media.RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
 
         LoggingConfiguration.ConfigureLogging();
         RegisterGlobalExceptionHandlers();
@@ -70,9 +78,13 @@ public partial class App : Application
 
         var orchestrator = Services.GetRequiredService<Orchestration.IslandOrchestrator>();
 
-        // Initialize Media GSMTC Service & Register MediaWidget
+        // Initialize Media GSMTC Service (only when EnableMediaWidget is enabled) & Register MediaWidget
+        var startupSettings = Services.GetRequiredService<Core.Settings.AppSettings>();
         var mediaService = Services.GetRequiredService<Services.MediaService>();
-        _ = mediaService.InitializeAsync();
+        if (startupSettings.EnableMediaWidget)
+        {
+            _ = mediaService.InitializeAsync();
+        }
 
         var mediaWidget = Services.GetRequiredService<Widgets.Media.MediaWidget>();
         orchestrator.RegisterWidget(mediaWidget);
@@ -120,9 +132,13 @@ public partial class App : Application
         var screenshotWidget = Services.GetRequiredService<Widgets.Screenshot.ScreenshotWidget>();
         orchestrator.RegisterWidget(screenshotWidget);
 
-        // Register PrivacyWidget (Priority 85, Transient) & Start PrivacyAccessMonitor
+        // Register PrivacyWidget (Priority 85, Transient) & Start PrivacyAccessMonitor if enabled
+        var privacySettings = Services.GetRequiredService<Core.Settings.AppSettings>();
         var privacyMonitor = Services.GetRequiredService<Services.PrivacyAccessMonitor>();
-        privacyMonitor.Start();
+        if (privacySettings.EnableMicrophoneIndicator || privacySettings.EnableCameraIndicator || privacySettings.EnablePrivacyAlerts)
+        {
+            privacyMonitor.Start();
+        }
 
         var privacyWidget = Services.GetRequiredService<Widgets.Privacy.PrivacyWidget>();
         orchestrator.RegisterWidget(privacyWidget);
@@ -137,11 +153,11 @@ public partial class App : Application
 
         // Initialize Global Hotkey Service using native Win32 RegisterHotKey
         _hotkeyService = Services.GetRequiredService<Services.IHotkeyService>();
-        var hwndSource = System.Windows.Interop.HwndSource.FromHwnd(islandWindow.Hwnd);
-        if (hwndSource != null)
+        _hwndSource = System.Windows.Interop.HwndSource.FromHwnd(islandWindow.Hwnd);
+        if (_hwndSource != null)
         {
             uint taskbarCreatedMsg = Native.NativeMethods.RegisterWindowMessage("TaskbarCreated");
-            hwndSource.AddHook((IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled) =>
+            _taskbarCreatedHook = (IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled) =>
             {
                 if (msg != 0 && (uint)msg == taskbarCreatedMsg)
                 {
@@ -149,9 +165,10 @@ public partial class App : Application
                     _trayIconManager?.Recreate();
                 }
                 return IntPtr.Zero;
-            });
+            };
+            _hwndSource.AddHook(_taskbarCreatedHook);
 
-            _hotkeyService.Initialize(islandWindow.Hwnd, hwndSource);
+            _hotkeyService.Initialize(islandWindow.Hwnd, _hwndSource);
             var settings = Services.GetRequiredService<Core.Settings.AppSettings>();
             if (settings.EnableGlobalHotkeys && !string.IsNullOrWhiteSpace(settings.ToggleIslandHotkey))
             {
@@ -238,6 +255,7 @@ public partial class App : Application
     {
         for (int i = 0; i < args.Length; i++)
         {
+#if DEBUG
             if (args[i] == "--trigger-test-exception")
             {
                 Log.Information("Triggering test exception on Dispatcher to verify global exception handling...");
@@ -246,6 +264,7 @@ public partial class App : Application
                     throw new InvalidOperationException("Test intentional exception handled by DispatcherUnhandledException");
                 });
             }
+#endif
 
             if (args[i] == "--exit-after-ms" && i + 1 < args.Length && int.TryParse(args[i + 1], out int ms))
             {
@@ -274,6 +293,13 @@ public partial class App : Application
     {
         try
         {
+            if (_hwndSource != null && _taskbarCreatedHook != null)
+            {
+                _hwndSource.RemoveHook(_taskbarCreatedHook);
+                _taskbarCreatedHook = null;
+            }
+            _hwndSource = null;
+
             _trayIconManager?.Dispose();
             _trayIconManager = null;
 
@@ -286,6 +312,9 @@ public partial class App : Application
 
             var settingsWindow = Services?.GetService<Views.SettingsWindow>();
             settingsWindow?.ForceClose();
+
+            var islandWindow = Services?.GetService<Windowing.IslandWindow>();
+            islandWindow?.Close();
 
             if (Services is IDisposable disposableServices)
             {

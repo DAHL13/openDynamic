@@ -1,0 +1,34 @@
+name: Solicitud de Funcionalidad (Feature Request)
+description: Propón una mejora, nuevo widget o ajuste para openDynamic.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ¡Gracias por sugerir una mejora para **openDynamic**! Recuerda que toda funcionalidad debe respetar las Reglas de Oro del proyecto (**0.0% CPU en reposo**, cero privilegios de administrador y privacidad por diseño).
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: ¿Qué necesidad o problema resuelve esta propuesta?
+      description: Describe el contexto o caso de uso.
+      placeholder: Sería útil poder visualizar...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Solución o diseño propuesto
+      description: Describe cómo debería comportarse en modo compacto, split y expandido.
+    validations:
+      required: true
+
+  - type: textarea
+    id: performance
+    attributes:
+      label: Consideraciones de rendimiento y privacidad
+      description: ¿Puede implementarse de forma 100% reactiva por eventos del sistema sin polling en reposo?
+    validations:
+      required: false

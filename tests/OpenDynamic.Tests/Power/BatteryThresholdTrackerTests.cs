@@ -51,7 +51,7 @@ public class BatteryThresholdTrackerTests
     public void LowBatteryThreshold_EmitsExactlyOnce_NoRepeatsOnFluctuation()
     {
         var tracker = new BatteryThresholdTracker(lowThresholdPercent: 20, criticalThresholdPercent: 10, hysteresisPercent: 2);
-        
+
         // Start discharging at 25%
         tracker.Evaluate(new BatterySnapshot(Percent: 25, IsCharging: false, HasBattery: true));
 
@@ -76,7 +76,7 @@ public class BatteryThresholdTrackerTests
     public void CriticalBatteryThreshold_EmitsExactlyOnce_NoRepeats()
     {
         var tracker = new BatteryThresholdTracker(lowThresholdPercent: 20, criticalThresholdPercent: 10);
-        
+
         // Discharging at 15% (already in low battery range)
         tracker.Evaluate(new BatterySnapshot(Percent: 15, IsCharging: false, HasBattery: true));
 
@@ -98,7 +98,7 @@ public class BatteryThresholdTrackerTests
     public void PluggingInCharger_ResetsAlertsForNextDischargeCycle()
     {
         var tracker = new BatteryThresholdTracker(lowThresholdPercent: 20, criticalThresholdPercent: 10);
-        
+
         // Discharging through 20%
         tracker.Evaluate(new BatterySnapshot(Percent: 25, IsCharging: false, HasBattery: true));
         var lowAlert = tracker.Evaluate(new BatterySnapshot(Percent: 20, IsCharging: false, HasBattery: true));

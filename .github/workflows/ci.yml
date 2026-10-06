@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read
+
 jobs:
   build-and-test:
     runs-on: windows-latest
@@ -21,6 +24,9 @@ jobs:
 
     - name: Restore dependencies
       run: dotnet restore openDynamic.sln
+
+    - name: Verify code formatting (.editorconfig)
+      run: dotnet format openDynamic.sln --verify-no-changes --no-restore
 
     - name: Build
       run: dotnet build openDynamic.sln -c Release --no-restore

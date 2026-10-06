@@ -18,7 +18,11 @@ public static class LoggingConfiguration
         string logFilePath = Path.Combine(LogDirectory, "openDynamic-.log");
 
         Log.Logger = new LoggerConfiguration()
+#if DEBUG
             .MinimumLevel.Debug()
+#else
+            .MinimumLevel.Information()
+#endif
             .WriteTo.File(
                 path: logFilePath,
                 rollingInterval: RollingInterval.Day,
@@ -28,7 +32,7 @@ public static class LoggingConfiguration
                 outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
             .CreateLogger();
 
-        Log.Information("openDynamic logging initialized. Logs directory: {LogDir}", LogDirectory);
+        Log.Information("openDynamic logging initialized.");
     }
 
     public static void CloseAndFlush()

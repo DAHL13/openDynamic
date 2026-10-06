@@ -73,7 +73,7 @@ public sealed class EnergySaverService : IResourceProfileProvider, IDisposable
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _settingsService = settingsService;
         _dispatcher = dispatcher ?? (System.Windows.Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher);
-        _alertPolicy = new EnergySaverAlertPolicy(timeProvider ?? TimeProvider.System, cooldownDuration: TimeSpan.FromMilliseconds(500));
+        _alertPolicy = new EnergySaverAlertPolicy(timeProvider ?? TimeProvider.System, cooldownDuration: TimeSpan.FromSeconds(5));
 
         _alertPolicy.AlertTriggered += OnAlertPolicyTriggered;
 

@@ -14,12 +14,14 @@
         Height="240"
         Title="openDynamic Island">
     <Grid Background="{x:Null}" VerticalAlignment="Top" Margin="0,0,0,0">
-        <!-- Sensor notch at Y=0 for resting hover detection in Hidden state -->
+        <!-- Minimal sensor strip flush with the top bezel for resting hover detection in Hidden state (AUD-005).
+             Sized from RestingSensorPolicy (120x4 DIP). Hit-testing is gated by RestingSensorPolicy so it never
+             captures clicks when the ambient clock is off or a fullscreen app is active. -->
         <Border x:Name="RestingSensorNotch"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Top"
-                Width="240"
-                Height="44"
+                Width="120"
+                Height="4"
                 Background="#01000000"
                 Focusable="False"
                 IsHitTestVisible="True" />

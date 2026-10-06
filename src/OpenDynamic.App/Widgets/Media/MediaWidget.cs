@@ -384,6 +384,12 @@ public sealed class MediaWidget : IslandWidgetBase
     {
         try
         {
+            if (!_settings.EnableMediaWidget)
+            {
+                HandleSessionTerminated();
+                return;
+            }
+
             var session = _hookedSession;
             if (session == null)
             {
@@ -445,6 +451,8 @@ public sealed class MediaWidget : IslandWidgetBase
     {
         try
         {
+            if (!_settings.EnableMediaWidget) return;
+
             var session = _hookedSession;
             if (session == null) return;
 
@@ -670,6 +678,39 @@ public sealed class MediaWidget : IslandWidgetBase
         _dragGestureDetector.ResetAll();
 
         Log.Information("Media session terminated or removed. Widget set to inactive.");
+        UpdateVisualizerState();
+    }
+
+    private bool _isFullscreenSuppressed;
+
+    /// <summary>
+    /// Updates fullscreen suppression state and refreshes the audio visualizer activation context.
+    /// </summary>
+    public void SetFullscreenSuppressed(bool isSuppressed)
+    {
+        if (_isFullscreenSuppressed == isSuppressed) return;
+        _isFullscreenSuppressed = isSuppressed;
+        UpdateVisualizerState();
+    }
+
+    /// <summary>
+    /// Applies live changes to media widget settings (EnableMediaWidget, DefaultMediaPriority, VisualizerMode).
+    /// </summary>
+    public void ApplySettingsLive()
+    {
+        Priority = _settings.DefaultMediaPriority;
+        if (!_settings.EnableMediaWidget)
+        {
+            HandleSessionTerminated();
+        }
+        else
+        {
+            _ = _mediaService.InitializeAsync();
+            HookCurrentSession(_mediaService.CurrentSession);
+            UpdateSessionProperties();
+            UpdateSessionState();
+            UpdateVisualizerState();
+        }
     }
 
     /// <summary>
@@ -767,10 +808,10 @@ public sealed class MediaWidget : IslandWidgetBase
 
         var context = new VisualizerActivationContext(
             Mode: effectiveMode,
-            IsMediaPlaying: _isPlaying,
-            IsMediaWidgetVisible: IsVisibleOnIsland,
+            IsMediaPlaying: _isPlaying && _settings.EnableMediaWidget,
+            IsMediaWidgetVisible: IsVisibleOnIsland && _settings.EnableMediaWidget,
             IslandState: state,
-            IsFullscreenSuppressed: false);
+            IsFullscreenSuppressed: _isFullscreenSuppressed);
 
         _spectrumService.UpdateActivation(in context);
         OnPropertyChanged(nameof(IsVisualizerActive));

@@ -724,12 +724,18 @@ public partial class SettingsViewModel : ObservableObject
     {
         _settings.EnableMediaWidget = value;
         _settingsService.SaveDebounced();
+
+        var mediaWidget = _orchestrator.RegisteredWidgets.OfType<Widgets.Media.MediaWidget>().FirstOrDefault();
+        mediaWidget?.ApplySettingsLive();
     }
 
     partial void OnDefaultMediaPriorityChanged(int value)
     {
         _settings.DefaultMediaPriority = value;
         _settingsService.SaveDebounced();
+
+        var mediaWidget = _orchestrator.RegisteredWidgets.OfType<Widgets.Media.MediaWidget>().FirstOrDefault();
+        mediaWidget?.ApplySettingsLive();
     }
 
     partial void OnMediaPauseGracePeriodSecondsChanged(int value)
@@ -762,12 +768,18 @@ public partial class SettingsViewModel : ObservableObject
         _settingsService.SaveDebounced();
         OnPropertyChanged(nameof(SelectedVisualizerModeOption));
         OnPropertyChanged(nameof(IsReactiveVisualizerEnabled));
+
+        var mediaWidget = _orchestrator.RegisteredWidgets.OfType<Widgets.Media.MediaWidget>().FirstOrDefault();
+        mediaWidget?.UpdateVisualizerState();
     }
 
     partial void OnEnableVolumeWidgetChanged(bool value)
     {
         _settings.EnableVolumeWidget = value;
         _settingsService.SaveDebounced();
+
+        var volumeWidget = _orchestrator.RegisteredWidgets.OfType<Widgets.Volume.VolumeWidget>().FirstOrDefault();
+        volumeWidget?.ApplyEnabledState(value);
     }
 
     partial void OnDefaultVolumePriorityChanged(int value)
@@ -786,6 +798,9 @@ public partial class SettingsViewModel : ObservableObject
     {
         _settings.EnableBatteryWidget = value;
         _settingsService.SaveDebounced();
+
+        var batteryWidget = _orchestrator.RegisteredWidgets.OfType<Widgets.Battery.BatteryWidget>().FirstOrDefault();
+        batteryWidget?.ApplyEnabledState(value);
     }
 
     partial void OnDefaultBatteryPriorityChanged(int value)
@@ -894,12 +909,18 @@ public partial class SettingsViewModel : ObservableObject
     {
         _settings.EnableGpuMonitoring = value;
         _settingsService.SaveDebounced();
+
+        var hwWidget = _orchestrator.RegisteredWidgets.OfType<HardwareWidget>().FirstOrDefault();
+        hwWidget?.ApplyGpuMonitoringSetting(value);
     }
 
     partial void OnEnableTimerWidgetChanged(bool value)
     {
         _settings.EnableTimerWidget = value;
         _settingsService.SaveDebounced();
+
+        var timerWidget = _orchestrator.RegisteredWidgets.OfType<Widgets.Timer.TimerWidget>().FirstOrDefault();
+        timerWidget?.ApplyEnabledState(value);
     }
 
     partial void OnDefaultTimerPriorityChanged(int value)
@@ -1362,6 +1383,7 @@ public partial class SettingsViewModel : ObservableObject
     {
         _settings.HideOnFullscreen = value;
         _settingsService.SaveDebounced();
+        ApplyPositionLive();
     }
 
     partial void OnStartWithWindowsChanged(bool value)

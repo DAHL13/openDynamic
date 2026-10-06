@@ -243,4 +243,23 @@ public sealed class DeviceAlertPolicyTests
         // Suppressed by cooldown
         Assert.Equal(2, alerts.Count);
     }
+
+    [Fact]
+    public void ResetEnumeration_ClearsCompletionStateAndCancelsPendingCoalesce()
+    {
+        var clock = new FakeTimeProvider();
+        using var policy = new DeviceAlertPolicy(clock, coalesceDuration: TimeSpan.FromMilliseconds(800));
+        policy.NotifyEnumerationCompleted();
+        Assert.True(policy.IsEnumerationCompleted);
+
+        var alerts = new List<DeviceEvent>();
+        policy.AlertTriggered += (_, ev) => alerts.Add(ev);
+
+        policy.ProcessDeviceEvent(new DeviceEvent(DeviceEventType.Connected, "USB\\VID_1111", "Headset", DeviceCategory.Audio));
+        policy.ResetEnumeration();
+
+        Assert.False(policy.IsEnumerationCompleted);
+        clock.Advance(TimeSpan.FromSeconds(2));
+        Assert.Empty(alerts);
+    }
 }

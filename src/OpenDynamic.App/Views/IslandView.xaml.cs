@@ -375,6 +375,8 @@ public partial class IslandView : UserControl
         _currentMotionProfile = profile ?? MotionProfile.Full;
     }
 
+    private readonly Dictionary<ContentControl, int> _transitionVersions = new();
+
     /// <summary>
     /// Smoothly swaps content on a ContentControl using opacity cross-fade according to the active motion profile.
     /// In reduced mode (&lt;=150ms total), uses accelerated, direct transitions.
@@ -385,6 +387,9 @@ public partial class IslandView : UserControl
         {
             return;
         }
+
+        int version = _transitionVersions.TryGetValue(container, out int currentVersion) ? currentVersion + 1 : 1;
+        _transitionVersions[container] = version;
 
         int outMs = _currentMotionProfile.CrossFadeOutDurationMs;
         int inMs = _currentMotionProfile.CrossFadeInDurationMs;
@@ -404,6 +409,14 @@ public partial class IslandView : UserControl
             if (newContent != null)
             {
                 var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(inMs));
+                fadeIn.Completed += (_, _) =>
+                {
+                    if (_transitionVersions.TryGetValue(container, out int activeVersion) && activeVersion == version)
+                    {
+                        container.BeginAnimation(OpacityProperty, null);
+                        container.Opacity = 1.0;
+                    }
+                };
                 container.BeginAnimation(OpacityProperty, fadeIn);
             }
             return;
@@ -415,8 +428,12 @@ public partial class IslandView : UserControl
             var fadeOut = new DoubleAnimation(container.Opacity, 0.0, TimeSpan.FromMilliseconds(outMs));
             fadeOut.Completed += (_, _) =>
             {
-                container.Content = null;
-                container.Opacity = 1.0;
+                if (_transitionVersions.TryGetValue(container, out int activeVersion) && activeVersion == version)
+                {
+                    container.BeginAnimation(OpacityProperty, null);
+                    container.Content = null;
+                    container.Opacity = 1.0;
+                }
             };
             container.BeginAnimation(OpacityProperty, fadeOut);
             return;
@@ -426,8 +443,21 @@ public partial class IslandView : UserControl
         var crossFadeOut = new DoubleAnimation(container.Opacity, 0.0, TimeSpan.FromMilliseconds(outMs));
         crossFadeOut.Completed += (_, _) =>
         {
+            if (!_transitionVersions.TryGetValue(container, out int activeVersion) || activeVersion != version)
+            {
+                return;
+            }
+
             container.Content = newContent;
             var crossFadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(inMs));
+            crossFadeIn.Completed += (_, _) =>
+            {
+                if (_transitionVersions.TryGetValue(container, out int inVersion) && inVersion == version)
+                {
+                    container.BeginAnimation(OpacityProperty, null);
+                    container.Opacity = 1.0;
+                }
+            };
             container.BeginAnimation(OpacityProperty, crossFadeIn);
         };
         container.BeginAnimation(OpacityProperty, crossFadeOut);

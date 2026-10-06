@@ -11,11 +11,16 @@ public sealed class TimerCollection : ITimerCollection, IDisposable
 
     private readonly TimeProvider _timeProvider;
     private readonly int _maxTimers;
+    private readonly TimeSpan? _defaultStandardDuration;
+    private readonly TimeSpan? _pomodoroWorkDuration;
+    private readonly TimeSpan? _pomodoroBreakDuration;
     private readonly List<TimerController> _timers = new();
     private readonly Queue<TimerAlert> _alertQueue = new();
     private readonly object _lock = new();
 
     private ITimer? _backgroundTimer;
+    private DateTimeOffset? _scheduledTargetUtc;
+    private bool _isBatchUpdating;
     private TimerAlert? _activeAlert;
     private bool _disposed;
 
@@ -106,13 +111,16 @@ public sealed class TimerCollection : ITimerCollection, IDisposable
     {
         _timeProvider = timeProvider ?? TimeProvider.System;
         _maxTimers = maxTimers > 0 ? maxTimers : DefaultMaxTimers;
+        _defaultStandardDuration = defaultStandardDuration;
+        _pomodoroWorkDuration = pomodoroWorkDuration;
+        _pomodoroBreakDuration = pomodoroBreakDuration;
 
         // Create default initial timer (guarantees backward compatibility with Phase 6)
         var defaultTimer = new TimerController(
             _timeProvider,
-            defaultStandardDuration,
-            pomodoroWorkDuration,
-            pomodoroBreakDuration,
+            _defaultStandardDuration,
+            _pomodoroWorkDuration,
+            _pomodoroBreakDuration,
             id: "primary",
             label: "Temporizador");
 
@@ -122,6 +130,7 @@ public sealed class TimerCollection : ITimerCollection, IDisposable
 
     public TimerController AddTimer(string label, TimeSpan duration, TimerMode mode = TimerMode.Standard)
     {
+        TimerController timer;
         lock (_lock)
         {
             if (_timers.Count >= _maxTimers)
@@ -129,9 +138,11 @@ public sealed class TimerCollection : ITimerCollection, IDisposable
                 throw new InvalidOperationException($"Cannot add more than {_maxTimers} timers.");
             }
 
-            var timer = new TimerController(
+            timer = new TimerController(
                 _timeProvider,
                 defaultStandardDuration: duration,
+                pomodoroWorkDuration: _pomodoroWorkDuration,
+                pomodoroBreakDuration: _pomodoroBreakDuration,
                 id: Guid.NewGuid().ToString("N"),
                 label: string.IsNullOrWhiteSpace(label) ? $"Temporizador {_timers.Count + 1}" : label);
 
@@ -140,9 +151,10 @@ public sealed class TimerCollection : ITimerCollection, IDisposable
             _timers.Add(timer);
 
             ScheduleNextCompletion();
-            TimersChanged?.Invoke(this, EventArgs.Empty);
-            return timer;
         }
+
+        TimersChanged?.Invoke(this, EventArgs.Empty);
+        return timer;
     }
 
     public bool TryAddTimer(string label, TimeSpan duration, out TimerController? timer, TimerMode mode = TimerMode.Standard)
@@ -154,9 +166,17 @@ public sealed class TimerCollection : ITimerCollection, IDisposable
                 timer = null;
                 return false;
             }
+        }
 
+        try
+        {
             timer = AddTimer(label, duration, mode);
             return true;
+        }
+        catch (InvalidOperationException)
+        {
+            timer = null;
+            return false;
         }
     }
 
@@ -180,9 +200,10 @@ public sealed class TimerCollection : ITimerCollection, IDisposable
             }
 
             ScheduleNextCompletion();
-            TimersChanged?.Invoke(this, EventArgs.Empty);
-            return true;
         }
+
+        TimersChanged?.Invoke(this, EventArgs.Empty);
+        return true;
     }
 
     public TimerController? GetTimer(string id)
@@ -222,14 +243,25 @@ public sealed class TimerCollection : ITimerCollection, IDisposable
         List<TimerController> timersCopy;
         lock (_lock)
         {
+            _isBatchUpdating = true;
             timersCopy = _timers.ToList();
         }
 
-        foreach (var timer in timersCopy)
+        try
         {
-            if (timer.State == TimerState.Running)
+            foreach (var timer in timersCopy)
             {
-                timer.UpdateTick();
+                if (timer.State == TimerState.Running)
+                {
+                    timer.UpdateTick();
+                }
+            }
+        }
+        finally
+        {
+            lock (_lock)
+            {
+                _isBatchUpdating = false;
             }
         }
 
@@ -259,9 +291,11 @@ public sealed class TimerCollection : ITimerCollection, IDisposable
 
         TimerAlert alert;
         bool shouldTriggerImmediately = false;
+        bool isBatch;
 
         lock (_lock)
         {
+            isBatch = _isBatchUpdating;
             alert = new TimerAlert(controller.Id, controller.Label, controller.Mode, _timeProvider.GetUtcNow());
 
             if (_activeAlert == null)
@@ -280,13 +314,25 @@ public sealed class TimerCollection : ITimerCollection, IDisposable
             AlertTriggered?.Invoke(this, alert);
         }
 
-        ScheduleNextCompletion();
+        if (!isBatch)
+        {
+            ScheduleNextCompletion();
+        }
     }
 
     private void OnTimerIndividualTick(object? sender, TimerSnapshot snapshot)
     {
-        ScheduleNextCompletion();
-        Tick?.Invoke(this, PrimaryTimer.CurrentSnapshot);
+        bool isBatch;
+        lock (_lock)
+        {
+            isBatch = _isBatchUpdating;
+        }
+
+        if (!isBatch)
+        {
+            ScheduleNextCompletion();
+            Tick?.Invoke(this, PrimaryTimer.CurrentSnapshot);
+        }
     }
 
     private void ScheduleNextCompletion()
@@ -310,6 +356,13 @@ public sealed class TimerCollection : ITimerCollection, IDisposable
                 }
             }
 
+            if (earliestTarget == _scheduledTargetUtc &&
+                (!earliestTarget.HasValue || (_backgroundTimer != null && earliestTarget.Value > now)))
+            {
+                return;
+            }
+
+            _scheduledTargetUtc = earliestTarget;
             _backgroundTimer?.Dispose();
             _backgroundTimer = null;
 
@@ -334,6 +387,9 @@ public sealed class TimerCollection : ITimerCollection, IDisposable
     {
         return new TimerController(
             _timeProvider,
+            _defaultStandardDuration,
+            _pomodoroWorkDuration,
+            _pomodoroBreakDuration,
             id: "primary",
             label: "Temporizador");
     }
@@ -347,6 +403,7 @@ public sealed class TimerCollection : ITimerCollection, IDisposable
 
             _backgroundTimer?.Dispose();
             _backgroundTimer = null;
+            _scheduledTargetUtc = null;
 
             foreach (var timer in _timers)
             {
