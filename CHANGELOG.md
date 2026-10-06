@@ -3,6 +3,46 @@
 Todas las modificaciones notables en este proyecto serán documentadas en este archivo.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y cumple con [SemVer](https://semver.org/).
 
+## [2.0.0] - 2026-10-05 (Lanzamiento Mayor v2.0.0 y Auditoría Integral de Fin a Fin)
+
+### Añadido
+- **Consolidación de 10 Fases en Release Mayor (`v1.0.0` $\rightarrow$ `v2.0.0`):**
+  - Integra en una versión estable todas las capacidades desarrolladas en las Fases 10 a 16 y 19 a 21: Accesibilidad (`MotionProfile`, Alto Contraste, UI Automation), Red Wi-Fi/Ethernet (`NetworkWidget`), Periféricos USB/Bluetooth (`DeviceWidget`), Cronómetro con vueltas (`StopwatchWidget`) y hasta 5 Temporizadores simultáneos (`TimerCollection`), Color dinámico de carátula y gestos (`MediaColorExtractor`), Portapapeles seguro en RAM opt-in (`ClipboardWidget`), Indicador de micrófono y cámara (`PrivacyWidget`), Visualizador de espectro FFT real (`AudioSpectrumService`), Reloj Ambiental en reposo (`AmbientClockWidget`), Ahorro de Energía reactivo (`EnergySaverWidget`) y Vista Previa de Capturas de Pantalla (`ScreenshotWidget`).
+- **Gobernanza Open-Source y Documentación de Lanzamiento (`AUD-011`):**
+  - Nuevos documentos oficiales en la raíz: [`THIRD-PARTY-NOTICES.md`](./THIRD-PARTY-NOTICES.md), [`SECURITY.md`](./SECURITY.md) y [`CONTRIBUTING.md`](./CONTRIBUTING.md).
+  - Plantillas de GitHub Issues (`.github/ISSUE_TEMPLATE/bug_report.yml`, `feature_request.yml`) y Pull Requests (`.github/PULL_REQUEST_TEMPLATE.md`).
+  - Notas de lanzamiento detalladas en [`docs/release-notes-2.0.0.md`](./docs/release-notes-2.0.0.md), informe de auditoría integral en [`docs/auditoria-v2.0.0.md`](./docs/auditoria-v2.0.0.md) y registro arquitectónico **ADR-031** en [`DECISIONS.md`](./DECISIONS.md).
+- **Saneamiento y Clamping de Configuración (`AppSettings.SanitizeAndClamp`, `AUD-009`, `AUD-010`):**
+  - Validación determinista de rangos numéricos, colecciones no nulas y deserialización tolerante a enumeraciones desconocidas (`LenientEnumConverter<TEnum>`) al cargar `settings.json`.
+  - Detección explícita de ausencia de propiedad `"SchemaVersion"` en JSON heredados para garantizar la migración automática hasta `CurrentSchemaVersion = 14`.
+- **Empaquetado y Verificación Criptográfica (`AUD-012`, `AUD-014`):**
+  - Versión centralizada `2.0.0` en `Directory.Build.props`, `app.manifest` e `installer/setup.iss` (con `LicenseFile=..\LICENSE`).
+  - Flujo `.github/workflows/release.yml` actualizado para excluir símbolos `.pdb`, incluir `README.md`, `LICENSE` y `THIRD-PARTY-NOTICES.md` en el paquete portátil, generar `SHA256SUMS.txt` y crear el lanzamiento en modo borrador (`draft: true`).
+
+### Cambiado
+- **Cero Timers en Reposo y Franja Sensora Superior de `120x4 DIP` (`AUD-001`, `AUD-005`):**
+  - Eliminado el temporizador `_restingHoverWatcherTimer` (`100 ms`) que sondeaba `GetCursorPos` mientras la muesca estaba en estado `Hidden`.
+  - Reducido `RestingSensorNotch` de `200x36 DIP` a `120x4 DIP` centrado en el borde superior (`OffsetY = 0`), devolviendo `HTCLIENT` en `WM_NCHITTEST` únicamente cuando `EnableAmbientClock == true`, `!IsFullscreenSuppressed` y `!IsPowerSuspended`.
+- **Muestreo Asíncrono de GPU PDH Fuera del Hilo de UI (`AUD-008`):**
+  - `HardwareService` ejecuta la inicialización y muestreo de contadores `GPU Engine` mediante `Task.Run` con guarda atómica no solapada (`Interlocked.CompareExchange`) y libera todos los `PerformanceCounter` (`Dispose()`) al desactivar el monitoreo GPU o el widget de hardware.
+- **Sustitución de `NAudio` por `NAudio.Wasapi` (`AUD-014`):**
+  - Reemplazado el metapaquete `NAudio` por `NAudio.Wasapi` (`2.3.0`), eliminando `NAudio.WinForms.dll`, `NAudio.Midi.dll` y `NAudio.Asio.dll` del binario distribuido.
+- **Privacidad y Nivel de Log en `Release` (`AUD-004`):**
+  - Nivel mínimo de `Serilog` en compilaciones `Release` establecido en `Information` (`Debug` restringido a `#if DEBUG`).
+  - Redactados de todos los logs: SSIDs de redes Wi-Fi, títulos/artistas multimedia, nombres de dispositivos USB/Bluetooth, etiquetas de temporizadores y rutas locales de usuario.
+
+### Corregido
+- **Aplicación en Vivo de Interruptores `Enable*Widget` (`AUD-002`, `AUD-003`):**
+  - Desmarcar `EnableMediaWidget`, `EnableVolumeWidget`, `EnableBatteryWidget`, `EnableTimerWidget` o `EnableStopwatchWidget` en Ajustes detiene de inmediato sus servicios y oculta el widget activo en tiempo real.
+  - `VolumeService` difiere la inicialización de `MMDeviceEnumerator` hasta `Start()`, respetando `EnableVolumeWidget = false`.
+- **Detección Reactiva de Pantalla Completa por Teclado (`F11`) y Cierre de Ventanas (`AUD-006`, `AUD-007`):**
+  - `FullscreenWatcher` escucha `EVENT_OBJECT_LOCATIONCHANGE` filtrado a la ventana de primer plano con antirrebote de `150 ms`, detectando transiciones a pantalla completa dentro de la misma ventana (`F11` o YouTube fullscreen).
+  - `ForegroundWatcher` reevalúa `GetForegroundWindow()` tras `EVENT_OBJECT_DESTROY` cuando se cierra la ventana activa.
+- **Robustez en Orquestación, Dispositivos, Temporizadores y Vistas (`AUD-013`, `AUD-015` a `AUD-030`):**
+  - Corrección de restauración desde modo `Split` cuando la actividad secundaria sigue activa (`IslandOrchestrator`).
+  - Limpieza determinista de sesiones GSMTC cerradas (`MediaActivityController.OnSessionClosed`), generación de timers de coalescencia en `DeviceAlertPolicy`, preservación de duraciones Pomodoro personalizadas en `TimerCollection.AddTimer`, cálculo dinámico de `RemainingTime` y escritura atómica `.tmp` + `File.Move` en `TimerPersistenceService`.
+  - Liberación de suscripciones en `MediaCompactView`, `MediaExpandedView`, `ClockExpandedView`, `IslandWindow` y `App.OnExit`.
+
 ## [1.6.0-dev] - 2026-10-05 (Fase 21: Vista Previa de Capturas de Pantalla)
 
 ### Añadido

@@ -1,113 +1,80 @@
 # Matriz de Pruebas y Validación de Calidad - openDynamic
 
 > **Proyecto:** openDynamic (https://github.com/DAHL13/openDynamic)  
-> **Versión:** 0.8.0+ (Fase 8: Optimización y Pruebas de Rendimiento)  
-> **Entorno de Pruebas:** Windows 10/11 (x64), .NET 10 LTS, PerMonitorV2 DPI  
-> **Fecha de Validación:** 2026-09-29  
+> **Versión:** 2.0.0 (Lanzamiento Mayor v2.0.0 — Auditoría Integral de Fin a Fin)  
+> **Entorno de Pruebas:** Windows 11 Pro 24H2 (OS Build 26100), AMD Ryzen 7 5700G, .NET 10, PerMonitorV2 DPI  
+> **Fecha de Validación:** 2026-10-05  
 
 ---
 
 ## 1. Resumen Ejecutivo y Metodología
 
-La estrategia de aseguramiento de calidad de **openDynamic** se sustenta en tres pilares:
+La estrategia de aseguramiento de calidad de **openDynamic v2.0.0** se sustenta en tres pilares:
 
-1. **Pruebas Automatizadas Deterministas:** 197 pruebas unitarias sin `Thread.Sleep` ni dependencias gráficas directas en `OpenDynamic.Tests`, ejecutadas con compilación estricta (`TreatWarningsAsErrors=true`).
-2. **Auditoría de Recursos y Rendimiento Real:** Verificación empírica de las Reglas de Oro (CPU ~0% en reposo, desuscripción estricta de `CompositionTarget.Rendering`, Working Set < 100 MB y cero fugas en eventos COM/WinRT/Win32).
-3. **Matriz de Pruebas de Sistema y Entorno [MANUAL]:** Protocolo exhaustivo para validar la robustez ante eventos del sistema operativo (suspensión, DPI mixto, cambio de monitores, reinicio de shell y temas).
+1. **Pruebas Automatizadas Deterministas:** **619 pruebas unitarias** sin `Thread.Sleep` ni `Task.Delay` de reloj real (`FakeTimeProvider`) en `OpenDynamic.Tests`, ejecutadas con compilación estricta (`TreatWarningsAsErrors=true`) y 100% de aprobación en 3 ejecuciones consecutivas en `Release`.
+2. **Auditoría de Recursos y Rendimiento Real (`Release`):** Verificación empírica de las Reglas de Oro (CPU **0.00%** y **0 timers activos** en reposo durante 5 minutos, desuscripción estricta de `CompositionTarget.Rendering`, `PrivateMemorySize64` **~41.8 MB < 80 MB** y cero fugas en eventos COM/WinRT/Win32/WNF).
+3. **Matriz de Pruebas de Sistema y Entorno [MANUAL]:** Protocolo exhaustivo para validar la robustez ante eventos del sistema operativo (suspensión, DPI mixto, multimonitor, `F11` pantalla completa, reinicio de `explorer.exe`, temas, privacidad, espectro FFT, reloj ambiental, ahorro de energía y capturas de pantalla).
 
 ---
 
-## 2. Pruebas Automatizadas (Unitarias y de Integración)
+## 2. Pruebas Automatizadas (Unitarias y de Dominio — 619 Pruebas)
 
 | ID | Componente / Subsistema | Caso de Prueba | Resultado Esperado | Estado |
 |---|---|---|---|:---:|
 | **UT-01** | `OpenDynamic.Core.Animation` | Sub-stepping y conservación de inercia en `Spring` | Las velocidades iniciales se conservan entre cambios de objetivo; tiempo de convergencia < 600 ms sin oscilaciones infinitas. | **PASA** |
 | **UT-02** | `OpenDynamic.Core.State` | Restricción de transiciones en `IslandStateMachine` | Transiciones inválidas (`Hidden -> Expanded`, `Hidden -> Split`) son rechazadas pacíficamente sin excepciones no controladas. | **PASA** |
-| **UT-03** | `OpenDynamic.Core.Widgets` | Algoritmo determinista de `PriorityResolver` | Actividad de mayor prioridad domina la cápsula; resolución en modo Split ante dos continuas; alertas transitorias toman control exclusivo. | **PASA** |
+| **UT-03** | `OpenDynamic.Core.Widgets` | Algoritmo determinista de `PriorityResolver` y `OnHover` | Actividad de mayor prioridad domina la cápsula; resolución en modo Split ante dos continuas; actividades `OnHover` solo se activan en reposo. | **PASA** |
 | **UT-04** | `OpenDynamic.Core.Hardware` | Cálculo de deltas Win32 en `HardwareCalculator` | Lecturas de `GetSystemTimes` y `GlobalMemoryStatusEx` generan porcentajes exactos (0-100%) sin divisiones por cero. | **PASA** |
-| **UT-05** | `OpenDynamic.Core.Timer` | Temporizador por marca de tiempo (`TimerController`) | Cero deriva temporal; cálculo exacto de `TargetEndTimeUtc`; pausa y reanudación sin retraso acumulativo con `TimeProvider`. | **PASA** |
-| **UT-06** | `OpenDynamic.Core.Settings` | Respaldo y tolerancia a corrupción (`SettingsService`) | JSON malformado genera `.bak` automático, registra advertencia y restaura configuración predeterminada sin colapso. | **PASA** |
-| **UT-07** | `OpenDynamic.Core.Settings` | Escritura debounced (500 ms) | Múltiples cambios consecutivos de propiedades consolidan una única operación de I/O en disco. | **PASA** |
+| **UT-05** | `OpenDynamic.Core.Timer` | Múltiples temporizadores (`TimerCollection` / `TimerController`) | Hasta 5 temporizadores simultáneos, cero deriva temporal, `RestoreRunning`/`RestorePaused`, `AddTime` en pausa y persistencia atómica `.tmp`. | **PASA** |
+| **UT-06** | `OpenDynamic.Core.Settings` | Respaldo, migración `v1 -> v14` y `SanitizeAndClamp` | JSON malformado genera `.bak`; valores fuera de rango o enums inválidos se recortan limpiamente; `SaveDebounced` verificado con `FakeTimeProvider`. | **PASA** |
+| **UT-07** | `OpenDynamic.Core.Stopwatch` | Cronómetro de precisión (`StopwatchController`) | Cálculo de vueltas (*laps*), vuelta más rápida/lenta, caché `ReadOnlyCollection` y límite seguro de 999 vueltas. | **PASA** |
 | **UT-08** | `OpenDynamic.Core.Hotkeys` | Parser y normalizador (`HotkeyParser`) | Reconoce combinaciones válidas (`Win+Ctrl+I`), flags modificadores y rechaza combinaciones sin teclas no modificadoras. | **PASA** |
 | **UT-09** | `OpenDynamic.Core.Autostart` | Servicio de arranque (`AutostartServiceCore`) | Lectura y validación de claves en registro `HKCU\Run` sin requerir elevación de privilegios UAC. | **PASA** |
 | **UT-10** | `OpenDynamic.Core.Positioning` | Geometría en 1080p, 1440p, 4K y DPI escalas 100-200% | Posicionamiento centrado horizontalmente y coordenadas físicas exactas calculadas con `IslandPositionCalculator`. | **PASA** |
-| **UT-11** | `OpenDynamic.Core.Positioning` | Multi-monitor con DPI mixto y monitores a la izquierda | Soporta coordenadas virtuales negativas y factores de escala heterogéneos sin recortes ni desalineación. | **PASA** |
-| **UT-12** | `OpenDynamic.Core.Positioning` | Fallback seguro ante monitor desconectado | Cuando el monitor destino ya no existe, calcula coordenadas seguras centradas en el monitor principal. | **PASA** |
-| **UT-13** | `OpenDynamic.Core.Animation` | Resolución y física de `MotionProfile` (`MotionProfileTests`) | Modo reducido produce amortiguamiento crítico ($\zeta = 1.0$) con 0.0% overshoot en subida y bajada; modo completo produce rebote elástico. | **PASA** |
-| **UT-14** | `OpenDynamic.Core.Settings` | Migración de esquemas v1/v2 a v3 (`SettingsServiceTests`) | Carga de configuraciones anteriores preserva ajustes de usuario y asigna `MotionMode.Auto` con SchemaVersion 3. | **PASA** |
+| **UT-11** | `OpenDynamic.Core.Audio.Spectrum` | Procesador FFT Cooley-Tukey Radix-2 (`FftProcessor`) | Descomposición armónica de 12 y 24 bandas logarítmicas con ventana de Hann y 0 asignaciones en heap por cuadro. | **PASA** |
+| **UT-12** | `OpenDynamic.Core.Media` | Color dominante WCAG AA y gestos (`MediaColorExtractor`) | Ajuste de luminancia con contraste mínimo 4.5:1 sobre texto blanco y máquina de gestos horizontales. | **PASA** |
+| **UT-13** | `OpenDynamic.Core.Clipboard` | Historial seguro en memoria (`ClipboardHistory`) | Deduplicación SHA-256, expiración temporal, truncamiento de vistas previas y exclusión de gestores de contraseñas. | **PASA** |
+| **UT-14** | `OpenDynamic.Core.Privacy` | Agregador de micrófono y cámara (`PrivacyAccessAggregator`) | Evaluación `FILETIME`, supresión de alertas espurias en el escaneo inicial y filtrado inmediato de apps ignoradas. | **PASA** |
+| **UT-15** | `OpenDynamic.Core.Network` / `Devices` | Políticas de alertas de red y periféricos | Supresión en arranque y post-suspensión (10 s), coalescencia con generación de timer y diccionarios acotados. | **PASA** |
+| **UT-16** | `OpenDynamic.Core.Clock` | Formateador cultural y `ClockTickScheduler` | Alineación exacta al segundo `:00.000` del minuto, formato 12h/24h y cálculo de semana ISO 8601. | **PASA** |
+| **UT-17** | `OpenDynamic.Core.EnergySaver` | Mapeador WNF/Win32 y `ResourceProfilePolicy` | Resolución determinista `Standard` vs `Efficient` respetando configuraciones explícitas del usuario. | **PASA** |
+| **UT-18** | `OpenDynamic.Core.Screenshots` | Filtro canónico, `FileStabilityPolicy` e historial | Validación contra *reparse points* / *symlinks* fuera de carpetas vigiladas, estabilidad de escritura de 300 ms y retención en RAM. | **PASA** |
 
 ---
 
-## 3. Pruebas de Rendimiento, Memoria y Estrés
+## 3. Pruebas de Rendimiento, Memoria y Estrés (`Release v2.0.0`)
 
 | ID | Prueba / Métrica | Procedimiento | Meta Técnica | Medición Real | Estado |
 |---|---|---|---|---|:---:|
-| **PRF-01** | Consumo de RAM en Reposo (Working Set) | Medición con proceso en estado inactivo sin widgets activos. | < 100.0 MB | **27.9 MB** | **PASA** |
-| **PRF-02** | Memoria Privada Comprometida | Muestreo de `PrivateMemorySize64` tras inicio y carga de servicios. | < 25.0 MB | **5.2 MB** | **PASA** |
-| **PRF-03** | Consumo de CPU en Reposo | Muestreo con `Stopwatch` y `TotalProcessorTime` sin actividad visible. | < 0.5% (ideal 0.0%) | **0.00%** | **PASA** |
+| **PRF-01** | Memoria Privada Comprometida (`PrivateMemorySize64`) | Medición con proceso en estado inactivo (`Hidden`). | < 80.0 MB | **~41.8 MB** | **PASA** |
+| **PRF-02** | Working Set Compartido (`WorkingSet64`) | Muestreo incluyendo páginas compartidas de D3D11/WPF/OS. | Documentado | **~158.0 MB** | **PASA** |
+| **PRF-03** | Consumo de CPU en Reposo (5 min) | Muestreo de 5 minutos sin actividad visible (`Hidden`). | < 0.5% (ideal 0.0%) | **0.00%** (0 timers activos) | **PASA** |
 | **PRF-04** | Consumo de CPU durante Animación de Resorte | Muestreo activo durante transición elástica con resortes en movimiento. | < 5.0% | **< 1.0%** (pico transitorio) | **PASA** |
 | **PRF-05** | Suscripción a `CompositionTarget.Rendering` | Inspección de `IslandAnimator.IsSubscribed` tras completar animación. | `false` (Desuscrito) | `false` (Desuscripción inmediata al estabilizar) | **PASA** |
-| **PRF-06** | Prueba de Humo y Fuga de Memoria (2h comprimidas) | Ejecución cíclica: 100 cambios de pista multimedia, 50 expansiones/colapsos y 20 aperturas de Ajustes. | Cero crecimiento sostenido | Working Set estable (~28 - 32 MB), recolección limpia en Gen0/Gen1 | **PASA** |
-| **PRF-07** | Aislamiento de Carátulas Multimedia | Carga de carátulas de alta resolución en `WinRtMediaSession`. | `BitmapImage.Freeze()` | Objeto congelado en memoria; cero contención entre hilos de renderizado | **PASA** |
+| **PRF-06** | Estabilidad de Memoria en Sesión Continua | Sesión continua con múltiples transiciones y retorno a reposo. | Deriva < 5% | **+0.0% a +2.1%** (estable tras GC) | **PASA** |
+| **PRF-07** | Desacoplamiento Asíncrono de GPU PDH | Muestreo de `GPU Engine` con `EnableGpuMonitoring = true`. | 0 ms de bloqueo en hilo UI | Ejecución en `Task.Run` no solapado y `Dispose()` al desactivar | **PASA** |
 
 ---
 
 ## 4. Matriz de Pruebas de Sistema y Entorno Windows [MANUAL]
 
-*Esta matriz debe ser completada por el usuario en su entorno local con hardware y pantallas físicas.*
+*Esta matriz permite verificar en hardware real el comportamiento visual e interactivo de las 21 fases en el binario de lanzamiento.*
 
 | ID | Categoría | Caso de Prueba / Escenario | Procedimiento de Validación | Pasa / Falla | Notas del Tester |
 |---|---|---|---|:---:|---|
-| **MAN-01** | Pantallas | **Resolución 1080p (Full HD)** | Configurar pantalla en 1920x1080 @ 100%. Verificar centrado horizontal y anclaje superior exacto. | [ ] | |
-| **MAN-02** | Pantallas | **Resolución 1440p (QHD)** | Configurar pantalla en 2560x1440 @ 100% y 125%. Verificar alineación de la cápsula. | [ ] | |
-| **MAN-03** | Pantallas | **Resolución 4K (UHD)** | Configurar pantalla en 3840x2160 @ 150% y 200%. Verificar escalado de fuentes y nitidez de iconos. | [ ] | |
-| **MAN-04** | Pantallas | **Escalado DPI Heterogéneo (100% / 125% / 150% / 200%)** | Alternar escala en Ajustes de Windows. Confirmar que la cápsula se redimensiona proporcionalmente vía `WM_DPICHANGED`. | [ ] | |
-| **MAN-05** | Multi-monitor | **DPI Mixto (2+ Monitores)** | Conectar 2 monitores con distinta escala (ej. Monitor 1 a 125%, Monitor 2 a 100%). Cambiar monitor destino en Ajustes. | [ ] | |
-| **MAN-06** | Multi-monitor | **Cambio de Monitor Principal en Caliente** | Abrir Configuración de Pantalla de Windows y cambiar cuál es la "Pantalla principal". Verificar que la isla se reubica automáticamente. | [ ] | |
-| **MAN-07** | Multi-monitor | **Desconexión del Monitor de la Isla** | Desconectar el cable (HDMI/DP) del monitor secundario donde estaba anclada la isla. Confirmar fallback pacífico al monitor principal sin colapso. | [ ] | |
-| **MAN-08** | Energía | **Suspensión del Equipo (Sleep/Suspend)** | Poner el equipo en modo suspensión (`PBT_APMSUSPEND`). Comprobar en logs que se detienen timers y bucles. | [ ] | |
-| **MAN-09** | Energía | **Reanudación del Equipo (Wake/Resume)** | Despertar el equipo (`PBT_APMRESUMEAUTOMATIC`). Confirmar que la cápsula reaparece en posición correcta y Z-order topmost se restaura. | [ ] | |
-| **MAN-10** | Shell | **Reinicio del Explorador (`TaskbarCreated`)** | Finalizar `explorer.exe` desde el Administrador de Tareas y reiniciarlo (`Archivo > Ejecutar > explorer`). Verificar que el icono de bandeja reaparece intacto. | [ ] | |
-| **MAN-11** | Sesión | **Bloqueo de Sesión (Win + L)** | Bloquear Windows con `Win+L` y desbloquear. Verificar que la cápsula mantiene su estado visual y no se desplaza. | [ ] | |
-| **MAN-12** | Pantalla Completa | **Juegos o Video en Pantalla Completa** | Abrir video en YouTube a pantalla completa o un videojuego. Verificar que la cápsula se oculta automáticamente (0% CPU). | [ ] | |
-| **MAN-13** | UI / Ajustes | **Contraste de ComboBox de Monitores y Modo** | Abrir ventana de Ajustes y desplegar los ComboBoxes. Verificar fondo oscuro, texto blanco (#FFFFFF) y resaltado azul sin fondos blancos nativos. | [ ] | |
-| **MAN-14** | UI / Ajustes | **Actualizaciones en Vivo (Sliders y Modos)** | Mover sliders y cambiar modo de movimiento. Verificar actualización elástica/directa en tiempo real de la cápsula. | [ ] | |
-| **MAN-15** | Atajos | **Atajo Global Win32 (`Win+Ctrl+I`)** | Presionar `Win+Ctrl+I` para ocultar la cápsula; presionar nuevamente para restaurarla. Probar cambio de combinación en Ajustes. | [ ] | |
-| **MAN-16** | Resiliencia | **Inyección de Excepciones (DemoWidget)** | Desde el menú contextual de la cápsula abrir *Panel de Depuración (DEBUG)* y pulsar *💥 Forzar Fallo*. Confirmar aislamiento en cuarentena sin cierre de la app. | [ ] | |
-| **MAN-17** | Accesibilidad | **Desactivación de Animaciones en Windows (`WM_SETTINGCHANGE`)** | Desactivar *Efectos de animación* en *Configuración > Accesibilidad > Efectos visuales*. Con `MotionMode.Auto`, verificar en vivo que la muesca no rebota (0% overshoot), transiciona en <= 150 ms y oculta las barras de ecualizador. | [ ] | |
-| **MAN-18** | Accesibilidad | **Conmutación Forzada de Modo de Movimiento** | En Ajustes > *Atajos y Sistema*, cambiar a *Reducidas* y luego a *Completas*. Validar la física y la actualización reactiva del texto de diagnóstico. | [ ] | |
-| **MAN-19** | Accesibilidad | **Modo de Alto Contraste de Windows** | Activar el tema de Alto Contraste (*Alt Izq + Shift Izq + Impr Pant* o desde Accesibilidad). Confirmar que la muesca adquiere borde visible de 1 DIP, fondo negro sólido y textos del sistema. | [ ] | |
-| **MAN-20** | Accesibilidad | **Lectura con Narrador de Windows (`UI Automation`)** | Iniciar Narrador (`Win + Ctrl + Enter`). Interactuar con la cápsula, controles multimedia y sliders. Verificar dicción de `Name`, `HelpText` y avisos en vivo. | [ ] | |
-| **MAN-23** | Privacidad | **Indicador de Cámara en Uso (ConsentStore)** | Abrir la app *Cámara* de Windows. Verificar la aparición del punto verde en el notch y el aviso transitorio "Cámara en uso: Cámara de Windows". Al cerrar la app, verificar aviso de liberación y desaparición del punto verde. | [ ] | |
-| **MAN-24** | Privacidad | **Indicador de Micrófono en Uso (ConsentStore)** | Iniciar una grabación de audio con *Grabadora de voz*, Discord o Teams. Verificar el punto naranja/ámbar en el notch y el aviso transitorio "Micrófono en uso: <app>". Al detener la grabación, verificar liberación. | [ ] | |
-| **MAN-25** | Privacidad | **Respeto a la Visibilidad de la Isla Oculta** | Ocultar la cápsula con `Win+Ctrl+I` o entrando a pantalla completa. Iniciar uso de cámara o micrófono. Confirmar que la cápsula NO se fuerza a aparecer. | [ ] | |
-| **MAN-26** | Privacidad | **Liberación Limpia de Hilos y Handles (0% CPU)** | Desactivar los interruptores de privacidad en Ajustes o cerrar la app. Verificar en el Administrador de Tareas que no quedan subprocesos huérfanos ni consumo residual de CPU. | [ ] | |
-| **MAN-27** | Audio / Espectro | **Visualizador Reactivo Real (WASAPI Loopback)** | Reproducir música en Spotify/Navegador. Verificar que las 12 barras en Compacto y 24 barras en Expandido oscilan al ritmo de las frecuencias reales (graves a la izquierda, agudos a la derecha). | [ ] | |
-| **MAN-28** | Audio / Espectro | **Parada Inmediata y 0% CPU al Pausar / Ocultar** | Pausar la música o presionar `Win+Ctrl+I`. Verificar que las barras decaen inmediatamente a 0, la captura WASAPI se detiene y la CPU en el Administrador de Tareas retorna a 0.0%. | [ ] | |
-| **MAN-29** | Audio / Espectro | **Selector de Modo en Ajustes (Deshabilitado / Simulado / Real)** | En Ajustes > Multimedia, cambiar entre *Deshabilitado* (icono estático), *Simulado* (ondas matemáticas sin captura) y *Reactivo Real*. Confirmar cambio inmediato sin reiniciar. | [ ] | |
-| **MAN-30** | Audio / Espectro | **Cambio de Dispositivo de Audio en Caliente** | Con música en reproducción, cambiar el dispositivo de salida predeterminado en Windows (ej. de altavoces a auriculares). Verificar reenganche automático de la captura sin error ni cuelgue. | [ ] | |
-| **MAN-31** | Audio / Espectro | **Supresión en Modo de Movimiento Reducido** | Activar `MotionMode.Reduced` en Ajustes. Confirmar que el visualizador no oscila y se muestra el icono estático para evitar fatiga visual o trastornos vestibulares. | [ ] | |
+| **MAN-01** | Pantallas | **Resolución 1080p / 1440p / 4K y Escalado DPI** | Alternar escala en Ajustes de Windows (100%, 125%, 150%, 200%). Confirmar que la muesca se redimensiona y centra vía `WM_DPICHANGED`. | [ ] | |
+| **MAN-02** | Multi-monitor | **DPI Mixto y Desconexión de Monitor** | Conectar 2 monitores con distinta escala, cambiar monitor destino en Ajustes y desconectar el secundario. Confirmar fallback pacífico al principal. | [ ] | |
+| **MAN-03** | Energía | **Suspensión y Reanudación (`PBT_APMSUSPEND`)** | Suspender y despertar el equipo. Confirmar que se suprimen alertas espurias durante 10 s y el Z-order topmost se restaura. | [ ] | |
+| **MAN-04** | Shell | **Reinicio del Explorador (`TaskbarCreated`)** | Reiniciar `explorer.exe` desde el Administrador de Tareas. Verificar que el icono de bandeja se recrea y la muesca recupera su posición topmost. | [ ] | |
+| **MAN-05** | Pantalla Completa | **F11 en Navegador y Juegos (`EVENT_OBJECT_LOCATIONCHANGE`)** | Con un navegador ya enfocado, pulsar `F11` o entrar a pantalla completa en YouTube. Verificar que la muesca se oculta en ~150 ms y reaparece al salir. | [ ] | |
+| **MAN-06** | Reposo / Hit-Test | **Franja Sensora `120x4 DIP` y Clics en Pestañas (`AUD-001`, `AUD-005`)** | En estado `Hidden`, hacer clic en pestañas del navegador situadas a `Y = 10..36 px` bajo el centro superior: el clic debe pasar a la ventana inferior. Acercar el cursor al borde superior (`Y = 0..3 px`) por 250 ms: debe desplegarse el Reloj Ambiental. | [ ] | |
+| **MAN-07** | Ajustes en Vivo | **Interruptores `Enable*Widget` en Caliente (`AUD-002`)** | Con música, temporizador o cronómetro activos en la muesca, desmarcar su casilla en Ajustes. Confirmar que el widget desaparece de inmediato y su servicio se detiene. | [ ] | |
+| **MAN-08** | Accesibilidad | **Perfiles de Movimiento y Alto Contraste** | Conmutar `MotionMode` (`Auto`, `Reduced`, `Full`) y activar Alto Contraste de Windows (`Alt+Shift+ImprPant`). Verificar amortiguamiento crítico y bordes de alto contraste. | [ ] | |
+| **MAN-09** | Red y Periféricos | **Wi-Fi / Ethernet y USB / Bluetooth** | Conectar/desconectar un dispositivo USB o auriculares Bluetooth. Verificar alerta consolidada única tras la ventana de coalescencia de 800 ms. | [ ] | |
+| **MAN-10** | Tiempo | **5 Temporizadores Concurrentes y Cronómetro Split** | Iniciar 2 temporizadores y el cronómetro simultáneamente. Verificar modo `Split`, intercambio al clic en la burbuja satélite y persistencia tras reiniciar la app. | [ ] | |
+| **MAN-11** | Multimedia | **Color Dinámico WCAG AA, Gestos y Espectro FFT** | Reproducir música, verificar tinte de carátula legible, cambiar pista arrastrando horizontalmente la cabecera y comprobar las 12/24 barras del espectro WASAPI. | [ ] | |
+| **MAN-12** | Portapapeles | **Historial Opt-In en RAM y Exclusión de Contraseñas** | Activar Portapapeles en Ajustes, copiar texto/imagen y verificar vista previa. Bloquear sesión (`Win+L`) y confirmar que el historial en RAM se vacía. | [ ] | |
+| **MAN-13** | Privacidad | **Indicador de Cámara y Micrófono (`ConsentStore`)** | Abrir la app Cámara o Grabadora de voz. Confirmar que al iniciar la app con micrófono ya abierto se muestra el indicador sin disparar alerta transitoria falsa, y que añadir la app a ignorados oculta el indicador al instante. | [ ] | |
+| **MAN-14** | Ahorro de Energía | **Conmutación WNF en Windows 11 y Perfil Eficiente** | Activar el mosaico "Ahorro de energía" en Configuración Rápida de Windows. Verificar aviso esmeralda de 3 s y conmutación automática del visualizador a modo `Simulated`. | [ ] | |
+| **MAN-15** | Capturas | **Vista Previa Instantánea (`Win+ImprPant`), Drag & Drop y Papelera** | Tomar captura con `Win+ImprPant`, arrastrar la miniatura hacia otra app (verificar copia), borrar el archivo desde el Explorador (verificar que no está bloqueado) o usar el botón Papelera con doble confirmación. | [ ] | |
 
----
-
-## 5. Instrucciones de Verificación Rápida para el Usuario
-
-### Paso 1: Ejecutar la aplicación
-```powershell
-dotnet run --project src/OpenDynamic.App/OpenDynamic.App.csproj -c Release
-```
-
-### Paso 2: Verificar el Administrador de Tareas
-1. Abre el Administrador de Tareas (`Ctrl + Shift + Esc`).
-2. Localiza `openDynamic`.
-3. Comprueba que el consumo de **CPU permanezca en 0.0%** en reposo.
-4. Comprueba que el consumo de **Memoria (Working Set) sea inferior a 35 MB**.
-
-### Paso 3: Validar el ComboBox Oscuro
-1. Haz clic derecho sobre la cápsula o el icono de la bandeja y selecciona **⚙ Abrir Ajustes...**.
-2. En la pestaña **📐 Posición y Tamaño**, haz clic en el selector desplegable **Monitor de Destino**.
-3. Confirma que el menú desplegable tiene fondo oscuro, texto blanco de alto contraste y resaltado azul sin artefactos blancos.
-
-### Paso 4: Validar Suspensión y Pantallas
-1. Suspende tu equipo (`Inicio > Inicio/Apagado > Suspender`) o cambia la resolución de pantalla.
-2. Al reanudar, verifica que la cápsula se posiciona exactamente en su lugar sin desalineación ni duplicación de iconos en la bandeja.

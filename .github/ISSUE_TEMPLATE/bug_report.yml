@@ -1,0 +1,76 @@
+name: Reporte de Error (Bug Report)
+description: Reporta un fallo, problema de rendimiento o comportamiento inesperado en openDynamic.
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Gracias por ayudar a mejorar **openDynamic**. Por favor completa los siguientes campos para facilitar el diagnóstico.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Descripción del problema
+      description: Explica de forma clara y concisa en qué consiste el fallo.
+      placeholder: Al reproducir música y pasar a pantalla completa...
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Pasos para reproducir
+      description: Enumera los pasos exactos para reproducir el comportamiento.
+      placeholder: |
+        1. Iniciar openDynamic v2.0.0
+        2. Activar el widget de...
+        3. Observar que...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Comportamiento esperado
+      description: ¿Qué debería haber ocurrido en su lugar?
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Versión de openDynamic
+      description: Ej. v2.0.0 (Instalador o Portátil)
+      placeholder: "2.0.0"
+    validations:
+      required: true
+
+  - type: input
+    id: windows-version
+    attributes:
+      label: Versión y compilación de Windows
+      description: Ej. Windows 11 24H2 (OS Build 26100) o Windows 10 22H2 (19045)
+      placeholder: "Windows 11 24H2"
+    validations:
+      required: true
+
+  - type: input
+    id: monitor-dpi
+    attributes:
+      label: Configuración de monitores y escala DPI
+      description: Ej. 1 monitor 1920x1080 @ 125% DPI, o 2 monitores (100% + 150%)
+      placeholder: "1920x1080 @ 125% DPI"
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Fragmento de registro (Logs)
+      description: |
+        Si aplica, adjunta las líneas relevantes de `%LocalAppData%\openDynamic\logs\openDynamic-*.log`.
+        (Los logs de Release ya redactan datos sensibles automáticamente).
+      render: text
+    validations:
+      required: false
