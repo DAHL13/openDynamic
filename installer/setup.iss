@@ -1,11 +1,11 @@
 ; =====================================================================
 ; openDynamic - Inno Setup Script
-; Versión: 1.0.0 (Hito M6 - Release Beta)
+; Versión: 2.0.0 (Lanzamiento Mayor v2.0.0)
 ; Arquitectura: Windows x64 (WPF, .NET 10)
 ; =====================================================================
 
 #define MyAppName "openDynamic"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "2.0.0"
 #define MyAppPublisher "DAHL13"
 #define MyAppURL "https://github.com/DAHL13/openDynamic"
 #define MyAppExeName "OpenDynamic.App.exe"
@@ -24,6 +24,7 @@ AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
+LicenseFile=..\LICENSE
 
 ; REGLA DE ORO 3: Cero privilegios de Administrador (UAC).
 ; Instalación por usuario en {localappdata}\Programs\openDynamic ({autopf}\openDynamic).

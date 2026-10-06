@@ -38,11 +38,15 @@ jobs:
         -r win-x64
         --self-contained false
         -p:PublishReadyToRun=true
+        -p:DebugType=none
+        -p:DebugSymbols=false
         -o publish
 
-    - name: Package portable ZIP
+    - name: Prepare distribution files and package portable ZIP
       shell: pwsh
       run: |
+        Remove-Item -Path publish\*.pdb -Force -ErrorAction SilentlyContinue
+        Copy-Item -Path README.md, LICENSE, THIRD-PARTY-NOTICES.md -Destination publish\ -Force
         Compress-Archive -Path publish\* -DestinationPath openDynamic-portable-win-x64.zip -Force
 
     - name: Install Inno Setup
@@ -56,10 +60,27 @@ jobs:
       run: |
         & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppSourcePath="${{ github.workspace }}\publish" installer\setup.iss
 
-    - name: Create GitHub Release and Upload Artifacts
+    - name: Generate SHA256SUMS.txt
+      shell: pwsh
+      run: |
+        $artifacts = @(
+          "installer\Output\openDynamic-setup.exe",
+          "openDynamic-portable-win-x64.zip"
+        )
+        $lines = foreach ($file in $artifacts) {
+          $hash = (Get-FileHash -Path $file -Algorithm SHA256).Hash.ToLowerInvariant()
+          $name = Split-Path -Path $file -Leaf
+          "$hash  $name"
+        }
+        $lines | Set-Content -Path SHA256SUMS.txt -Encoding utf8
+
+    - name: Create GitHub Release (Draft) and Upload Artifacts
       uses: softprops/action-gh-release@v2
       with:
+        draft: true
+        body_path: docs/release-notes-2.0.0.md
         files: |
           installer/Output/openDynamic-setup.exe
           openDynamic-portable-win-x64.zip
+          SHA256SUMS.txt
         generate_release_notes: true
