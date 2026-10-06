@@ -430,8 +430,9 @@ public sealed class TimerWidget : IslandWidgetBase
             ? _settings.TimerAlertTransientDurationSeconds
             : 5.0);
 
-        Log.Information("TimerWidget transient alert triggered for '{Label}' (Priority {Priority}, Duration {Duration}s).",
-            alert.Label, _settings.DefaultTimerAlertPriority, alertDuration.TotalSeconds);
+        // Privacy: do not log user-defined timer Label
+        Log.Information("TimerWidget transient alert triggered (Priority {Priority}, Duration {Duration}s).",
+            _settings.DefaultTimerAlertPriority, alertDuration.TotalSeconds);
 
         Activate(transientDuration: alertDuration, priorityOverride: _settings.DefaultTimerAlertPriority);
 
@@ -558,10 +559,10 @@ public sealed class TimerWidget : IslandWidgetBase
                 }
             }
 
-            // If any expired while closed, notify user once
-            foreach (var exp in result.ExpiredWhileClosed)
+            // If any expired while closed, notify once without logging user-defined labels
+            if (result.ExpiredWhileClosed.Count > 0)
             {
-                Log.Information("[TimerWidget] Timer '{Label}' expired while application was closed.", exp.Label);
+                Log.Information("[TimerWidget] {ExpiredCount} timer(s) expired while application was closed.", result.ExpiredWhileClosed.Count);
             }
 
             if (_timerCollection.AnyRunning)

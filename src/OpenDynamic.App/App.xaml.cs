@@ -245,6 +245,7 @@ public partial class App : Application
     {
         for (int i = 0; i < args.Length; i++)
         {
+#if DEBUG
             if (args[i] == "--trigger-test-exception")
             {
                 Log.Information("Triggering test exception on Dispatcher to verify global exception handling...");
@@ -253,6 +254,7 @@ public partial class App : Application
                     throw new InvalidOperationException("Test intentional exception handled by DispatcherUnhandledException");
                 });
             }
+#endif
 
             if (args[i] == "--exit-after-ms" && i + 1 < args.Length && int.TryParse(args[i + 1], out int ms))
             {

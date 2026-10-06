@@ -117,8 +117,9 @@ public sealed class NetworkWidget : IslandWidgetBase
 
             var duration = TimeSpan.FromSeconds(_settings.NetworkTransientDurationSeconds > 0 ? _settings.NetworkTransientDurationSeconds : 3.0);
 
-            Log.Information("NetworkWidget transient alert triggered: '{Title}' ({Subtitle}, Duration: {Duration}s)",
-                Title, Subtitle, duration.TotalSeconds);
+            // Privacy: do not log NetworkName/SSID
+            Log.Information("NetworkWidget transient alert triggered: State={State}, Type={Type}, Duration={Duration}s",
+                snapshot.State, snapshot.Type, duration.TotalSeconds);
 
             // Activate transient notice with priority 65
             Activate(transientDuration: duration, priorityOverride: _settings.DefaultNetworkPriority);
