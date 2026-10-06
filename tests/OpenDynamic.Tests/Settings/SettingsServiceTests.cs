@@ -1034,9 +1034,9 @@ public sealed class SettingsServiceTests : IDisposable
         Assert.Equal(0.0, s.CapsuleCornerRadius);
         Assert.Equal(2000.0, s.OffsetX);
         Assert.Equal(0.0, s.OffsetY);
-        Assert.Equal(-1, s.TargetMonitorIndex);
+        Assert.Equal(0, s.TargetMonitorIndex);
         Assert.Equal(0.5, s.ScaleFactor);
-        Assert.Equal(OpenDynamic.Core.Animation.MotionMode.Full, s.MotionMode);
+        Assert.Equal(OpenDynamic.Core.Animation.MotionMode.Auto, s.MotionMode);
         Assert.Equal(OpenDynamic.Core.Audio.Spectrum.AudioVisualizerMode.Real, s.VisualizerMode);
         Assert.Equal(OpenDynamic.Core.Clock.ClockTimeFormat.Auto, s.ClockTimeFormat);
         Assert.True(s.BatteryLowThresholdPercent > s.BatteryCriticalThresholdPercent);
