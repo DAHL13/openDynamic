@@ -448,26 +448,26 @@ public partial class IslandWindow : Window
 
             // Non-client hit test: pure geometry evaluation without side effects (Task 2)
             case NativeMethods.WM_NCHITTEST:
-            {
-                if (IsPhysicalCursorOverInteractiveZone())
                 {
-                    handled = true;
-                    return new IntPtr(NativeMethods.HTCLIENT); // (IntPtr)1
+                    if (IsPhysicalCursorOverInteractiveZone())
+                    {
+                        handled = true;
+                        return new IntPtr(NativeMethods.HTCLIENT); // (IntPtr)1
+                    }
+                    else
+                    {
+                        handled = true;
+                        return new IntPtr(NativeMethods.HTTRANSPARENT); // (IntPtr)(-1)
+                    }
                 }
-                else
-                {
-                    handled = true;
-                    return new IntPtr(NativeMethods.HTTRANSPARENT); // (IntPtr)(-1)
-                }
-            }
 
             // React to cursor movement and hover presence deterministically
             case NativeMethods.WM_MOUSEMOVE:
             case NativeMethods.WM_SETCURSOR:
-            {
-                OnPhysicalCursorPresence();
-                break;
-            }
+                {
+                    OnPhysicalCursorPresence();
+                    break;
+                }
 
             // React to display, resolution, and monitor connection/disconnection changes
             case NativeMethods.WM_DISPLAYCHANGE:
@@ -640,14 +640,14 @@ public partial class IslandWindow : Window
                 break;
 
             case NativeMethods.PBT_APMPOWERSTATUSCHANGE: // 0x000A
-            {
-                var newState = Services.EnergySaverService.QueryLiveEnergySaverState();
-                Log.Information("WM_POWERBROADCAST PBT_APMPOWERSTATUSCHANGE: Live State = {State}", newState);
-                _energySaverService?.HandleStatusChanged(newState);
-                WeakReferenceMessenger.Default.Send(new Widgets.Messages.EnergySaverStatusChangedMessage(newState));
-                _powerService?.HandlePowerBroadcast(wParam, lParam);
-                break;
-            }
+                {
+                    var newState = Services.EnergySaverService.QueryLiveEnergySaverState();
+                    Log.Information("WM_POWERBROADCAST PBT_APMPOWERSTATUSCHANGE: Live State = {State}", newState);
+                    _energySaverService?.HandleStatusChanged(newState);
+                    WeakReferenceMessenger.Default.Send(new Widgets.Messages.EnergySaverStatusChangedMessage(newState));
+                    _powerService?.HandlePowerBroadcast(wParam, lParam);
+                    break;
+                }
 
             case NativeMethods.PBT_POWERSETTINGCHANGE:
                 HandlePowerSettingChange(lParam);
